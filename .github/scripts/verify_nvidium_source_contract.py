@@ -2,7 +2,6 @@
 """Verify CAUSTIQ's mixin assumptions against the pinned Nvidium source tree."""
 from pathlib import Path
 import json
-import re
 import sys
 
 root = Path(sys.argv[1])
@@ -22,8 +21,8 @@ fragment = source("src/main/resources/assets/nvidium/shaders/terrain/frag.frag")
 primary = source("src/main/java/me/cortex/nvidium/renderers/PrimaryTerrainRasterizer.java")
 
 # The mixin shadows this exact private field and injects at this exact method.
-assert re.search(r"private\\s+final\\s+Map<\\s*ShaderType\\s*,\\s*String\\s*>\\s+sources", shader), "Shader.Builder.sources signature changed"
-assert re.search(r"public\\s+Shader\\s+compile\\s*\\(\\s*\\)", shader), "Shader.Builder.compile() signature changed"
+assert "private final Map<ShaderType, String> sources" in shader, "Shader.Builder.sources signature changed"
+assert "public Shader compile()" in shader, "Shader.Builder.compile() signature changed"
 assert "class Builder" in shader, "Shader.Builder nested class disappeared"
 assert "NvidiumShaderBuilderMixin" in (caustiq_root / "src/main/resources/caustiq.mixins.json").read_text()
 builder_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumShaderBuilderMixin.java").read_text()
@@ -32,7 +31,7 @@ assert '@Shadow @Final private Map<?, String> sources' in builder_mixin
 assert 'method = "compile"' in builder_mixin
 
 # checkIrisShouldDisable() returns true when the Nvidium backend is allowed.
-assert re.search(r"public\\s+static\\s+boolean\\s+checkIrisShouldDisable\\s*\\(\\s*\\)", iris_check)
+assert "public static boolean checkIrisShouldDisable()" in iris_check
 assert "return !(IRIS_LOADED && checkIrisShaders());" in iris_check
 assert "IrisCheck.checkIrisShouldDisable()" in render_section
 assert "Nvidium.IS_ENABLED = (!Nvidium.FORCE_DISABLE) && Nvidium.IS_COMPATIBLE" in render_section
