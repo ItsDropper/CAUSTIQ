@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 /** Supplies the extended packed format to Sodium before Nvidium repackages chunk meshes. */
 @Pseudo
 @Mixin(targets = "net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager",
-        remap = false, priority = 2000)
+        remap = false, priority = 900)
 public abstract class NvidiumExtendedVertexFormatMixin {
     @ModifyArg(
             method = "<init>",
