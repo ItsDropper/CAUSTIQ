@@ -166,7 +166,6 @@ public final class ShaderRuntime {
             }
             IrisShaderPackModel packModel = new IrisShaderPackParser().parse(sources);
             activePassPlan = new IrisTerrainPassScheduler().schedule(packModel, null);
-            NvidiumGBufferTargets.configureTargets(activePassPlan.targets());
             CaustiqClient.LOGGER.info(
                     "Built Iris pass schedule for '{}': {} ordered program pass(es), {} declared render target(s): {}.",
                     selected.displayName(), activePassPlan.passes().size(), activePassPlan.targets().size(),
