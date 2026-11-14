@@ -16,7 +16,7 @@ public record ShaderPackMetadata(Map<String, String> properties, List<Option> op
     private static final int MAX_FILE_CHARS = 256 * 1024;
     private static final int MAX_LINES = 8_192;
     private static final int MAX_SCREEN_DEPTH = 16;
-    private static final int MAX_SHADER_FILES = 512;
+    private static final int MAX_SHADER_FILES = 4_096;
     private static final int MAX_TOTAL_SHADER_CHARS = 8 * 1024 * 1024;
     private static final Pattern OPTION_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]{0,127}");
     private static final Pattern INLINE_DEFINE = Pattern.compile(
