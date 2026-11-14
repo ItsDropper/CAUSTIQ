@@ -1,0 +1,250 @@
+package dev.itsdropper.caustiq.shaderpack;
+
+import org.lwjgl.opengl.GL20C;
+
+import java.io.IOException;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/** Compiles actual Iris full-screen vertex/fragment stages into OpenGL programs. */
+public final class IrisGlProgramCompiler {
+    private static final Pattern VERSION = Pattern.compile("(?m)^\\s*#\\s*version[^\\r\\n]*\\R?");
+    private static final Pattern EXTENSION = Pattern.compile("(?m)^\\s*#\\s*extension[^\\r\\n]*\\R?");
+    private static final Pattern SAMPLER = Pattern.compile("(?m)^\\s*uniform\\s+sampler2D\\s+(\\w+)\\s*;\\s*");
+    private static final Pattern FRAG_DATA = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]");
+    private static final Pattern TEXCOORD = Pattern.compile("\\bgl_TexCoord\\s*\\[\\s*(\\d+)\\s*]");
+    private static final String FULLSCREEN_VERTEX = """
+            #version 460 core
+            out vec2 texCoord;
+            out vec2 texcoord;
+            out vec2 vTexCoord;
+            out vec2 uv;
+            const vec2 caustiqPositions[3] = vec2[3](
+                vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
+            const vec2 caustiqCoordinates[3] = vec2[3](
+                vec2(0.0, 0.0), vec2(2.0, 0.0), vec2(0.0, 2.0));
+            void main() {
+                vec2 p = caustiqPositions[gl_VertexID];
+                vec2 t = caustiqCoordinates[gl_VertexID];
+                gl_Position = vec4(p, 0.0, 1.0);
+                texCoord = t;
+                texcoord = t;
+                vTexCoord = t;
+                uv = t;
+            }
+            """;
+
+    private static final Set<String> SUPPORTED_SAMPLERS = Set.of(
+            "gcolor", "DiffuseSampler", "texture", "tex",
+            "colortex0", "colortex1", "colortex2", "colortex3",
+            "colortex4", "colortex5", "colortex6", "colortex7");
+
+    public IrisGlProgram compile(ShaderPackProgramCatalog.Program program,
+                                 GlslPreprocessor.SourceProvider sourceProvider,
+                                 Set<String> defines) throws IOException {
+        if (program.hasCompute() || program.vertexSource() == null || program.fragmentSource() == null
+                || program.stages().containsKey(ShaderPackProgramCatalog.Stage.GEOMETRY)
+                || program.stages().containsKey(ShaderPackProgramCatalog.Stage.TESSELLATION_CONTROL)
+                || program.stages().containsKey(ShaderPackProgramCatalog.Stage.TESSELLATION_EVALUATION)) {
+            throw new IOException("Program '" + program.name() + "' is not a supported full-screen vertex/fragment pass.");
+        }
+
+        GlslPreprocessor preprocessor = new GlslPreprocessor();
+        String vertex = preprocessor.preprocess(program.vertexSource(), sourceProvider).source();
+        String fragment = preprocessor.preprocess(program.fragmentSource(), sourceProvider).source();
+        vertex = translateVertex(vertex);
+        fragment = translateFragment(fragment);
+        vertex = injectDefines(vertex, defines);
+        fragment = injectDefines(fragment, defines);
+
+        int vertexShader = compileShader(GL20C.GL_VERTEX_SHADER, vertex, program.name() + " vertex");
+        int fragmentShader = 0;
+        int linkedProgram = 0;
+        try {
+            fragmentShader = compileShader(GL20C.GL_FRAGMENT_SHADER, fragment, program.name() + " fragment");
+            linkedProgram = GL20C.glCreateProgram();
+            GL20C.glAttachShader(linkedProgram, vertexShader);
+            GL20C.glAttachShader(linkedProgram, fragmentShader);
+            GL20C.glLinkProgram(linkedProgram);
+            if (GL20C.glGetProgrami(linkedProgram, GL20C.GL_LINK_STATUS) == GL20C.GL_FALSE) {
+                throw new IOException("Iris program '" + program.name() + "' failed to link:\n"
+                        + GL20C.glGetProgramInfoLog(linkedProgram));
+            }
+            return new IrisGlProgram(program.name(), linkedProgram, findSamplers(fragment));
+        } catch (IOException | RuntimeException exception) {
+            if (linkedProgram != 0) GL20C.glDeleteProgram(linkedProgram);
+            throw exception;
+        } finally {
+            GL20C.glDeleteShader(vertexShader);
+            if (fragmentShader != 0) GL20C.glDeleteShader(fragmentShader);
+        }
+    }
+
+    private static int compileShader(int type, String source, String label) throws IOException {
+        int shader = GL20C.glCreateShader(type);
+        GL20C.glShaderSource(shader, source);
+        GL20C.glCompileShader(shader);
+        if (GL20C.glGetShaderi(shader, GL20C.GL_COMPILE_STATUS) == GL20C.GL_FALSE) {
+            String log = GL20C.glGetShaderInfoLog(shader);
+            GL20C.glDeleteShader(shader);
+            throw new IOException(label + " failed to compile:\n" + log);
+        }
+        return shader;
+    }
+
+    private static Set<String> findSamplers(String source) throws IOException {
+        Set<String> samplers = new LinkedHashSet<>();
+        Matcher matcher = SAMPLER.matcher(source);
+        while (matcher.find()) {
+            String name = matcher.group(1);
+            if (!SUPPORTED_SAMPLERS.contains(name)) {
+                throw new IOException("Unsupported Iris pass sampler '" + name
+                        + "'. Shadow, depth, noise and custom texture bindings require their own render resources.");
+            }
+            samplers.add(name);
+        }
+        return Set.copyOf(samplers);
+    }
+
+    private static String translateVertex(String source) throws IOException {
+        String working = VERSION.matcher(source).replaceAll("");
+        Set<Integer> texCoords = texCoordIndices(working);
+        StringBuilder declarations = new StringBuilder();
+        declarations.append("const vec2 caustiqPositions[3] = vec2[3](")
+                .append("vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));\n")
+                .append("const vec2 caustiqCoordinates[3] = vec2[3](")
+                .append("vec2(0.0, 0.0), vec2(2.0, 0.0), vec2(0.0, 2.0));\n");
+        for (int index : texCoords) {
+            if (!Pattern.compile("(?m)^\\s*out\\s+vec4\\s+caustiqTexCoord" + index + "\\s*;").matcher(working).find()
+                    && !Pattern.compile("(?m)^\\s*varying\\s+vec4\\s+caustiqTexCoord" + index + "\\s*;").matcher(working).find()) {
+                declarations.append("out vec4 caustiqTexCoord").append(index).append(";\n");
+            }
+        }
+
+        working = working.replaceAll("\\bvarying\\b", "out")
+                .replaceAll("\\battribute\\b", "in");
+        working = replaceIdentifier(working, "gl_Vertex",
+                "vec4(caustiqPositions[gl_VertexID], 0.0, 1.0)");
+        working = replaceIdentifier(working, "gl_MultiTexCoord0",
+                "vec4(caustiqCoordinates[gl_VertexID], 0.0, 1.0)");
+        working = working.replaceAll("\\bftransform\\s*\\(\\s*\\)",
+                "vec4(caustiqPositions[gl_VertexID], 0.0, 1.0)");
+        for (int index : texCoords) {
+            working = working.replaceAll("\\bgl_TexCoord\\s*\\[\\s*" + index + "\\s*]",
+                    "caustiqTexCoord" + index);
+        }
+        if (working.contains("gl_TexCoord") || working.contains("gl_MultiTexCoord")
+                || working.contains("gl_Color") || working.contains("gl_Normal")
+                || working.contains("gl_FrontColor")) {
+            throw new IOException("Iris full-screen vertex shader uses an unsupported legacy vertex input.");
+        }
+        working = EXTENSION.matcher(working).replaceAll("");
+        String translated = "#version 460 core\n" + declarations + working;
+        return initializeTexCoordOutputs(translated, texCoords);
+    }
+
+    private static String initializeTexCoordOutputs(String source, Set<Integer> indices) {
+        if (indices.isEmpty()) return source;
+        int main = source.indexOf("void main()");
+        if (main < 0) return source;
+        int open = source.indexOf('{', main);
+        if (open < 0) return source;
+        StringBuilder init = new StringBuilder();
+        for (int index : indices) {
+            init.append("    caustiqTexCoord").append(index)
+                    .append(" = vec4(caustiqCoordinates[gl_VertexID], 0.0, 1.0);\n");
+        }
+        return source.substring(0, open + 1) + "\n" + init + source.substring(open + 1);
+    }
+
+    private static String translateFragment(String source) throws IOException {
+        String working = VERSION.matcher(source).replaceAll("");
+        Set<Integer> texCoords = texCoordIndices(working);
+        Set<Integer> fragData = fragmentDataIndices(working);
+        boolean usesFragColor = working.contains("gl_FragColor");
+        boolean explicitOutput = Pattern.compile("(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+").matcher(working).find();
+        if (usesFragColor && explicitOutput) {
+            throw new IOException("Iris fragment stage mixes gl_FragColor with explicit output declarations.");
+        }
+        if (!fragData.isEmpty() && explicitOutput) {
+            throw new IOException("Iris fragment stage mixes gl_FragData with explicit output declarations.");
+        }
+
+        StringBuilder declarations = new StringBuilder();
+        if (usesFragColor) declarations.append("layout(location = 0) out vec4 caustiqFragColor;\n");
+        for (int index : fragData) {
+            if (index > 7) throw new IOException("Iris MRT location " + index + " exceeds Nvidium's eight draw buffers.");
+            declarations.append("layout(location = ").append(index)
+                    .append(") out vec4 caustiqFragData").append(index).append(";\n");
+        }
+        for (int index : texCoords) {
+            if (!Pattern.compile("(?m)^\\s*in\\s+vec4\\s+caustiqTexCoord" + index + "\\s*;").matcher(working).find()
+                    && !Pattern.compile("(?m)^\\s*varying\\s+vec4\\s+caustiqTexCoord" + index + "\\s*;").matcher(working).find()) {
+                declarations.append("in vec4 caustiqTexCoord").append(index).append(";\n");
+            }
+        }
+
+        working = working.replaceAll("\\bvarying\\b", "in");
+        if (usesFragColor) working = replaceIdentifier(working, "gl_FragColor", "caustiqFragColor");
+        for (int index : fragData) {
+            working = working.replaceAll("\\bgl_FragData\\s*\\[\\s*" + index + "\\s*]",
+                    "caustiqFragData" + index);
+        }
+        for (int index : texCoords) {
+            working = working.replaceAll("\\bgl_TexCoord\\s*\\[\\s*" + index + "\\s*]",
+                    "caustiqTexCoord" + index);
+        }
+        working = working.replaceAll("\\btexture2D\\b|\\btextureCube\\b", "texture")
+                .replaceAll("\\btexture2DLod\\b", "textureLod")
+                .replaceAll("\\btexture2DProj\\b", "textureProj");
+        if (working.contains("gl_FragData") || working.contains("gl_TexCoord")
+                || working.contains("gl_FragColor") || working.contains("gl_FragDepth")) {
+            throw new IOException("Iris fragment shader contains an unsupported legacy fragment output.");
+        }
+        working = EXTENSION.matcher(working).replaceAll("");
+        return "#version 460 core\n" + declarations + working;
+    }
+
+    private static Set<Integer> texCoordIndices(String source) throws IOException {
+        Set<Integer> indices = new LinkedHashSet<>();
+        Matcher matcher = TEXCOORD.matcher(source);
+        while (matcher.find()) {
+            int index = Integer.parseInt(matcher.group(1));
+            if (index > 7) throw new IOException("Iris gl_TexCoord index " + index + " exceeds the supported range 0-7.");
+            indices.add(index);
+        }
+        return indices;
+    }
+
+    private static Set<Integer> fragmentDataIndices(String source) throws IOException {
+        Set<Integer> indices = new LinkedHashSet<>();
+        Matcher matcher = FRAG_DATA.matcher(source);
+        while (matcher.find()) {
+            int index = Integer.parseInt(matcher.group(1));
+            if (index > 7) throw new IOException("Iris MRT location " + index + " exceeds Nvidium's eight draw buffers.");
+            indices.add(index);
+        }
+        return indices;
+    }
+
+    private static String injectDefines(String source, Set<String> defines) {
+        if (defines == null || defines.isEmpty()) return source;
+        int newline = source.indexOf('\n');
+        StringBuilder block = new StringBuilder();
+        for (String define : defines) {
+            if (define == null || define.isBlank()) continue;
+            String[] parts = define.split("=", 2);
+            block.append("#define ").append(parts[0].trim());
+            if (parts.length == 2) block.append(' ').append(parts[1].trim());
+            block.append('\n');
+        }
+        return newline < 0 ? source + "\n" + block : source.substring(0, newline + 1) + block + source.substring(newline + 1);
+    }
+
+    private static String replaceIdentifier(String source, String identifier, String replacement) {
+        return source.replaceAll("(?<![A-Za-z0-9_])" + Pattern.quote(identifier)
+                + "(?![A-Za-z0-9_])", Matcher.quoteReplacement(replacement));
+    }
+}
