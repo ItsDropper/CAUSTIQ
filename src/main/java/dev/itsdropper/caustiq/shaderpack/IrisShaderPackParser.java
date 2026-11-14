@@ -100,7 +100,7 @@ public final class IrisShaderPackParser {
         Set<String> required = tokens(properties.get("iris.features.required"));
         Set<String> optional = tokens(properties.get("iris.features.optional"));
         Map<String, String> conditionalPrograms = select(properties, "program.", ".enabled");
-        Map<String, String> renderTargets = select(properties, "colortex.", null);
+        Map<String, String> renderTargets = select(properties, "colortex", null);
 
         List<String> diagnostics = new ArrayList<>();
         if (!conditionalPrograms.isEmpty()) {
