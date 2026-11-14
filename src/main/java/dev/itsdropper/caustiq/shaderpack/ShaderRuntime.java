@@ -4,6 +4,7 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import dev.itsdropper.caustiq.CaustiqClient;
 import dev.itsdropper.caustiq.CaustiqConfig;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumGBufferTargets;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisVertexContext;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumRenderBridge;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
@@ -139,6 +140,18 @@ public final class ShaderRuntime {
         }
         try {
             sources = ShaderPackSources.open(selected);
+            List<String> shaderFiles = sources.listShaderFiles();
+            if (shaderFiles.contains("block.properties")) {
+                Map<String, Integer> blockIds = new IrisBlockPropertiesParser()
+                        .parse(sources.read("block.properties"));
+                NvidiumIrisVertexContext.setBlockIds(blockIds);
+                CaustiqClient.LOGGER.info("Loaded {} block.properties material ID mapping(s) for mc_Entity.",
+                        blockIds.size());
+            } else {
+                NvidiumIrisVertexContext.setBlockIds(Map.of());
+                CaustiqClient.LOGGER.info("Shader pack '{}' has no block.properties; mc_Entity uses registry block IDs.",
+                        selected.displayName());
+            }
             IrisShaderPackModel packModel = new IrisShaderPackParser().parse(sources);
             activePassPlan = new IrisTerrainPassScheduler().schedule(packModel, null);
             CaustiqClient.LOGGER.info(
