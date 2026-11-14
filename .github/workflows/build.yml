@@ -31,6 +31,35 @@ jobs:
           set -o pipefail
           ./gradlew build --stacktrace --info 2>&1 | tee build.log
 
+      - name: Verify distributable JAR
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          jars=(build/libs/caustiq-*.jar)
+          distributable=()
+          for jar in "${jars[@]}"; do
+            [[ "$jar" == *-sources.jar ]] || distributable+=("$jar")
+          done
+
+          if (( ${#distributable[@]} != 1 )); then
+            printf 'Expected exactly one remapped Caustiq JAR, found %s.\n' "${#distributable[@]}" >&2
+            printf 'JAR candidates: %s\n' "${jars[*]:-<none>}" >&2
+            exit 1
+          fi
+
+          test -s "${distributable[0]}"
+          echo "Distributable JAR: ${distributable[0]}"
+          echo "CAUSTIQ_JAR=${distributable[0]}" >> "$GITHUB_ENV"
+
+      - name: Upload Caustiq JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: caustiq-${{ github.sha }}
+          path: ${{ env.CAUSTIQ_JAR }}
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
