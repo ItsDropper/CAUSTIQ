@@ -324,4 +324,20 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 i.code().equals("UNRESOLVED_PREPROCESSOR_CONDITION")));
     }
 
+    @Test
+    void rejectsFragmentOutputArraysEvenWhenOnlyOneDeclarationExists() {
+        String vertex = """
+                #version 400
+                void main() { gl_Position = gl_Vertex; }
+                """;
+        String fragment = """
+                #version 400
+                layout(location = 0) out vec4 color[2];
+                void main() { color[0] = vec4(1.0); color[1] = vec4(0.0); }
+                """;
+        var result = analyzer.analyze(vertex, fragment);
+        assertTrue(result.issues().stream().anyMatch(i ->
+                i.code().equals("UNSUPPORTED_FRAGMENT_OUTPUT_ARRAY") && i.symbol().equals("color")));
+    }
+
 }
