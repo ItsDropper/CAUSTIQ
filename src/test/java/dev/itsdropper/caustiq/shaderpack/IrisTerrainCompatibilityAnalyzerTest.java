@@ -1,8 +1,11 @@
 package dev.itsdropper.caustiq.shaderpack;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
 
 import static org.junit.jupiter.api.Assertions.*;
+
+import java.nio.file.Path;
 
 class IrisTerrainCompatibilityAnalyzerTest {
     private final IrisTerrainCompatibilityAnalyzer analyzer = new IrisTerrainCompatibilityAnalyzer();
@@ -90,4 +93,26 @@ class IrisTerrainCompatibilityAnalyzerTest {
     void rejectsMissingShaderStages() {
         assertThrows(IllegalArgumentException.class, () -> analyzer.analyze("", "void main(){}"));
     }
+    @Test
+    void auditsThePinnedRealPhotonTerrainProgramWhenCiProvidesItsSource() throws Exception {
+        String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
+        Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),
+                "Photon source checkout is supplied by CI only");
+        var descriptor = new ShaderPackDescriptor("photon", "Photon",
+                Path.of(photonDirectory), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (var sources = ShaderPackSources.open(descriptor)) {
+            var preprocessor = new GlslPreprocessor();
+            String vertex = preprocessor.preprocess("world0/gbuffers_terrain.vsh", sources).source();
+            String fragment = preprocessor.preprocess("world0/gbuffers_terrain.fsh", sources).source();
+            var result = analyzer.analyze(vertex, fragment);
+            assertFalse(result.compatible(), "Photon must not be reported compatible with the incomplete Nvidium ABI");
+            assertTrue(result.issues().stream().anyMatch(i -> i.symbol().equals("at_tangent")));
+            assertTrue(result.issues().stream().anyMatch(i -> i.symbol().equals("mc_Entity")));
+            assertTrue(result.issues().stream().anyMatch(i -> i.symbol().equals("mc_midTexCoord")));
+            assertTrue(result.issues().stream().anyMatch(i -> i.symbol().equals("cameraPosition")));
+            assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("MULTIPLE_RENDER_TARGETS")));
+        }
+    }
+
 }
