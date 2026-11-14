@@ -88,10 +88,12 @@ class NvidiumTerrainVaryingAdapterTest {
         Assumptions.assumeTrue(sourceDirectory != null && !sourceDirectory.isBlank(),
                 "Pinned Nvidium source checkout is supplied by CI only");
         Path shaderRoot = Path.of(sourceDirectory, "src/main/resources/assets/nvidium/shaders/terrain");
+        String scene = Files.readString(shaderRoot.getParent().resolve("occlusion/scene.glsl"));
+        String vertexFormat = Files.readString(shaderRoot.resolve("vertex_format/vertex_format.glsl"));
         Map<String, String> sources = Map.of(
                 "TASK", Files.readString(shaderRoot.resolve("task.glsl")),
-                "MESH", Files.readString(shaderRoot.resolve("mesh.glsl")),
-                "FRAGMENT", Files.readString(shaderRoot.resolve("frag.frag")));
+                "MESH", scene + "\\n" + vertexFormat + "\\n" + Files.readString(shaderRoot.resolve("mesh.glsl")),
+                "FRAGMENT", scene + "\\n" + vertexFormat + "\\n" + Files.readString(shaderRoot.resolve("frag.frag")));
 
         Map<String, String> adapted = NvidiumTerrainVaryingAdapter.adapt(sources);
         assertTrue(adapted.get("MESH").contains("caustiqDecodeTangent(V)"));
@@ -146,9 +148,18 @@ class NvidiumTerrainVaryingAdapterTest {
                 #version 460
                 layout(triangles, max_vertices=64, max_primitives=32) out;
                 struct Vertex {
-                    uint hi; uint lo; uint color; uint16_t u; uint16_t v;
-                    uint8_t blockLight; uint8_t skyLight; uint8_t material; uint8_t section;
+                    uint hi;
+                    uint lo;
+                    uint color;
+                    uint16_t u;
+                    uint16_t v;
+                    uint8_t blockLight;
+                    uint8_t skyLight;
+                    uint8_t material;
+                    uint8_t section;
                 };
+                bool hasMipping(Vertex v) { return bool(int(v.material) & 1); }
+                uint rawVertexAlphaCutoff(Vertex v) { return (int(v.material) >> 1) & 3; }
                 layout(location=1) out Interpolants {
                     vec2 uv;
                     vec3 v_colour;
@@ -174,9 +185,18 @@ class NvidiumTerrainVaryingAdapterTest {
         String fragment = """
                 #version 460
                 struct Vertex {
-                    uint hi; uint lo; uint color; uint16_t u; uint16_t v;
-                    uint8_t blockLight; uint8_t skyLight; uint8_t material; uint8_t section;
+                    uint hi;
+                    uint lo;
+                    uint color;
+                    uint16_t u;
+                    uint16_t v;
+                    uint8_t blockLight;
+                    uint8_t skyLight;
+                    uint8_t material;
+                    uint8_t section;
                 };
+                bool hasMipping(Vertex v) { return bool(int(v.material) & 1); }
+                uint rawVertexAlphaCutoff(Vertex v) { return (int(v.material) >> 1) & 3; }
                 layout(location = 0) out vec4 colour;
                 layout(location = 1) in Interpolants {
                     vec2 uv;
