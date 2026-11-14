@@ -61,6 +61,10 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("viewHeight", "(screenSize.y * 2.0)"),
             Map.entry("fogColor", "fogColour"),
             Map.entry("noisetex", "caustiqNoiseTexture"),
+            Map.entry("colortex1", "caustiqColortex1"),
+            Map.entry("colortex2", "caustiqColortex2"),
+            Map.entry("colortex4", "caustiqColortex4"),
+            Map.entry("depthtex1", "caustiqDepthTexture1"),
             Map.entry("colortex15", "caustiqColortex15"),
             Map.entry("dhDepthTex", "caustiqDhDepthTexture"),
             Map.entry("dhDepthTex1", "caustiqDhDepthTexture1"),
@@ -98,6 +102,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("taa_offset", "caustiqTaaOffset"),
             Map.entry("light_dir", "caustiqLightDirection"),
             Map.entry("world_age", "caustiqWorldAge"),
+            Map.entry("worldTime", "caustiqWorldTime"),
             Map.entry("time_sunrise", "caustiqTimeSunrise"),
             Map.entry("time_noon", "caustiqTimeNoon"),
             Map.entry("time_sunset", "caustiqTimeSunset"),
@@ -551,6 +556,10 @@ public final class IrisNvidiumTerrainTranslator {
                 layout(binding = 2) uniform sampler2D caustiqNoiseTexture;
                 layout(binding = 3) uniform sampler2D caustiqNormalTexture;
                 layout(binding = 4) uniform sampler2D caustiqSpecularTexture;
+                layout(binding = 5) uniform sampler2D caustiqColortex1;
+                layout(binding = 6) uniform sampler2D caustiqColortex2;
+                layout(binding = 7) uniform sampler2D caustiqColortex4;
+                layout(binding = 8) uniform sampler2D caustiqDepthTexture1;
                 layout(binding = 15) uniform sampler2D caustiqColortex15;
                 layout(binding = 10) uniform sampler2D caustiqVxDepthTextureOpaque;
                 layout(binding = 11) uniform sampler2D caustiqVxDepthTextureTrans;
@@ -586,6 +595,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform vec2 caustiqTaaOffset;
                 uniform vec3 caustiqLightDirection;
                 uniform float caustiqWorldAge;
+                uniform float caustiqWorldTime;
                 uniform float caustiqTimeSunrise;
                 uniform float caustiqTimeNoon;
                 uniform float caustiqTimeSunset;
@@ -602,14 +612,15 @@ public final class IrisNvidiumTerrainTranslator {
 
     private static String expectedUniformType(String name) {
         return switch (name) {
-            case "gtexture", "lightmap", "noisetex", "normals", "specular", "colortex15",
+            case "gtexture", "lightmap", "noisetex", "normals", "specular",
+                    "colortex1", "colortex2", "colortex4", "depthtex1", "colortex15",
                     "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans" -> "sampler2D";
             case "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
                     "dhProjection", "dhProjectionInverse", "dhPreviousProjection", "dhModelView",
                     "dhModelViewInverse", "vxProj", "vxProjInv", "vxProjPrev" -> "mat4";
             case "cameraPosition", "fogColor", "light_dir", "eyePosition" -> "vec3";
             case "frameTimeCounter", "viewWidth", "viewHeight", "near", "far", "rainStrength",
-                    "wetness", "world_age", "time_sunrise", "time_noon", "time_sunset",
+                    "wetness", "world_age", "worldTime", "time_sunrise", "time_noon", "time_sunset",
                     "time_midnight", "biome_temperature", "biome_humidity", "alphaTestRef",
                     "dhNearPlane", "dhFarPlane", "combined_near", "combined_far" -> "float";
             case "frameCounter", "blockEntityId", "entityId", "currentRenderedItemId",
