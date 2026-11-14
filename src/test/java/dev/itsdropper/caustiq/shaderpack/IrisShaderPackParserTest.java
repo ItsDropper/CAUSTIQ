@@ -22,6 +22,7 @@ class IrisShaderPackParserTest {
                 program.gbuffers_terrain.enabled=true
                 colortex0Format=RGBA16F
                 """);
+        Files.writeString(pack.resolve("dimension.properties"), "dimension.world0=minecraft:overworld\\n");
         Files.writeString(pack.resolve("gbuffers_terrain.vsh"), "#version 150\nvoid main(){ gl_Position=vec4(0.0); }");
         Files.writeString(pack.resolve("gbuffers_terrain.fsh"), "#version 150\nout vec4 color; void main(){ color=vec4(1.0); }");
         Path world = Files.createDirectories(pack.resolve("world0"));
@@ -36,6 +37,7 @@ class IrisShaderPackParserTest {
             assertEquals(1, model.base().programs().size());
             assertTrue(model.base().programs().get("gbuffers_terrain").hasVertexAndFragment());
             assertEquals(1, model.dimensionOverrides().get("world0").programs().size());
+            assertEquals("world0", model.dimensionMappings().get("minecraft:overworld"));
             assertTrue(model.requiredFeatures().contains("ssbo"));
             assertTrue(model.optionalFeatures().contains("compute_shaders"));
             assertEquals("true", model.conditionalPrograms().get("gbuffers_terrain"));
