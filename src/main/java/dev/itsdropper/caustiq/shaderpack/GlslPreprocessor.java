@@ -1,6 +1,7 @@
 package dev.itsdropper.caustiq.shaderpack;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -13,13 +14,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Bounded GLSL source preprocessor for shader-pack include directives.
- *
- * <p>This stage intentionally does not implement C macro expansion. The GLSL
- * compiler remains responsible for macros, conditional compilation, and
- * language validation.</p>
- */
+/** Bounded GLSL include expansion. Macro expansion and GLSL validation remain compiler responsibilities. */
 public final class GlslPreprocessor {
     public static final int MAX_INCLUDE_DEPTH = 32;
     public static final int MAX_SOURCE_FILES = 256;
@@ -31,17 +26,13 @@ public final class GlslPreprocessor {
     private static final Pattern EXTENSION = Pattern.compile("^\\s*#\\s*extension\\s+([A-Za-z0-9_]+)\\s*:\\s*(require|enable|warn|disable)\\s*(?://.*)?$");
     private static final Pattern PRAGMA_ONCE = Pattern.compile("^\\s*#\\s*pragma\\s+once\\s*(?://.*)?$");
 
-    /**
-     * Reads UTF-8 shader text by normalized path relative to the pack's
-     * shaders/ directory. Implementations must not follow paths outside it.
-     */
+    /** Reads UTF-8 source using a normalized path relative to the pack's shaders/ directory. */
     @FunctionalInterface
     public interface SourceProvider {
         String read(String normalizedPath) throws IOException;
     }
 
     public record SourceLocation(int sourceId, String path) { }
-
     public record Extension(String name, String behavior) { }
 
     public record Result(
@@ -61,9 +52,8 @@ public final class GlslPreprocessor {
 
     public Result preprocess(String entryPoint, SourceProvider provider) throws IOException {
         Objects.requireNonNull(provider, "provider");
-        String root = normalizePath(entryPoint);
         State state = new State(provider);
-        String expanded = state.expand(root, 0, true);
+        String expanded = state.expand(normalizePath(entryPoint), 0, true);
         StringBuilder output = new StringBuilder(expanded.length() + 128);
         if (state.versionDirective != null) {
             output.append(state.versionDirective).append('\n');
@@ -78,6 +68,7 @@ public final class GlslPreprocessor {
         private final Deque<String> includeStack = new ArrayDeque<>();
         private final Set<String> onceFiles = new LinkedHashSet<>();
         private final Map<String, Integer> sourceIds = new LinkedHashMap<>();
+        private final Map<String, String> sourceCache = new LinkedHashMap<>();
         private final Map<String, Extension> extensions = new LinkedHashMap<>();
         private final List<SourceLocation> sourceMap = new ArrayList<>();
         private final List<String> includedFiles = new ArrayList<>();
@@ -104,11 +95,8 @@ public final class GlslPreprocessor {
                 throw failure(path, "maximum source-file count of " + MAX_SOURCE_FILES + " exceeded");
             }
 
-            String source = provider.read(path);
-            if (source == null) {
-                throw failure(path, "source provider returned null");
-            }
-            int bytes = source.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+            String source = readSource(path);
+            int bytes = source.getBytes(StandardCharsets.UTF_8).length;
             if (bytes > MAX_SOURCE_BYTES) {
                 throw failure(path, "source exceeds the " + MAX_SOURCE_BYTES + " byte limit");
             }
@@ -128,7 +116,6 @@ public final class GlslPreprocessor {
             });
             includeStack.addLast(path);
             includedFiles.add(path);
-            boolean hasPragmaOnce = false;
             StringBuilder output = new StringBuilder(source.length() + 64);
             String[] lines = source.split("\\R", -1);
             try {
@@ -139,18 +126,18 @@ public final class GlslPreprocessor {
                     Matcher extension = EXTENSION.matcher(line);
 
                     if (PRAGMA_ONCE.matcher(line).matches()) {
-                        hasPragmaOnce = true;
+                        // Mark immediately so a recursive include after this line is suppressed.
+                        onceFiles.add(path);
                         continue;
                     }
                     if (version.matches()) {
                         if (!root) {
                             throw failure(path, "#version is not permitted in included source files");
                         }
-                        String directive = line.strip();
-                        if (versionDirective != null && !versionDirective.equals(directive)) {
-                            throw failure(path, "conflicting #version directives");
+                        if (versionDirective != null) {
+                            throw failure(path, "multiple #version directives were found");
                         }
-                        versionDirective = directive;
+                        versionDirective = line.strip();
                         continue;
                     }
                     if (extension.matches()) {
@@ -170,17 +157,70 @@ public final class GlslPreprocessor {
                             output.append('\n');
                         }
                         output.append("#line ").append(index + 2).append(' ').append(sourceId).append('\n');
-                        continue;
+                    } else {
+                        output.append(line).append('\n');
                     }
-                    output.append(line).append('\n');
                 }
             } finally {
                 includeStack.removeLast();
             }
-            if (hasPragmaOnce) {
-                onceFiles.add(path);
-            }
             return output.toString();
+        }
+
+        private String readSource(String path) throws IOException {
+            String cached = sourceCache.get(path);
+            if (cached != null) {
+                return cached;
+            }
+            String source = provider.read(path);
+            if (source == null) {
+                throw failure(path, "source provider returned null");
+            }
+            int bytes = source.getBytes(StandardCharsets.UTF_8).length;
+            if (bytes > MAX_SOURCE_BYTES) {
+                throw failure(path, "source exceeds the " + MAX_SOURCE_BYTES + " byte limit");
+            }
+            sourceCache.put(path, source);
+            return source;
+        }
+
+        private String resolveInclude(String includingFile, String requested, boolean rooted) throws IOException {
+            if (requested == null || requested.isBlank() || requested.indexOf('\\') >= 0) {
+                throw failure(includingFile, "invalid include path");
+            }
+            if (requested.startsWith("/")) {
+                rooted = true;
+            }
+            String candidate;
+            if (rooted) {
+                candidate = requested.startsWith("/") ? requested.substring(1) : requested;
+            } else {
+                int separator = includingFile.lastIndexOf('/');
+                String parent = separator < 0 ? "" : includingFile.substring(0, separator + 1);
+                candidate = parent + requested;
+            }
+
+            String normalized;
+            try {
+                normalized = normalizePath(candidate);
+            } catch (IllegalArgumentException exception) {
+                throw failure(includingFile, "include path escapes the shaders/ root: " + requested);
+            }
+            if (rooted) {
+                return normalized;
+            }
+            try {
+                readSource(normalized);
+                return normalized;
+            } catch (IOException relativeFailure) {
+                try {
+                    String packRootPath = normalizePath(requested);
+                    readSource(packRootPath);
+                    return packRootPath;
+                } catch (IOException | IllegalArgumentException rootFailure) {
+                    throw failure(includingFile, "unable to resolve include '" + requested + "'");
+                }
+            }
         }
 
         private int sourceId(String path) {
@@ -189,56 +229,6 @@ public final class GlslPreprocessor {
                 throw new IllegalStateException("Source ID has not been assigned: " + path);
             }
             return id;
-        }
-
-        private String resolveInclude(String includingFile, String requested, boolean rooted) throws IOException {
-            String candidate;
-            if (requested.startsWith("/") || requested.startsWith("\\")) {
-                candidate = requested.substring(1);
-                rooted = true;
-            } else if (rooted) {
-                candidate = requested;
-            } else {
-                int separator = includingFile.lastIndexOf('/');
-                String parent = separator < 0 ? "" : includingFile.substring(0, separator + 1);
-                candidate = parent + requested;
-            }
-            String normalized;
-            try {
-                normalized = normalizePath(candidate);
-            } catch (IllegalArgumentException exception) {
-                throw failure(includingFile, "unsafe include path '" + requested + "'");
-            }
-            // Quoted includes first resolve relative to the including file.
-            // A missing relative target may still be a pack-root include.
-            if (!rooted && !normalized.equals(candidate)) {
-                throw failure(includingFile, "include path normalization failed");
-            }
-            if (!rooted && candidate.contains("/") && !candidate.startsWith("../")) {
-                try {
-                    provider.read(normalized);
-                    return normalized;
-                } catch (IOException ignored) {
-                    // Try pack-root resolution below. The original failure is
-                    // reported if neither location exists.
-                }
-            } else if (!rooted) {
-                try {
-                    provider.read(normalized);
-                    return normalized;
-                } catch (IOException ignored) {
-                    // Try pack-root resolution below.
-                }
-            } else {
-                return normalized;
-            }
-            String packRoot = normalizePath(requested.startsWith("/") ? requested.substring(1) : requested);
-            try {
-                provider.read(packRoot);
-                return packRoot;
-            } catch (IOException exception) {
-                throw failure(includingFile, "unable to resolve include '" + requested + "'");
-            }
         }
 
         private IOException failure(String path, String message) {
