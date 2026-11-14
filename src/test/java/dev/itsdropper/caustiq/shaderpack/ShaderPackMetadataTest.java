@@ -2,6 +2,7 @@ package dev.itsdropper.caustiq.shaderpack;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -43,7 +44,7 @@ class ShaderPackMetadataTest {
         ShaderPackMetadata.Option option = metadata.options().getFirst();
         assertEquals("SHADOW_QUALITY", option.name());
         assertEquals("2", option.defaultValue());
-        assertEquals(java.util.List.of("2", "0", "1", "3"), option.values());
+        assertEquals(List.of("0", "1", "2", "3"), option.values());
         assertTrue(option.slider());
     }
 
