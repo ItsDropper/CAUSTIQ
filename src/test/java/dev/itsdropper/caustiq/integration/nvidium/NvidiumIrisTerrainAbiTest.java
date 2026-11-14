@@ -35,6 +35,17 @@ class NvidiumIrisTerrainAbiTest {
     }
 
     @Test
+    void emitsLineSeparatedAliasesForOnlyBoundNvidiumResources() {
+        String aliases = NvidiumIrisTerrainAbi.fragmentAliasDeclarations();
+        assertTrue(aliases.contains("#define CAUSTIQ_IRIS_GTEXTURE tex_diffuse"));
+        assertTrue(aliases.contains("#define CAUSTIQ_IRIS_LIGHTMAP tex_light"));
+        assertTrue(aliases.contains("#define CAUSTIQ_IRIS_FOG_COLOR fogColour"));
+        assertTrue(aliases.contains("#define CAUSTIQ_IRIS_VIEW_WIDTH (screenSize.x * 2.0)"));
+        assertTrue(aliases.contains("\\n"));
+        assertFalse(aliases.contains("\\\\n"));
+    }
+
+    @Test
     void doesNotMisrepresentCameraRelativePositionOrFaceNormals() {
         assertEquals(NvidiumIrisTerrainAbi.Availability.UNAVAILABLE,
                 NvidiumIrisTerrainAbi.vertexSemantic("viewSpacePosition").orElseThrow().availability());
