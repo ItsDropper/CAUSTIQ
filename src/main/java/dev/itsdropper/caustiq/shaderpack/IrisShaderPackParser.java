@@ -104,6 +104,19 @@ public final class IrisShaderPackParser {
         Map<String, String> renderTargets = select(properties, "colortex", null);
 
         List<String> diagnostics = new ArrayList<>();
+        Map<ShaderPackProgramCatalog.Stage, String> terrainStages =
+                inventories.getOrDefault("", Map.of()).get("gbuffers_terrain");
+        if (terrainStages != null
+                && terrainStages.containsKey(ShaderPackProgramCatalog.Stage.VERTEX)
+                && terrainStages.containsKey(ShaderPackProgramCatalog.Stage.FRAGMENT)) {
+            String vertexPath = terrainStages.get(ShaderPackProgramCatalog.Stage.VERTEX);
+            String fragmentPath = terrainStages.get(ShaderPackProgramCatalog.Stage.FRAGMENT);
+            IrisTerrainCompatibilityAnalyzer.Result terrainCompatibility =
+                    new IrisTerrainCompatibilityAnalyzer().analyze(
+                            preprocessed.get(vertexPath), preprocessed.get(fragmentPath));
+            terrainCompatibility.issues().forEach(issue ->
+                    diagnostics.add("Nvidium gbuffers_terrain ABI: " + issue));
+        }
         if (!conditionalPrograms.isEmpty()) {
             diagnostics.add("Conditional program enablement was parsed but Iris option-expression evaluation is not implemented.");
         }
