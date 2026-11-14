@@ -24,11 +24,13 @@ public final class IrisTerrainCompatibilityAnalyzer {
                     + "(in|out|attribute|varying)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+"
                     + "([A-Za-z_][A-Za-z0-9_]*)\\s*(?:\\[[^]]*])?\\s*;");
     private static final Pattern FRAGMENT_OUTPUT = Pattern.compile(
-            "(?m)^\\s*(?:" + LAYOUT + ")"+ QUALIFIERS
+            "(?m)^\\s*(" + LAYOUT + ")" + QUALIFIERS
                     + "out\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)"
                     + "\\s*(?:\\[[^]]*])?\\s*;");
     private static final Pattern LOCATION = Pattern.compile(
             "layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)");
+    private static final Pattern TEXTURE_COORDINATE_INDEX = Pattern.compile(
+            "\\bgl_TexCoord\\s*\\[\\s*([0-9]+)\\s*]");
     private static final Pattern SAMPLER = Pattern.compile(
             "\\buniform\\s+(?:(?:highp|mediump|lowp)\\s+)?"
                     + "([iu]?sampler[A-Za-z0-9_]*|image[A-Za-z0-9_]*)\\s+"
@@ -118,9 +120,17 @@ public final class IrisTerrainCompatibilityAnalyzer {
             }
         }
 
-        if (vertexIdentifiers.contains("gl_TexCoord")) {
-            issues.add(new Issue("UNSUPPORTED_TEXTURE_COORDINATE_SET", "gl_TexCoord",
-                    "Only texture coordinate set 0 (terrain UV) and set 1 (lightmap UV) are represented."));
+        Matcher textureCoordinates = TEXTURE_COORDINATE_INDEX.matcher(vertex + "\n" + fragment);
+        while (textureCoordinates.find()) {
+            int index = Integer.parseInt(textureCoordinates.group(1));
+            if (index > 1) {
+                issues.add(new Issue("UNSUPPORTED_TEXTURE_COORDINATE_SET", "gl_TexCoord[" + index + "]",
+                        "Only texture coordinate set 0 (terrain UV) and set 1 (lightmap UV) are represented."));
+            }
+        }
+        if ((vertex + fragment).matches("(?s).*\\bgl_TexCoord\\s*\\[(?!\\s*[01]\\s*]).*")) {
+            issues.add(new Issue("DYNAMIC_TEXTURE_COORDINATE_INDEX", "gl_TexCoord",
+                    "A dynamic texture-coordinate index cannot be mapped to Nvidium's fixed UV/lightmap attributes."));
         }
         if (fragmentIdentifiers.contains("gl_FragData")) {
             issues.add(new Issue("MULTIPLE_RENDER_TARGETS", "gl_FragData",
@@ -140,19 +150,16 @@ public final class IrisTerrainCompatibilityAnalyzer {
         Set<Integer> locations = new LinkedHashSet<>();
         while (matcher.find()) {
             outputCount++;
-            int declarationStart = matcher.start();
-            int lineStart = source.lastIndexOf('\\n', declarationStart);
-            String declarationPrefix = source.substring(lineStart + 1, declarationStart);
-            Matcher location = LOCATION.matcher(declarationPrefix);
+            Matcher location = LOCATION.matcher(matcher.group(1));
             if (location.find()) {
                 int index = Integer.parseInt(location.group(1));
                 locations.add(index);
                 if (index != 0) {
-                    issues.add(new Issue("MULTIPLE_RENDER_TARGETS", matcher.group(2),
+                    issues.add(new Issue("MULTIPLE_RENDER_TARGETS", matcher.group(3),
                             "Nvidium's current terrain fragment pipeline only exposes the primary color target (location 0)."));
                 }
             } else if (outputCount > 1) {
-                issues.add(new Issue("MULTIPLE_RENDER_TARGETS", matcher.group(2),
+                issues.add(new Issue("MULTIPLE_RENDER_TARGETS", matcher.group(3),
                         "Multiple fragment outputs require explicit attachment routing, which Nvidium does not provide."));
             }
         }
