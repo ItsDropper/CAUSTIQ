@@ -22,6 +22,7 @@ public final class ShaderRuntime {
     private static boolean discoveryStarted, discoveryFinished;
     private static ShaderPackSources sources;
     private static List<ShaderPackProgramCatalog.Program> pending = List.of();
+    private static IrisTerrainPassScheduler.Plan activePassPlan;
     private static Map<String, String> selectedDefines = Map.of();
     private static int nextProgram;
     private static boolean postProcessFailureLogged;
@@ -43,12 +44,15 @@ public final class ShaderRuntime {
         COMPILED.forEach(CompiledShaderProgram::close);
         COMPILED.clear();
         pending = List.of();
+        activePassPlan = null;
         selectedDefines = Map.of();
         nextProgram = 0;
         discoveryStarted = false;
         discoveryFinished = false;
         postProcessFailureLogged = false;
     }
+
+    public static IrisTerrainPassScheduler.Plan activePassPlan() { return activePassPlan; }
 
     public static void onWorldRender() {
         if (!CaustiqConfig.get().enabled()) return;
@@ -136,6 +140,11 @@ public final class ShaderRuntime {
         try {
             sources = ShaderPackSources.open(selected);
             IrisShaderPackModel packModel = new IrisShaderPackParser().parse(sources);
+            activePassPlan = new IrisTerrainPassScheduler().schedule(packModel, null);
+            CaustiqClient.LOGGER.info(
+                    "Built Iris pass schedule for '{}': {} ordered program pass(es), {} declared render target(s): {}.",
+                    selected.displayName(), activePassPlan.passes().size(), activePassPlan.targets().size(),
+                    activePassPlan.orderedProgramNames());
             List<ShaderPackProgramCatalog.Program> discoveredPrograms = new ArrayList<>();
             List<String> invalidPrograms = new ArrayList<>();
             for (IrisShaderPackModel.Program program : packModel.base().programs().values()) {
