@@ -21,6 +21,7 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 uniform mat4 gbufferModelViewInverse;
                 uniform mat4 gbufferProjection;
                 uniform vec3 cameraPosition;
+                uniform float customPackUniform;
                 out vec3 scene_pos;
                 out vec4 tint;
                 void main() {
@@ -51,7 +52,7 @@ class IrisTerrainCompatibilityAnalyzerTest {
         assertFalse(result.issues().stream().anyMatch(i -> i.code().equals("UNAVAILABLE_TRANSFORM")
                 && i.symbol().equals("cameraPosition")));
         assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNBOUND_UNIFORM")
-                && i.symbol().equals("viewSize")));
+                && i.symbol().equals("customPackUniform")));
         assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("MULTIPLE_RENDER_TARGETS")));
     }
 
@@ -213,9 +214,9 @@ class IrisTerrainCompatibilityAnalyzerTest {
     void rejectsCustomUniformsAndUniformBlocksWithoutNvidiumBindings() {
         String vertex = """
                 #version 400
-                uniform float frameTimeCounter;
+                uniform float unsupportedFrameTime;
                 uniform mat4 customTransform;
-                void main() { gl_Position = customTransform * vec4(frameTimeCounter); }
+                void main() { gl_Position = customTransform * vec4(unsupportedFrameTime); }
                 """;
         String fragment = """
                 #version 400
@@ -225,7 +226,7 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 """;
         var result = analyzer.analyze(vertex, fragment);
         assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNBOUND_UNIFORM")
-                && i.symbol().equals("frameTimeCounter")));
+                && i.symbol().equals("unsupportedFrameTime")));
         assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNBOUND_UNIFORM")
                 && i.symbol().equals("customTransform")));
         assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNSUPPORTED_UNIFORM_BLOCK")));
