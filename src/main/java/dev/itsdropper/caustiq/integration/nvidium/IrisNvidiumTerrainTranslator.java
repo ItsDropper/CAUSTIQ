@@ -102,6 +102,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("taa_offset", "caustiqTaaOffset"),
             Map.entry("light_dir", "caustiqLightDirection"),
             Map.entry("world_age", "caustiqWorldAge"),
+            Map.entry("day_factor", "caustiqDayFactor"),
             Map.entry("worldTime", "caustiqWorldTime"),
             Map.entry("time_sunrise", "caustiqTimeSunrise"),
             Map.entry("time_noon", "caustiqTimeNoon"),
@@ -609,6 +610,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform vec2 caustiqTaaOffset;
                 uniform vec3 caustiqLightDirection;
                 uniform float caustiqWorldAge;
+                uniform float caustiqDayFactor;
                 uniform float caustiqWorldTime;
                 uniform float caustiqTimeSunrise;
                 uniform float caustiqTimeNoon;
@@ -634,7 +636,7 @@ public final class IrisNvidiumTerrainTranslator {
                     "dhModelViewInverse", "vxProj", "vxProjInv", "vxProjPrev" -> "mat4";
             case "cameraPosition", "fogColor", "light_dir", "eyePosition" -> "vec3";
             case "frameTimeCounter", "viewWidth", "viewHeight", "near", "far", "rainStrength",
-                    "wetness", "world_age", "worldTime", "time_sunrise", "time_noon", "time_sunset",
+                    "wetness", "world_age", "day_factor", "worldTime", "time_sunrise", "time_noon", "time_sunset",
                     "time_midnight", "biome_temperature", "biome_humidity", "alphaTestRef",
                     "dhNearPlane", "dhFarPlane", "combined_near", "combined_far" -> "float";
             case "frameCounter", "blockEntityId", "entityId", "currentRenderedItemId",
