@@ -178,8 +178,6 @@ public final class NvidiumGBufferTargets {
                 GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_NEAREST);
                 GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, GL12_CLAMP_TO_EDGE);
                 GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, GL12_CLAMP_TO_EDGE);
-                GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_RGBA16F, newWidth, newHeight,
-                        0, GL11C.GL_RGBA, GL30C.GL_HALF_FLOAT, (java.nio.ByteBuffer) null);
             }
             width = newWidth;
             height = newHeight;
