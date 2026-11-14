@@ -63,52 +63,6 @@ public final class ShaderPackSources implements GlslPreprocessor.SourceProvider,
     }
 
 
-    /**
-     * Lists compilable stage files relative to shaders/. Includes are resolved separately
-     * by the preprocessor and are intentionally not treated as program stages.
-     */
-    public List<String> listShaderSources() throws IOException {
-        List<String> paths = new ArrayList<>();
-        if (archive != null) {
-            Enumeration<? extends ZipEntry> entries = archive.entries();
-            while (entries.hasMoreElements()) {
-                ZipEntry entry = entries.nextElement();
-                if (entry.isDirectory() || !entry.getName().startsWith(archivePrefix)) {
-                    continue;
-                }
-                String relative = entry.getName().substring(archivePrefix.length());
-                if (ShaderStage.fromPath(relative).isPresent()) {
-                    paths.add(validateRelativePath(relative));
-                    if (paths.size() > ShaderProgramDiscovery.MAX_SHADER_FILES) {
-                        throw new IOException("Shader pack contains more than "
-                                + ShaderProgramDiscovery.MAX_SHADER_FILES + " shader stage files.");
-                    }
-                }
-            }
-        } else {
-            try (var files = Files.walk(directoryRoot)) {
-                var iterator = files.iterator();
-                while (iterator.hasNext()) {
-                    Path file = iterator.next();
-                    if (Files.isSymbolicLink(file) || !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
-                        continue;
-                    }
-                    String relative = directoryRoot.relativize(file).toString().replace(file.getFileSystem()
-                            .getSeparator(), "/");
-                    if (ShaderStage.fromPath(relative).isPresent()) {
-                        paths.add(validateRelativePath(relative));
-                        if (paths.size() > ShaderProgramDiscovery.MAX_SHADER_FILES) {
-                            throw new IOException("Shader pack contains more than "
-                                    + ShaderProgramDiscovery.MAX_SHADER_FILES + " shader stage files.");
-                        }
-                    }
-                }
-            }
-        }
-        paths.sort(Comparator.naturalOrder());
-        return List.copyOf(paths);
-    }
-
     /** Lists bounded, normalized shader-relative paths without extracting archives. */
     public List<String> listShaderFiles() throws IOException {
         final int maximumEntries = 50_000;
