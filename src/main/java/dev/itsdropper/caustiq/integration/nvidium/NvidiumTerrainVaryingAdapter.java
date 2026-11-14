@@ -165,6 +165,12 @@ public final class NvidiumTerrainVaryingAdapter {
         }
         mesh = replaceOnce(mesh, "    uint8_t section;", "    uint8_t section;\n" + VERTEX_FORMAT_EXTENSION,
                 "extended mesh vertex storage layout");
+        String opaqueColourDecode = "return vec4(vec3(packed_color) * COLOR_SCALE, 1);";
+        String aoColourDecode = "return vec4(vec3(packed_color) * COLOR_SCALE, float((uint(v.color) >> 24u) & 0xFFu) * COLOR_SCALE);";
+        if (!mesh.contains(opaqueColourDecode)) {
+            throw new IllegalStateException("Nvidium terrain vertex color decoder no longer exposes its alpha channel.");
+        }
+        mesh = mesh.replace(opaqueColourDecode, aoColourDecode);
         fragment = replaceOnce(fragment, "    uint8_t section;", "    uint8_t section;\n" + VERTEX_FORMAT_EXTENSION,
                 "extended fragment vertex storage layout");
         mesh = replaceOnce(mesh, "return bool(int(v.material) & 1);",
