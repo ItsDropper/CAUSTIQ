@@ -24,7 +24,7 @@ class IrisNvidiumTerrainTranslatorTest {
                 void main() {
                     gl_Position = gbufferProjection * gbufferModelView * gl_Vertex;
                     gl_TexCoord[0] = gl_MultiTexCoord0;
-                    texCoord = gl_MultiTexCoord0.xy;
+                    texCoord = gl_MultiTexCoord0.xy + at_midBlock.xy + iris_Normal.xy;
                 }
                 """, """
                 #version 150
