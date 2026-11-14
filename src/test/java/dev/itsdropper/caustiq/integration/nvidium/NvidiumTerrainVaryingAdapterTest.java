@@ -41,9 +41,9 @@ class NvidiumTerrainVaryingAdapterTest {
         Map<String, String> sources = Map.of(
                 "TASK", base.get("TASK"),
                 "MESH", base.get("MESH").replace("#version 460",
-                        "#version 460\\n#define USE_NV_FRAGMENT_SHADER_BARYCENTRIC"),
+                        "#version 460\n#define USE_NV_FRAGMENT_SHADER_BARYCENTRIC"),
                 "FRAGMENT", base.get("FRAGMENT").replace("#version 460",
-                        "#version 460\\n#define USE_NV_FRAGMENT_SHADER_BARYCENTRIC"));
+                        "#version 460\n#define USE_NV_FRAGMENT_SHADER_BARYCENTRIC"));
 
         Map<String, String> adapted = NvidiumTerrainVaryingAdapter.adapt(sources);
         assertFalse(adapted.get("MESH").contains("#define USE_NV_FRAGMENT_SHADER_BARYCENTRIC"));
