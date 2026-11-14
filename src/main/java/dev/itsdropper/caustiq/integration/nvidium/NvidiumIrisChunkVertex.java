@@ -100,13 +100,11 @@ public final class NvidiumIrisChunkVertex implements ChunkVertexType {
     }
 
     private static int encodeColor(int color, float brightness) {
-        int red = ColorU8.normalizedFloatToByte(
-                ColorU8.byteToNormalizedFloat(ColorABGR.unpackRed(color)) * brightness);
-        int green = ColorU8.normalizedFloatToByte(
-                ColorU8.byteToNormalizedFloat(ColorABGR.unpackGreen(color)) * brightness);
-        int blue = ColorU8.normalizedFloatToByte(
-                ColorU8.byteToNormalizedFloat(ColorABGR.unpackBlue(color)) * brightness);
-        return ColorABGR.pack(red, green, blue, 0);
+        int red = ColorABGR.unpackRed(color);
+        int green = ColorABGR.unpackGreen(color);
+        int blue = ColorABGR.unpackBlue(color);
+        int alpha = ColorU8.normalizedFloatToByte(Mth.clamp(brightness, 0.0f, 1.0f));
+        return ColorABGR.pack(red, green, blue, alpha);
     }
 
     private static int compactLight(int light) {
