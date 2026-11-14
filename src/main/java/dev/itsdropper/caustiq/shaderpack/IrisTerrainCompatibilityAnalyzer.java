@@ -29,7 +29,7 @@ public final class IrisTerrainCompatibilityAnalyzer {
             "(?m)^\\s*(" + LAYOUT + ")" + QUALIFIERS
                     + "out\\s+(?:(?:highp|mediump|lowp)\\s+)?"
                     + "([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)"
-                    + "\\s*(?:\\[[^]]*])?\\s*;");
+                    + "\\s*(\\[[^]]*])?\\s*;");
     private static final Pattern LOCATION = Pattern.compile(
             "layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)");
     private static final Pattern TEXTURE_COORDINATE_INDEX = Pattern.compile(
@@ -213,6 +213,10 @@ public final class IrisTerrainCompatibilityAnalyzer {
         Set<Integer> locations = new LinkedHashSet<>();
         while (matcher.find()) {
             outputCount++;
+            if (matcher.group(4) != null) {
+                issues.add(new Issue("UNSUPPORTED_FRAGMENT_OUTPUT_ARRAY", matcher.group(3),
+                        "Fragment output arrays require multiple color attachments or indexed routing not exposed by Nvidium."));
+            }
             Matcher location = LOCATION.matcher(matcher.group(1));
             if (location.find()) {
                 int index = Integer.parseInt(location.group(1));
