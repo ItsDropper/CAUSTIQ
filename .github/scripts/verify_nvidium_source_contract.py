@@ -35,7 +35,7 @@ assert 'method = "raster"' in rasterizer_mixin
 gbuffer_manager = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumGBufferTargets.java").read_text(encoding="utf-8")
 assert "GL_COLOR_ATTACHMENT1" in gbuffer_manager and "GL_COLOR_ATTACHMENT0 + i" in gbuffer_manager
 assert "glCheckFramebufferStatus" in gbuffer_manager and "glDrawBuffers" in gbuffer_manager
-assert "GL_RGBA16F" in gbuffer_manager and "getColorTextureView()" in gbuffer_manager
+assert "getColorTextureView()" in gbuffer_manager and "TextureTarget" in gbuffer_manager
 postprocess = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/ShaderPostProcessPass.java").read_text(encoding="utf-8")
 compiler = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/ShaderProgramCompiler.java").read_text(encoding="utf-8")
 for index in range(1, 5):
