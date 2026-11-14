@@ -115,4 +115,90 @@ class IrisTerrainCompatibilityAnalyzerTest {
         }
     }
 
+    @Test
+    void acceptsOnlyTheLegacyVertexInputsRepresentedByNvidiumPackedVertices() {
+        String vertex = """
+                #version 400 compatibility
+                out vec2 uv;
+                out vec2 lightUv;
+                out vec4 tint;
+                void main() {
+                    uv = gl_MultiTexCoord0.xy;
+                    lightUv = gl_MultiTexCoord1.xy;
+                    tint = gl_Color;
+                    gl_Position = gl_Vertex;
+                }
+                """;
+        String fragment = """
+                #version 400 compatibility
+                in vec2 uv;
+                in vec2 lightUv;
+                in vec4 tint;
+                layout(location = 0) out vec4 color;
+                void main() {
+                    color = texture(gtexture, gl_TexCoord[0].xy) * tint
+                            + texture(lightmap, gl_TexCoord[1].xy) * vec4(lightUv, 0.0, 0.0);
+                }
+                """;
+        var result = analyzer.analyze(vertex, fragment);
+        assertTrue(result.compatible(), result.issues().toString());
+    }
+
+    @Test
+    void rejectsUnrepresentedTextureCoordinateSetsAndCustomVertexAttributes() {
+        String vertex = """
+                #version 400
+                layout(location = 4) in vec4 customData;
+                void main() { gl_Position = vec4(customData.xyz, 1.0); }
+                """;
+        String fragment = """
+                #version 400
+                layout(location = 0) out vec4 color;
+                void main() { color = texture(gtexture, gl_TexCoord[2].xy); }
+                """;
+        var result = analyzer.analyze(vertex, fragment);
+        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNMAPPED_VERTEX_INPUT")
+                && i.symbol().equals("customData")));
+        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNSUPPORTED_TEXTURE_COORDINATE_SET")
+                && i.symbol().equals("gl_TexCoord[2]")));
+    }
+
+    @Test
+    void comparesVaryingTypesAndParsesQualifiedFragmentOutputs() {
+        String vertex = """
+                #version 400
+                out vec3 sharedValue;
+                void main() { sharedValue = vec3(1.0); }
+                """;
+        String fragment = """
+                #version 400
+                in vec2 sharedValue;
+                layout(location = 1) out highp vec4 normalTarget;
+                void main() { normalTarget = vec4(sharedValue, 0.0, 1.0); }
+                """;
+        var result = analyzer.analyze(vertex, fragment);
+        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("VARYING_TYPE_MISMATCH")
+                && i.symbol().equals("sharedValue")));
+        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("MULTIPLE_RENDER_TARGETS")
+                && i.symbol().equals("normalTarget")));
+    }
+
+    @Test
+    void acceptsQualifiedPrimaryFragmentOutputAndSamplerPrecision() {
+        String vertex = """
+                #version 400
+                out vec2 uv;
+                void main() { uv = vec2(0.0); }
+                """;
+        String fragment = """
+                #version 400
+                in vec2 uv;
+                uniform highp sampler2D gtexture;
+                layout(location = 0) out highp vec4 color;
+                void main() { color = texture(gtexture, uv); }
+                """;
+        var result = analyzer.analyze(vertex, fragment);
+        assertTrue(result.compatible(), result.issues().toString());
+    }
+
 }
