@@ -1,10 +1,10 @@
 # Caustiq
 
-Caustiq is an independent, client-side Minecraft shader engine. Its primary goal is to load existing OptiFine/Iris-compatible shader packs while preserving compatibility with accelerated terrain renderers such as Nvidium.
+Caustiq is an independent, client-side Minecraft shader engine. Its primary goal is to load existing OptiFine/Iris-style shader packs while preserving compatibility with accelerated terrain renderers such as Nvidium.
 
 ## Project status
 
-**Early development — initialization only.** The current code establishes the Fabric client entrypoint and creates the standard `.minecraft/shaderpacks` directory. It does not load, compile, or render shader packs yet.
+**Early development — shader-pack discovery is implemented.** Caustiq now scans the standard `.minecraft/shaderpacks` directory for directory packs and ZIP archives, validates their layout, and reports recognized pipeline entry points. It does not compile or render shaders yet.
 
 ## Development target
 
@@ -15,11 +15,26 @@ Caustiq is an independent, client-side Minecraft shader engine. Its primary goal
 - Fabric Loom 1.19-SNAPSHOT
 - Official Mojang mappings
 - Gradle Kotlin DSL
-- No Fabric API dependency
+- No third-party runtime mod dependencies
 
-The current Loom release requires JDK 25 to run Gradle. The mod itself is compiled with `--release 21` and targets Java 21, as required for Minecraft 1.21.11. Fabric Loader is the only required mod-platform dependency. Sodium and Mod Menu integrations are intended to remain optional.
+The current Loom release requires JDK 25 to run Gradle. The mod itself is compiled with `--release 21`. Fabric Loader is the only required mod-platform dependency. Sodium and Mod Menu integrations are intended to remain optional. JUnit is used only by the test source set and is not included in the mod JAR.
 
-## Build
+## Shader-pack discovery
+
+The scanner:
+
+- Discovers directory packs and `.zip` archives.
+- Accepts a `shaders/` directory at the pack root or one wrapper directory below it, and preserves that internal root in each descriptor.
+- Identifies common OptiFine-style pipeline entry points such as `gbuffers_*`, `composite*`, `deferred*`, `shadow*`, and `final`.
+- Inspects ZIP central-directory metadata without extracting or decompressing entries.
+- Rejects absolute paths, traversal segments, backslash paths, duplicate/case-colliding entries, ambiguous shader roots, and malformed archives.
+- Applies candidate, entry-count, nesting-depth, compressed-size, per-entry-size, total-size, and compression-ratio limits.
+- Skips symbolic links and hidden top-level entries.
+- Produces immutable descriptors and per-candidate diagnostics.
+
+This is structural recognition, not a claim that all Iris extensions or shader-pack features are supported. Actual compatibility requires later preprocessing, compilation, and rendering stages.
+
+## Build and test
 
 Use JDK 25 to run Gradle.
 
@@ -35,16 +50,13 @@ On Linux/macOS:
 ./gradlew build
 ```
 
-The distributable JAR is written to `build/libs/`.
+The build runs the shader-pack scanner tests. The distributable JAR is written to `build/libs/`.
 
-## Initial engineering direction
+## Next engineering stages
 
-1. Shader-pack discovery and safe ZIP inspection.
-2. Shader-pack format identification and compatibility reporting.
-3. GLSL preprocessing and compilation.
-4. A renderer abstraction that does not require Sodium.
-5. Optional Sodium integration.
-6. Nvidium-compatible terrain rendering integration.
-7. Optional Mod Menu integration.
-
-Nvidium coexistence and broad shader-pack compatibility are design goals, not capabilities claimed by the current initialization commit.
+1. Parse shader-pack metadata and options.
+2. Implement GLSL include resolution and preprocessing.
+3. Build shader compilation and diagnostic reporting.
+4. Establish a renderer abstraction independent of Sodium.
+5. Add optional Sodium and Mod Menu integrations.
+6. Develop and test Nvidium coexistence.

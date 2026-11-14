@@ -9,14 +9,18 @@ base {
 }
 
 repositories {
-    // Loom supplies the Minecraft and Fabric repositories.
-    // Add repositories here only when a real external dependency is introduced.
+    mavenCentral()
 }
 
 dependencies {
     minecraft("com.mojang:minecraft:${property("minecraft_version")}")
     mappings(loom.officialMojangMappings())
     modImplementation("net.fabricmc:fabric-loader:${property("loader_version")}")
+
+    // Test-only dependency; it is not included in the shipped mod.
+    testImplementation(platform("org.junit:junit-bom:5.12.2"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 val modVersion = project.version.toString()
@@ -31,6 +35,10 @@ tasks.processResources {
 tasks.withType<JavaCompile>().configureEach {
     options.release.set(21)
     options.encoding = "UTF-8"
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 java {
