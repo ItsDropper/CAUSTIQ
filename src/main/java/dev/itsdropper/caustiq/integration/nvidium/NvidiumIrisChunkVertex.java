@@ -28,7 +28,16 @@ public final class NvidiumIrisChunkVertex implements ChunkVertexType {
     private NvidiumIrisChunkVertex() { }
 
     public static void enable() { enabled = true; }
-    public static boolean isEnabled() { return enabled; }
+    public static boolean isEnabled() {
+        if (!enabled) return false;
+        try {
+            Class<?> nvidium = Class.forName("me.cortex.nvidium.Nvidium");
+            return nvidium.getField("IS_COMPATIBLE").getBoolean(null)
+                    && !nvidium.getField("FORCE_DISABLE").getBoolean(null);
+        } catch (ReflectiveOperationException | RuntimeException exception) {
+            return false;
+        }
+    }
 
     @Override public GlVertexFormat getVertexFormat() { return FORMAT; }
 
