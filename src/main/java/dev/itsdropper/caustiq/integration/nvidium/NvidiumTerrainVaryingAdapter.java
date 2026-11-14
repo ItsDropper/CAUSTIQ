@@ -125,8 +125,14 @@ public final class NvidiumTerrainVaryingAdapter {
         fragment = replaceOnce(fragment, "#version 460", "#version 460\\n" + MARKER, "fragment version");
         mesh = replaceOnce(mesh, "    vec2 uv;\\n    vec3 v_colour;", MESH_VARYINGS, "mesh interpolant declaration");
         fragment = replaceOnce(fragment, "    vec2 uv;\\n    vec3 v_colour;", FRAGMENT_VARYINGS, "fragment interpolant declaration");
-        fragment = replaceOnce(fragment, "#version 460\\n",
-                "#version 460\\n" + MARKER + "\\n" + FRAGMENT_UNIFORM_ALIASES, "fragment uniform aliases");
+        fragment = replaceOnce(fragment, MARKER + "\\n",
+                MARKER + "\\n" + FRAGMENT_UNIFORM_ALIASES, "fragment uniform aliases");
+        mesh = replaceOnce(mesh, "void putVertex(uint id, Vertex V) {",
+                "void putVertex(uint id, Vertex V, uint quadId) {", "mesh varying writer signature");
+        mesh = replaceOnce(mesh, "putVertex(qId+uint(triangle1), Vc);",
+                "putVertex(qId+uint(triangle1), Vc, quadId);", "common vertex varying call");
+        mesh = replaceOnce(mesh, "putVertex(uId, V);",
+                "putVertex(uId, V, quadId);", "unique vertex varying call");
         mesh = replaceOnce(mesh, "vec4 transformVertex(Vertex V) {",
                 NORMAL_HELPER + "\\n\\nvec4 transformVertex(Vertex V) {", "terrain basis helper insertion point");
         mesh = replaceOnce(mesh, "    bool triangle1 = (gl_LocalInvocationIndex & uint(1)) == 1;",
