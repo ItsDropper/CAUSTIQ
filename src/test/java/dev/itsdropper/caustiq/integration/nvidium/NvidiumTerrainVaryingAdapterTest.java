@@ -144,7 +144,10 @@ class NvidiumTerrainVaryingAdapterTest {
                     OUT[id].v_colour = computeMultiplier(V);
                 }
                 void main() {
+                    uint quadId = 0u;
                     bool triangle1 = (gl_LocalInvocationIndex & uint(1)) == 1;
+                    putVertex(0u, Vc);
+                    putVertex(1u, V, quadId);
                 }
                 """;
         String fragment = """
