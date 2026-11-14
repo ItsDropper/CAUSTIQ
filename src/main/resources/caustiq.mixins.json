@@ -3,6 +3,13 @@
   "minVersion": "0.8",
   "package": "dev.itsdropper.caustiq.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": ["GameRendererMixin", "ScreenAccessor", "VideoSettingsScreenMixin", "NvidiumWorldRendererMixin"],
+  "client": [
+    "GameRendererMixin",
+    "ScreenAccessor",
+    "VideoSettingsScreenMixin",
+    "NvidiumWorldRendererMixin",
+    "NvidiumShaderBuilderMixin",
+    "NvidiumIrisCheckMixin"
+  ],
   "injectors": {"defaultRequire": 1}
 }
