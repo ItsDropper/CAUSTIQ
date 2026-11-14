@@ -28,8 +28,9 @@ public final class NvidiumGBufferTargets {
     public static final int POSITION = 2;
     public static final int MATERIAL = 3;
     public static final int LIGHTMAP = 4;
+    public static final int MAX_ATTACHMENT = 7;
     private static final int FIRST_ATTACHMENT = GL30C.GL_COLOR_ATTACHMENT1;
-    private static final int ATTACHMENT_COUNT = 4;
+    private static final int ATTACHMENT_COUNT = MAX_ATTACHMENT;
     private static final int REQUIRED_DRAW_BUFFERS = ATTACHMENT_COUNT + 1;
 
     private static final int[] TEXTURES = new int[ATTACHMENT_COUNT];
@@ -126,8 +127,8 @@ public final class NvidiumGBufferTargets {
 
     /** Returns the GL texture object for an auxiliary color attachment (1 through 4). */
     public static int texture(int attachment) {
-        if (attachment < NORMAL || attachment > LIGHTMAP) {
-            throw new IllegalArgumentException("G-buffer attachment must be between 1 and 4.");
+        if (attachment < NORMAL || attachment > MAX_ATTACHMENT) {
+            throw new IllegalArgumentException("G-buffer attachment must be between 1 and " + MAX_ATTACHMENT + ".");
         }
         return TEXTURES[attachment - 1];
     }
