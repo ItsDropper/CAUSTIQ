@@ -1,5 +1,6 @@
 package dev.itsdropper.caustiq.shaderpack;
 
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTerrainAbi;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -54,15 +55,7 @@ public final class IrisTerrainCompatibilityAnalyzer {
             "cameraPosition", "previousCameraPosition");
     private static final Set<String> AVAILABLE_SAMPLERS = Set.of(
             "gtexture", "lightmap", "tex_diffuse", "tex_light");
-    private static final Map<String, String> AVAILABLE_VERTEX_ATTRIBUTES = Map.ofEntries(
-            Map.entry("gl_Vertex", "packed position"),
-            Map.entry("gl_MultiTexCoord0", "packed terrain UV"),
-            Map.entry("gl_MultiTexCoord1", "packed lightmap UV"),
-            Map.entry("gl_Color", "packed vertex tint"),
-            Map.entry("vaPosition", "packed position"),
-            Map.entry("vaUV0", "packed terrain UV"),
-            Map.entry("vaUV2", "packed lightmap UV"),
-            Map.entry("vaColor", "packed vertex tint"));
+
 
     public Result analyze(String vertexSource, String fragmentSource) {
         if (vertexSource == null || vertexSource.isBlank()
@@ -94,7 +87,9 @@ public final class IrisTerrainCompatibilityAnalyzer {
         Map<String, Declaration> vertexAttributes = declarations(vertex, Set.of("attribute", "in"));
         for (Declaration attribute : vertexAttributes.values()) {
             if (UNAVAILABLE_VERTEX_INPUTS.contains(attribute.name())) continue;
-            if (!AVAILABLE_VERTEX_ATTRIBUTES.containsKey(attribute.name())) {
+            if (NvidiumIrisTerrainAbi.vertexSemantic(attribute.name())
+                    .filter(semantic -> semantic.availability() != NvidiumIrisTerrainAbi.Availability.UNAVAILABLE)
+                    .isEmpty()) {
                 issues.add(new Issue("UNMAPPED_VERTEX_INPUT", attribute.name(),
                         "Nvidium's packed terrain vertex has no source for this declared vertex attribute."));
             }
