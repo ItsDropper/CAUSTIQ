@@ -1,12 +1,14 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NvidiumShaderProgramBridgeTest {
+    @BeforeEach void resetBefore() { NvidiumShaderProgramBridge.resetForTests(); }
     @AfterEach void reset() { NvidiumShaderProgramBridge.resetForTests(); }
 
     @Test void capturesTerrainStagesAtCompileBoundary() {
