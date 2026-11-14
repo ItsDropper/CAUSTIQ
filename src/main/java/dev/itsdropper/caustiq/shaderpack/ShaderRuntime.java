@@ -114,14 +114,20 @@ public final class ShaderRuntime {
 
             Map<String, String> defines = new LinkedHashMap<>();
             try {
-                ShaderPackMetadata metadata = ShaderPackMetadata.parse(sources.read("shaders.properties"));
+                String properties;
+                try {
+                    properties = sources.read("shaders.properties");
+                } catch (IOException missingProperties) {
+                    properties = "";
+                }
+                ShaderPackMetadata metadata = ShaderPackMetadata.parse(properties, sources);
                 for (ShaderPackMetadata.Option option : metadata.options()) {
                     defines.put(option.name(), CaustiqConfig.get().option(
                             selected.id(), option.name(), option.defaultValue()));
                 }
-            } catch (IOException | IllegalArgumentException exception) {
-                CaustiqClient.LOGGER.info("Shader pack '{}' has no readable shaders.properties options: {}",
-                        selected.displayName(), exception.getMessage());
+            } catch (IOException | IllegalArgumentException metadataFailure) {
+                CaustiqClient.LOGGER.warn("Unable to parse shader options for '{}'; compiling with pack defaults: {}",
+                        selected.displayName(), metadataFailure.getMessage());
             }
             selectedDefines = Map.copyOf(defines);
 

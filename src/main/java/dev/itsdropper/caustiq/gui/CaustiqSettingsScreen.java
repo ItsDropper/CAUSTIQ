@@ -20,6 +20,9 @@ public final class CaustiqSettingsScreen extends Screen {
     private static final int PAGE_SIZE = 7;
     private final Screen parent;
     private int optionPage;
+    private String metadataCachePackId;
+    private ShaderPackMetadata metadataCache;
+    private boolean metadataLoaded;
 
     public CaustiqSettingsScreen(Screen parent) {
         super(Component.translatable("caustiq.settings.title"));
@@ -67,9 +70,7 @@ public final class CaustiqSettingsScreen extends Screen {
                 .bounds(width / 2 - 100, height - 28, 200, 20).build());
     }
 
-    public void refreshView() {
-        init();
-    }
+    public void refreshView() { init(); }
 
     private void addOptionButtons(ShaderPackDescriptor pack, CaustiqConfig config) {
         ShaderPackMetadata metadata = readMetadata(pack);
@@ -89,6 +90,7 @@ public final class CaustiqSettingsScreen extends Screen {
         for (ShaderPackMetadata.Option option : metadata.options().subList(start, end)) {
             String value = config.option(pack.id(), option.name(), option.defaultValue());
             int selectedIndex = option.values().indexOf(value);
+            if (selectedIndex < 0) selectedIndex = option.values().indexOf(option.defaultValue());
             if (selectedIndex < 0) selectedIndex = 0;
             final int currentIndex = selectedIndex;
             addRenderableWidget(Button.builder(Component.literal(option.label() + ": " + value), button -> {
@@ -109,13 +111,23 @@ public final class CaustiqSettingsScreen extends Screen {
     }
 
     private ShaderPackMetadata readMetadata(ShaderPackDescriptor pack) {
+        if (metadataLoaded && pack.id().equals(metadataCachePackId)) return metadataCache;
+        metadataLoaded = true;
+        metadataCachePackId = pack.id();
+        metadataCache = null;
         try (ShaderPackSources sources = ShaderPackSources.open(pack)) {
-            return ShaderPackMetadata.parse(sources.read("shaders.properties"));
+            String properties;
+            try {
+                properties = sources.read("shaders.properties");
+            } catch (IOException missingProperties) {
+                properties = "";
+            }
+            metadataCache = ShaderPackMetadata.parse(properties, sources);
         } catch (IOException | IllegalArgumentException exception) {
             CaustiqClient.LOGGER.warn("Unable to read options for shader pack '{}': {}",
                     pack.displayName(), exception.getMessage());
-            return null;
         }
+        return metadataCache;
     }
 
     private static Component enabledLabel(boolean enabled) {
