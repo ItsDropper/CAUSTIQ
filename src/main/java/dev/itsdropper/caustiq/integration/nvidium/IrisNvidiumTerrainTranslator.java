@@ -543,7 +543,7 @@ public final class IrisNvidiumTerrainTranslator {
     private static String renameMain(String source, String replacement) {
         Matcher matcher = MAIN.matcher(source);
         if (!matcher.find()) throw new IllegalArgumentException("Iris terrain stage does not define void main().");
-        String result = matcher.replaceFirst(replacement + "()");
+        String result = matcher.replaceFirst("void " + replacement + "()");
         if (MAIN.matcher(result).find()) {
             throw new IllegalArgumentException("Iris terrain stage defines more than one main entry point.");
         }
