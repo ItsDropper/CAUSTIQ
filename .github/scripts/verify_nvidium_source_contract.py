@@ -26,7 +26,15 @@ bridge = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidi
 assert "private final Map<ShaderType, String> sources" in shader, "Shader.Builder.sources signature changed"
 assert "public Shader compile()" in shader, "Shader.Builder.compile() signature changed"
 assert "class Builder" in shader, "Shader.Builder nested class disappeared"
-assert "NvidiumShaderBuilderMixin" in (caustiq_root / "src/main/resources/caustiq.mixins.json").read_text()
+mixins_json = json.loads((caustiq_root / "src/main/resources/caustiq.mixins.json").read_text(encoding="utf-8"))
+assert "NvidiumShaderBuilderMixin" in mixins_json["client"]
+assert "NvidiumTerrainRasterizerMixin" in mixins_json["client"]
+rasterizer_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumTerrainRasterizerMixin.java").read_text(encoding="utf-8")
+assert 'me.cortex.nvidium.renderers.PrimaryTerrainRasterizer' in rasterizer_mixin
+assert 'method = "raster"' in rasterizer_mixin
+gbuffer_manager = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumGBufferTargets.java").read_text(encoding="utf-8")
+assert "GL_COLOR_ATTACHMENT1" in gbuffer_manager and "GL_COLOR_ATTACHMENT0 + i" in gbuffer_manager
+assert "glCheckFramebufferStatus" in gbuffer_manager and "glDrawBuffers" in gbuffer_manager
 builder_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumShaderBuilderMixin.java").read_text()
 assert 'me.cortex.nvidium.gl.shader.Shader$Builder' in builder_mixin
 assert '@Shadow @Final private Map<?, String> sources' in builder_mixin
