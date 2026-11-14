@@ -159,6 +159,10 @@ class NvidiumTerrainVaryingAdapterTest {
                     uint8_t material;
                     uint8_t section;
                 };
+                vec4 decodeVertexColour(Vertex v) {
+                    uvec3 packed_color = (uvec3(v.color) >> uvec3(0, 8, 16)) & uvec3(0xFFu);
+                    return vec4(vec3(packed_color) * COLOR_SCALE, 1);
+                }
                 bool hasMipping(Vertex v) { return bool(int(v.material) & 1); }
                 uint rawVertexAlphaCutoff(Vertex v) { return (int(v.material) >> 1) & 3; }
                 layout(location=1) out Interpolants {
