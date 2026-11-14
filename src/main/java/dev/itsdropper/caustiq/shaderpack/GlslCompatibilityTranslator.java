@@ -7,11 +7,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Converts the common GLSL 1.10/1.20 fragment-shader idioms used by older
- * OptiFine-style final passes into the GLSL 1.50 core profile used by Minecraft.
+ * Converts common GLSL 1.10/1.20 fragment syntax used by older OptiFine-style
+ * final passes into the GLSL 1.50 core profile used by Minecraft.
  *
- * This is deliberately a bounded compatibility layer, not a general GLSL
- * transpiler. Unsupported multi-render-target output is rejected explicitly.
+ * This is a bounded compatibility layer, not a general GLSL transpiler.
  */
 public final class GlslCompatibilityTranslator {
     private static final Pattern VERSION = Pattern.compile("^\\s*#\\s*version\\s+(\\d+)(?:\\s+\\w+)?\\s*$");
@@ -25,16 +24,14 @@ public final class GlslCompatibilityTranslator {
 
         String[] lines = source.split("\\R", -1);
         int version = 120;
-        int versionLine = -1;
-        for (int i = 0; i < lines.length; i++) {
-            Matcher matcher = VERSION.matcher(lines[i]);
+        for (String line : lines) {
+            Matcher matcher = VERSION.matcher(line);
             if (matcher.matches()) {
                 version = Integer.parseInt(matcher.group(1));
-                versionLine = i;
                 break;
             }
-            if (!lines[i].isBlank() && !lines[i].stripLeading().startsWith("#")
-                    && !lines[i].stripLeading().startsWith("//")) {
+            if (!line.isBlank() && !line.stripLeading().startsWith("#")
+                    && !line.stripLeading().startsWith("//")) {
                 break;
             }
         }
@@ -50,24 +47,16 @@ public final class GlslCompatibilityTranslator {
         List<String> extensions = new ArrayList<>();
         List<String> body = new ArrayList<>();
         for (String line : lines) {
+            if (VERSION.matcher(line).matches()) continue;
             if (EXTENSION.matcher(line).matches()) extensions.add(line.strip());
             else body.add(line);
         }
 
-        int insertion = 0;
-        if (versionLine >= 0) {
-            // The version directive must remain the first directive.
-            body.remove(versionLine);
-            body.add(0, "#version 150");
-            insertion = 1;
-        } else {
-            body.add(0, "#version 150");
-            insertion = 1;
-        }
-        for (String extension : extensions) body.add(insertion++, extension);
+        StringBuilder translated = new StringBuilder(source.length() + 128);
+        translated.append("#version 150\n");
+        for (String extension : extensions) translated.append(extension).append('\n');
+        for (String line : body) translated.append(line).append('\n');
 
-        StringBuilder translated = new StringBuilder(source.length() + 96);
-        translated.append(String.join("\n", body));
         String result = translated.toString()
                 .replaceAll("\\btexture2D\\s*\\(", "texture(")
                 .replaceAll("\\btextureCube\\s*\\(", "texture(")
@@ -76,12 +65,9 @@ public final class GlslCompatibilityTranslator {
                 .replaceAll("\\bgl_FragColor\\b", "caustiq_FragColor");
 
         if (result.contains("caustiq_FragColor")) {
-            declaration = result.indexOf('\n', declaration);
-            declaration = result.indexOf('\n', declaration);
-            if (declaration < 0) declaration = 0;
-            else declaration++;
-            result = result.substring(0, declaration)
-                    + "out vec4 caustiq_FragColor;\n" + result.substring(declaration);
+            int insertion = result.indexOf('\n') + 1;
+            result = result.substring(0, insertion)
+                    + "out vec4 caustiq_FragColor;\n" + result.substring(insertion);
         }
         return result;
     }
