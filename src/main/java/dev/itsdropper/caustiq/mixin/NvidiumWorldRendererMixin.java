@@ -1,6 +1,7 @@
 package dev.itsdropper.caustiq.mixin;
 
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisChunkVertex;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTextureBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumRenderBridge;
 import org.spongepowered.asm.mixin.Mixin;
