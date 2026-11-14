@@ -261,4 +261,24 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 && i.symbol().equals("gtexture")));
     }
 
+    @Test
+    void rejectsLegacyFixedFunctionInputsOutsideThePackedVertexFormat() {
+        String vertex = """
+                #version 400 compatibility
+                void main() {
+                    gl_Position = gl_Vertex + gl_MultiTexCoord2 + vec4(gl_FogCoord);
+                }
+                """;
+        String fragment = """
+                #version 400
+                layout(location = 0) out vec4 color;
+                void main() { color = vec4(1.0); }
+                """;
+        var result = analyzer.analyze(vertex, fragment);
+        assertTrue(result.issues().stream().anyMatch(i ->
+                i.code().equals("UNAVAILABLE_VERTEX_INPUT") && i.symbol().equals("gl_MultiTexCoord2")));
+        assertTrue(result.issues().stream().anyMatch(i ->
+                i.code().equals("UNAVAILABLE_VERTEX_INPUT") && i.symbol().equals("gl_FogCoord")));
+    }
+
 }
