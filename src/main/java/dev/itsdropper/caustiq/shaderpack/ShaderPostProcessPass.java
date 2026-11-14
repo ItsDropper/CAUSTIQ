@@ -1,6 +1,7 @@
 package dev.itsdropper.caustiq.shaderpack;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumGBufferTargets;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderPass;
@@ -37,6 +38,10 @@ public final class ShaderPostProcessPass implements AutoCloseable {
             pass.setPipeline(program.pipeline());
             pass.bindTexture("DiffuseSampler", mainTarget.getColorTextureView(), sampler);
             pass.bindTexture("colortex0", mainTarget.getColorTextureView(), sampler);
+            pass.bindTexture("colortex1", textureOrMain(NvidiumGBufferTargets.NORMAL, mainTarget), sampler);
+            pass.bindTexture("colortex2", textureOrMain(NvidiumGBufferTargets.POSITION, mainTarget), sampler);
+            pass.bindTexture("colortex3", textureOrMain(NvidiumGBufferTargets.MATERIAL, mainTarget), sampler);
+            pass.bindTexture("colortex4", textureOrMain(NvidiumGBufferTargets.LIGHTMAP, mainTarget), sampler);
             pass.bindTexture("gcolor", mainTarget.getColorTextureView(), sampler);
             pass.bindTexture("texture", mainTarget.getColorTextureView(), sampler);
             pass.bindTexture("tex", mainTarget.getColorTextureView(), sampler);
@@ -50,6 +55,12 @@ public final class ShaderPostProcessPass implements AutoCloseable {
                 0, 0, 0, 0, 0,
                 targetWidth, targetHeight
         );
+    }
+
+    private static com.mojang.blaze3d.textures.GpuTextureView textureOrMain(
+            int attachment, RenderTarget mainTarget) {
+        com.mojang.blaze3d.textures.GpuTextureView view = NvidiumGBufferTargets.view(attachment);
+        return view == null ? mainTarget.getColorTextureView() : view;
     }
 
     private void ensureTarget(int targetWidth, int targetHeight) {
