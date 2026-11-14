@@ -44,7 +44,7 @@ public final class IrisGlProgramCompiler {
     public IrisGlProgram compile(ShaderPackProgramCatalog.Program program,
                                  GlslPreprocessor.SourceProvider sourceProvider,
                                  Set<String> defines) throws IOException {
-        if (program.hasCompute() || program.vertexSource() == null || program.fragmentSource() == null
+        if (program.hasCompute() || program.fragmentSource() == null
                 || program.stages().containsKey(ShaderPackProgramCatalog.Stage.GEOMETRY)
                 || program.stages().containsKey(ShaderPackProgramCatalog.Stage.TESSELLATION_CONTROL)
                 || program.stages().containsKey(ShaderPackProgramCatalog.Stage.TESSELLATION_EVALUATION)) {
@@ -52,9 +52,14 @@ public final class IrisGlProgramCompiler {
         }
 
         GlslPreprocessor preprocessor = new GlslPreprocessor();
-        String vertex = preprocessor.preprocess(program.vertexSource(), sourceProvider).source();
         String fragment = preprocessor.preprocess(program.fragmentSource(), sourceProvider).source();
-        vertex = translateVertex(vertex);
+        String vertex;
+        if (program.vertexSource() == null) {
+            vertex = FULLSCREEN_VERTEX;
+        } else {
+            String vertexSource = preprocessor.preprocess(program.vertexSource(), sourceProvider).source();
+            vertex = translateVertex(vertexSource, texCoordIndices(fragment));
+        }
         fragment = translateFragment(fragment);
         vertex = injectDefines(vertex, defines);
         fragment = injectDefines(fragment, defines);
@@ -105,12 +110,17 @@ public final class IrisGlProgramCompiler {
             }
             samplers.add(name);
         }
+        String withoutSupported = SAMPLER.matcher(source).replaceAll("");
+        if (Pattern.compile("\\buniform\\s+\\w*sampler\\w*\\b").matcher(withoutSupported).find()) {
+            throw new IOException("Iris pass contains a sampler declaration that is not a supported single sampler2D binding.");
+        }
         return Set.copyOf(samplers);
     }
 
-    private static String translateVertex(String source) throws IOException {
+    private static String translateVertex(String source, Set<Integer> fragmentTexCoords) throws IOException {
         String working = VERSION.matcher(source).replaceAll("");
-        Set<Integer> texCoords = texCoordIndices(working);
+        Set<Integer> texCoords = new LinkedHashSet<>(texCoordIndices(working));
+        texCoords.addAll(fragmentTexCoords);
         StringBuilder declarations = new StringBuilder();
         declarations.append("const vec2 caustiqPositions[3] = vec2[3](")
                 .append("vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));\n")
@@ -198,7 +208,8 @@ public final class IrisGlProgramCompiler {
         }
         working = working.replaceAll("\\btexture2D\\b|\\btextureCube\\b", "texture")
                 .replaceAll("\\btexture2DLod\\b", "textureLod")
-                .replaceAll("\\btexture2DProj\\b", "textureProj");
+                .replaceAll("\\btexture2DProj\\b", "textureProj")
+                .replaceAll("\\btexture2DGradARB\\b", "textureGrad");
         if (working.contains("gl_FragData") || working.contains("gl_TexCoord")
                 || working.contains("gl_FragColor") || working.contains("gl_FragDepth")) {
             throw new IOException("Iris fragment shader contains an unsupported legacy fragment output.");
