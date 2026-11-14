@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class NvidiumTerrainVaryingAdapterTest {
     @Test
-    void addsUvTintLightmapWorldPositionAndFaceNormalToMeshFragmentAbi() {
+    void addsUvTintLightmapRenderPositionMaterialFlagsAndFaceNormalToMeshFragmentAbi() {
         Map<String, String> adapted = NvidiumTerrainVaryingAdapter.adapt(sourceStages());
         String mesh = adapted.get("MESH");
         String fragment = adapted.get("FRAGMENT");
@@ -22,13 +22,19 @@ class NvidiumTerrainVaryingAdapterTest {
         assertTrue(fragment.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 1"));
         for (String varying : new String[]{
                 "vec2 uv;", "vec3 v_colour;", "vec3 v_vertexColour;",
-                "vec2 v_lightmapCoord;", "vec3 v_worldPosition;", "vec3 v_normal;"
+                "vec2 v_lightmapCoord;", "vec3 v_renderPosition;", "vec3 v_normal;", "flat uint v_materialFlags;"
         }) {
             assertTrue(mesh.contains(varying), "Mesh output missing " + varying);
             assertTrue(fragment.contains(varying), "Fragment input missing " + varying);
         }
         assertTrue(mesh.contains("decodeVertexColour(V).rgb"));
         assertTrue(mesh.contains("decodeLightUV(V)"));
+        assertTrue(mesh.contains("rawVertexAlphaCutoff(V) << 1u"));
+        assertTrue(mesh.contains("hasMipping(V) ? 1u : 0u"));
+        assertTrue(fragment.contains("#define CAUSTIQ_IRIS_VIEW_WIDTH (screenSize.x * 2.0)"));
+        assertTrue(fragment.contains("#define CAUSTIQ_IRIS_VIEW_HEIGHT (screenSize.y * 2.0)"));
+        assertTrue(fragment.contains("#define CAUSTIQ_IRIS_GTEXTURE tex_diffuse"));
+        assertTrue(fragment.contains("#define CAUSTIQ_IRIS_LIGHTMAP tex_light"));
         assertTrue(mesh.contains("transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)"));
         assertTrue(mesh.contains("cross(pb - pa, pc - pa)"));
         assertTrue(mesh.contains("caustiqComputeTriangleNormal(quadId, triangle1)"));
@@ -70,7 +76,8 @@ class NvidiumTerrainVaryingAdapterTest {
         Map<String, String> adapted = NvidiumTerrainVaryingAdapter.adapt(sources);
         assertTrue(adapted.get("MESH").contains("caustiqComputeTriangleNormal(quadId, triangle1)"));
         assertTrue(adapted.get("MESH").contains("OUT[id].v_lightmapCoord = decodeLightUV(V);"));
-        assertTrue(adapted.get("FRAGMENT").contains("vec3 v_worldPosition;"));
+        assertTrue(adapted.get("FRAGMENT").contains("vec3 v_renderPosition;"));
+        assertTrue(adapted.get("FRAGMENT").contains("flat uint v_materialFlags;"));
         assertEquals(sources.get("TASK"), adapted.get("TASK"));
     }
 
