@@ -59,6 +59,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("viewHeight", "(screenSize.y * 2.0)"),
             Map.entry("fogColor", "fogColour"),
             Map.entry("noisetex", "caustiqNoiseTexture"),
+            Map.entry("colortex15", "caustiqColortex15"),
             Map.entry("normals", "caustiqNormalTexture"),
             Map.entry("specular", "caustiqSpecularTexture"),
             Map.entry("near", "caustiqNear"),
@@ -497,6 +498,7 @@ public final class IrisNvidiumTerrainTranslator {
                 layout(binding = 2) uniform sampler2D caustiqNoiseTexture;
                 layout(binding = 3) uniform sampler2D caustiqNormalTexture;
                 layout(binding = 4) uniform sampler2D caustiqSpecularTexture;
+                layout(binding = 15) uniform sampler2D caustiqColortex15;
                 uniform float caustiqNear;
                 uniform float caustiqFar;
                 uniform ivec2 caustiqAtlasSize;
@@ -521,7 +523,7 @@ public final class IrisNvidiumTerrainTranslator {
 
     private static String expectedUniformType(String name) {
         return switch (name) {
-            case "gtexture", "lightmap", "noisetex", "normals", "specular" -> "sampler2D";
+            case "gtexture", "lightmap", "noisetex", "normals", "specular", "colortex15" -> "sampler2D";
             case "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse" -> "mat4";
             case "cameraPosition", "fogColor", "light_dir", "eyePosition" -> "vec3";
             case "frameTimeCounter", "viewWidth", "viewHeight", "near", "far", "rainStrength",
