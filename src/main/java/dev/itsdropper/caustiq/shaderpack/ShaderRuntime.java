@@ -122,6 +122,17 @@ public final class ShaderRuntime {
         }
     }
 
+    private static void rebuildTerrainSections() {
+        Object levelRenderer = Minecraft.getInstance().levelRenderer;
+        if (levelRenderer == null) return;
+        try {
+            levelRenderer.getClass().getMethod("allChanged").invoke(levelRenderer);
+            CaustiqClient.LOGGER.info("Requested terrain section rebuild after changing the shader pack block material map.");
+        } catch (ReflectiveOperationException exception) {
+            CaustiqClient.LOGGER.warn("Could not request a terrain section rebuild after changing block.properties IDs.", exception);
+        }
+    }
+
     private static void beginDiscovery() {
         ShaderPackScanResult result = SCAN_RESULT.get();
         if (result == null || result.packs().isEmpty()) {
@@ -144,11 +155,11 @@ public final class ShaderRuntime {
             if (shaderFiles.contains("block.properties")) {
                 Map<String, Integer> blockIds = new IrisBlockPropertiesParser()
                         .parse(sources.read("block.properties"));
-                NvidiumIrisVertexContext.setBlockIds(blockIds);
+                if (NvidiumIrisVertexContext.setBlockIds(blockIds)) rebuildTerrainSections();
                 CaustiqClient.LOGGER.info("Loaded {} block.properties material ID mapping(s) for mc_Entity.",
                         blockIds.size());
             } else {
-                NvidiumIrisVertexContext.setBlockIds(Map.of());
+                if (NvidiumIrisVertexContext.setBlockIds(Map.of())) rebuildTerrainSections();
                 CaustiqClient.LOGGER.info("Shader pack '{}' has no block.properties; mc_Entity uses registry block IDs.",
                         selected.displayName());
             }
