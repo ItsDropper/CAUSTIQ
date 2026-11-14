@@ -1,5 +1,7 @@
 package dev.itsdropper.caustiq.shaderpack;
 
+import dev.itsdropper.caustiq.integration.nvidium.IrisNvidiumTerrainTranslator;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
 
@@ -105,22 +107,11 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 Path.of(photonDirectory), "", ShaderPackSourceType.DIRECTORY,
                 ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
         try (var sources = ShaderPackSources.open(descriptor)) {
-            var preprocessor = new GlslPreprocessor();
-            String vertex = preprocessor.preprocess("world0/gbuffers_terrain.vsh", sources).source();
-            String fragment = preprocessor.preprocess("world0/gbuffers_terrain.fsh", sources).source();
-            var result = analyzer.analyze(vertex, fragment);
-            assertFalse(result.compatible(), "Photon must not be reported compatible with the incomplete Nvidium ABI");
-            assertFalse(result.issues().stream().anyMatch(i -> i.code().equals("UNAVAILABLE_VERTEX_INPUT")
-                    && i.symbol().equals("at_tangent")));
-            assertFalse(result.issues().stream().anyMatch(i -> i.code().equals("UNAVAILABLE_VERTEX_INPUT")
-                    && i.symbol().equals("mc_Entity")));
-            assertFalse(result.issues().stream().anyMatch(i -> i.code().equals("UNMAPPED_VERTEX_INPUT")
-                    && i.symbol().equals("mc_midTexCoord")));
-            assertFalse(result.issues().stream().anyMatch(i -> i.code().equals("UNAVAILABLE_TRANSFORM")
-                    && i.symbol().equals("cameraPosition")));
-            assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNBOUND_SAMPLER")
-                    && i.symbol().equals("noisetex")));
-            assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("MULTIPLE_RENDER_TARGETS")));
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisNvidiumTerrainTranslator translator = assertDoesNotThrow(
+                    () -> IrisNvidiumTerrainTranslator.from(model),
+                    "The pinned Photon gbuffers_terrain pair must translate into the Nvidium mesh/fragment ABI");
+            assertNotNull(translator);
         }
     }
 
