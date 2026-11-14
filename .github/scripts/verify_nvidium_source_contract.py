@@ -67,8 +67,13 @@ assert fragment.count("    vec2 uv;\n    vec3 v_colour;") == 1, "Pinned Nvidium 
 assert "CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS" in adapter
 assert "USE_NV_FRAGMENT_SHADER_BARYCENTRIC" in adapter, "Extended varying ABI must disable Nvidium barycentric-only path"
 assert "decodeLightUV(V)" in adapter and "decodeVertexColour(V).rgb" in adapter
-assert "cross(pb - pa, pc - pa)" in adapter, "Geometric face-normal reconstruction is missing"
-assert "transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)" in adapter, "Terrain render position is not transformed"
+assert "cross(edge1, edge2)" in adapter, "Geometric face-normal reconstruction is missing"
+assert "caustiqQuadMidUv(uint quadId)" in adapter, "Quad midpoint UV reconstruction is missing"
+assert "caustiqQuadMidPosition(uint quadId)" in adapter, "Quad midpoint position reconstruction is missing"
+assert "caustiqComputeTriangleBasis(uint quadId, bool triangle1)" in adapter, "Per-triangle tangent basis reconstruction is missing"
+assert "flat mat3 v_tbn;" in adapter and "OUT[id].v_tbn = caustiqTriangleTbn;" in adapter
+assert "putVertex(uint id, Vertex V, uint quadId)" in adapter, "Mesh varying writer does not receive quad identity"
+assert "transformMat * vec4(decodeVertexPosition(vertex) + origin, 1.0)" in adapter, "Terrain render position is not transformed"
 assert "flat uint v_materialFlags;" in adapter and "rawVertexAlphaCutoff(V)" in adapter
 abi = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisTerrainAbi.java").read_text(encoding="utf-8")
 assert "CAUSTIQ_IRIS_VIEW_WIDTH (screenSize.x * 2.0)" in abi
