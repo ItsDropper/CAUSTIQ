@@ -23,12 +23,12 @@ public final class NvidiumTerrainVaryingAdapter {
         vec3 v_worldPosition;
         vec3 v_normal;""";
     private static final String FRAGMENT_VARYINGS = """
-            vec2 uv;
-            vec3 v_colour;
-            vec3 v_vertexColour;
-            vec2 v_lightmapCoord;
-            vec3 v_worldPosition;
-            vec3 v_normal;""";
+        vec2 uv;
+        vec3 v_colour;
+        vec3 v_vertexColour;
+        vec2 v_lightmapCoord;
+        vec3 v_worldPosition;
+        vec3 v_normal;""";
     private static final String MESH_ASSIGNMENTS = """
         OUT[id].uv = decodeVertexUV(V);
         OUT[id].v_colour = computeMultiplier(V);
