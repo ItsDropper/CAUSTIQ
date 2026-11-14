@@ -127,7 +127,13 @@ jobs:
                   "dev/itsdropper/caustiq/mixin/NvidiumShaderBuilderMixin.class",
                   "dev/itsdropper/caustiq/mixin/NvidiumIrisCheckMixin.class",
                   "dev/itsdropper/caustiq/mixin/NvidiumTerrainRasterizerMixin.class",
+                  "dev/itsdropper/caustiq/mixin/NvidiumExtendedVertexFormatMixin.class",
+                  "dev/itsdropper/caustiq/mixin/NvidiumRepackagedStrideMixin.class",
+                  "dev/itsdropper/caustiq/mixin/NvidiumBlockRendererVertexContextMixin.class",
+                  "dev/itsdropper/caustiq/mixin/NvidiumFluidRendererVertexContextMixin.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumGBufferTargets.class",
+                  "dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.class",
+                  "dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisVertexContext.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumShaderProgramBridge.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumTerrainVaryingAdapter.class",
               }
@@ -140,6 +146,10 @@ jobs:
                   "NvidiumShaderBuilderMixin",
                   "NvidiumIrisCheckMixin",
                   "NvidiumTerrainRasterizerMixin",
+                  "NvidiumExtendedVertexFormatMixin",
+                  "NvidiumRepackagedStrideMixin",
+                  "NvidiumBlockRendererVertexContextMixin",
+                  "NvidiumFluidRendererVertexContextMixin",
               }), mixins["client"]
               assert required_classes.issubset(set(jar.namelist())), required_classes - set(jar.namelist())
               assert "caustiq-nvidium" in jar_path, jar_path
