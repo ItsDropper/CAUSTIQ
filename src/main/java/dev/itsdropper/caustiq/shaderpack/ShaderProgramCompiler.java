@@ -56,9 +56,8 @@ public final class ShaderProgramCompiler {
         Objects.requireNonNull(sourceProvider, "sourceProvider");
         GlslPreprocessor.Result preprocessed = new GlslPreprocessor()
                 .preprocess(program.fragmentSource(), sourceProvider);
-        String fragmentSource = new GlslCompatibilityTranslator()
-                .translateLegacyFragment(preprocessed.source());
-        fragmentSource = applyDefines(fragmentSource, defines);
+        final String fragmentSource = applyDefines(
+                new GlslCompatibilityTranslator().translateLegacyFragment(preprocessed.source()), defines);
 
         String key = program.name().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_./-]", "_");
         Identifier pipelineId = Identifier.fromNamespaceAndPath("caustiq", "dynamic/" + key);
