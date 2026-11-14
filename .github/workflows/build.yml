@@ -37,6 +37,19 @@ jobs:
           python3 .github/scripts/verify_nvidium_source_contract.py "$nvidium_dir" "$GITHUB_WORKSPACE"
           echo "NVIDIUM_SOURCE_DIR=$nvidium_dir" >> "$GITHUB_ENV"
 
+      - name: Check out pinned Photon shader-pack sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          photon_dir="$RUNNER_TEMP/photon-source"
+          mkdir -p "$photon_dir"
+          curl --fail --silent --show-error --location \
+            "https://github.com/sixthsurge/photon/archive/2a3d502c17d2e310412c717be47241f014cba7fc.tar.gz" \
+            | tar -xz --strip-components=1 -C "$photon_dir"
+          test -s "$photon_dir/shaders/world0/gbuffers_terrain.vsh"
+          test -s "$photon_dir/shaders/world0/gbuffers_terrain.fsh"
+          echo "PHOTON_SOURCE_DIR=$photon_dir" >> "$GITHUB_ENV"
+
       - name: Build mod and package example shader pack
         shell: bash
         run: |
