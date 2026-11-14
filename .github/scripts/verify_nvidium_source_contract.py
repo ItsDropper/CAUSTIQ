@@ -65,6 +65,7 @@ for anchor, label in [
     assert mesh.count(anchor) == 1, f"Pinned Nvidium mesh shader adapter anchor is missing or ambiguous: {label}"
 assert fragment.count("    vec2 uv;\n    vec3 v_colour;") == 1, "Pinned Nvidium fragment varying declaration changed or is ambiguous"
 assert "CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS" in adapter
+assert "USE_NV_FRAGMENT_SHADER_BARYCENTRIC" in adapter, "Extended varying ABI must disable Nvidium barycentric-only path"
 assert "decodeLightUV(V)" in adapter and "decodeVertexColour(V).rgb" in adapter
 assert "cross(pb - pa, pc - pa)" in adapter, "Geometric face-normal reconstruction is missing"
 assert "transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)" in adapter, "Terrain position is not transformed into world space"
