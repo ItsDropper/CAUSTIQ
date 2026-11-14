@@ -56,6 +56,34 @@ class NvidiumShaderProgramBridgeTest {
         assertFalse(NvidiumShaderProgramBridge.hasTerrainAdapter());
     }
 
+
+    @Test void nativeVaryingAdapterDoesNotEnableIrisCompatibility() {
+        NvidiumShaderProgramBridge.registerNativeSourceAdapter(sources -> Map.of(
+                "TASK", sources.get("TASK"),
+                "MESH", sources.get("MESH") + "\\n// native varying profile",
+                "FRAGMENT", sources.get("FRAGMENT") + "\\n// native varying profile"));
+        Map<Object, String> sources = terrainSources();
+        NvidiumShaderProgramBridge.transformBeforeCompile(sources);
+        assertTrue(sources.get(Stage.MESH).endsWith("// native varying profile"));
+        assertFalse(NvidiumShaderProgramBridge.hasTerrainAdapter(),
+                "Native varying support must not bypass Nvidium's Iris safety gate");
+    }
+
+    @Test void nativeAndIrisAdaptersRunInOrder() {
+        NvidiumShaderProgramBridge.registerNativeSourceAdapter(sources -> Map.of(
+                "TASK", sources.get("TASK"),
+                "MESH", sources.get("MESH") + "\\n// native",
+                "FRAGMENT", sources.get("FRAGMENT") + "\\n// native"));
+        NvidiumShaderProgramBridge.registerTerrainAdapter(sources -> Map.of(
+                "TASK", sources.get("TASK"),
+                "MESH", sources.get("MESH") + "\\n// iris",
+                "FRAGMENT", sources.get("FRAGMENT") + "\\n// iris"));
+        Map<Object, String> sources = terrainSources();
+        NvidiumShaderProgramBridge.transformBeforeCompile(sources);
+        assertTrue(sources.get(Stage.MESH).endsWith("// native\\n// iris"));
+        assertTrue(NvidiumShaderProgramBridge.hasTerrainAdapter());
+    }
+
     @Test void ignoresNonTerrainPrograms() {
         Map<Object, String> sources = new LinkedHashMap<>();
         sources.put(Stage.COMPUTE, "compute source");
