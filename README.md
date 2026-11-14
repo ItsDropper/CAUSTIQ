@@ -9,21 +9,24 @@ Caustiq is an independent, client-side Minecraft shader engine. Its primary goal
 ## Development target
 
 - Minecraft 1.21.11
-- Java 21
+- Java 21 bytecode / runtime target
+- JDK 25 for the current Fabric Loom build process
 - Fabric Loader 0.20.1
 - Fabric Loom 1.19-SNAPSHOT
 - Official Mojang mappings
 - Gradle Kotlin DSL
 - No Fabric API dependency
 
-Fabric Loader is the only required mod-platform dependency. Sodium and Mod Menu integrations are intended to remain optional.
+The current Loom release requires JDK 25 to run Gradle. The mod itself is compiled with `--release 21` and targets Java 21, as required for Minecraft 1.21.11. Fabric Loader is the only required mod-platform dependency. Sodium and Mod Menu integrations are intended to remain optional.
 
 ## Build
+
+Use JDK 25 to run Gradle.
 
 On Windows:
 
 ```powershell
-.gradlew.bat build
+.\gradlew.bat build
 ```
 
 On Linux/macOS:
