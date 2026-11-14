@@ -29,7 +29,7 @@ class NvidiumTerrainVaryingAdapterTest {
         }
         assertTrue(mesh.contains("decodeVertexColour(V).rgb"));
         assertTrue(mesh.contains("decodeLightUV(V)"));
-        assertTrue(mesh.contains("decodeVertexPosition(V) + origin"));
+        assertTrue(mesh.contains("transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)"));
         assertTrue(mesh.contains("cross(pb - pa, pc - pa)"));
         assertTrue(mesh.contains("caustiqComputeTriangleNormal(quadId, triangle1)"));
         assertEquals("task source", adapted.get("TASK"));
