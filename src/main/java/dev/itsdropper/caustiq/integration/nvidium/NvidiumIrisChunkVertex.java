@@ -32,8 +32,7 @@ public final class NvidiumIrisChunkVertex implements ChunkVertexType {
         if (!enabled) return false;
         try {
             Class<?> nvidium = Class.forName("me.cortex.nvidium.Nvidium");
-            return nvidium.getField("IS_COMPATIBLE").getBoolean(null)
-                    && !nvidium.getField("FORCE_DISABLE").getBoolean(null);
+            return nvidium.getField("IS_ENABLED").getBoolean(null);
         } catch (ReflectiveOperationException | RuntimeException exception) {
             return false;
         }
