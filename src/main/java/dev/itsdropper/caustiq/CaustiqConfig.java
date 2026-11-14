@@ -13,11 +13,14 @@ import java.util.TreeMap;
 
 /** Persistent, bounded local settings for Caustiq. */
 public final class CaustiqConfig {
+    public static final int MIN_COMPILE_BUDGET = 1;
+    public static final int MAX_COMPILE_BUDGET = 8;
     private static final Path FILE = net.fabricmc.loader.api.FabricLoader.getInstance()
             .getConfigDir().resolve("caustiq.properties");
     private static final CaustiqConfig INSTANCE = load();
 
     private boolean enabled;
+    private int compileBudget = 1;
     private String selectedPackId = "";
     private final Map<String, String> options = new LinkedHashMap<>();
 
@@ -25,6 +28,7 @@ public final class CaustiqConfig {
     public static CaustiqConfig get() { return INSTANCE; }
 
     public synchronized boolean enabled() { return enabled; }
+    public synchronized int compileBudget() { return compileBudget; }
     public synchronized String selectedPackId() { return selectedPackId; }
 
     public synchronized String option(String packId, String name, String fallback) {
@@ -42,6 +46,11 @@ public final class CaustiqConfig {
 
     public synchronized void setEnabled(boolean value) {
         enabled = value;
+        save();
+    }
+
+    public synchronized void setCompileBudget(int value) {
+        compileBudget = Math.clamp(value, MIN_COMPILE_BUDGET, MAX_COMPILE_BUDGET);
         save();
     }
 
@@ -73,6 +82,9 @@ public final class CaustiqConfig {
         try (InputStream input = Files.newInputStream(FILE)) {
             properties.load(input);
             config.enabled = Boolean.parseBoolean(properties.getProperty("enabled", "false"));
+            config.compileBudget = Math.clamp(
+                    Integer.parseInt(properties.getProperty("compileBudget", "1")),
+                    MIN_COMPILE_BUDGET, MAX_COMPILE_BUDGET);
             config.selectedPackId = properties.getProperty("selectedPack", "");
             if (config.selectedPackId.length() > 256) config.selectedPackId = "";
             for (String key : properties.stringPropertyNames()) {
@@ -83,6 +95,7 @@ public final class CaustiqConfig {
             }
         } catch (IOException | IllegalArgumentException exception) {
             config.enabled = false;
+            config.compileBudget = 1;
             config.selectedPackId = "";
             config.options.clear();
         }
@@ -92,6 +105,7 @@ public final class CaustiqConfig {
     private synchronized void save() {
         Properties properties = new Properties();
         properties.setProperty("enabled", Boolean.toString(enabled));
+        properties.setProperty("compileBudget", Integer.toString(compileBudget));
         properties.setProperty("selectedPack", selectedPackId);
         new TreeMap<>(options).forEach(properties::setProperty);
         try {

@@ -67,12 +67,15 @@ public final class ShaderRuntime {
             CaustiqClient.LOGGER.info("Caustiq shader compilation finished: {} linked program(s).", COMPILED.size());
             return;
         }
-        ShaderPackProgramCatalog.Program program = pending.get(nextProgram++);
-        try {
-            COMPILED.add(new ShaderProgramCompiler().compile(program, sources, selectedDefines));
-            CaustiqClient.LOGGER.info("Compiled shader program '{}' ({} linked).", program.name(), COMPILED.size());
-        } catch (IOException | RuntimeException exception) {
-            CaustiqClient.LOGGER.error("Shader program '{}' failed: {}", program.name(), exception.getMessage());
+        int budget = CaustiqConfig.get().compileBudget();
+        for (int compiledThisFrame = 0; compiledThisFrame < budget && nextProgram < pending.size(); compiledThisFrame++) {
+            ShaderPackProgramCatalog.Program program = pending.get(nextProgram++);
+            try {
+                COMPILED.add(new ShaderProgramCompiler().compile(program, sources, selectedDefines));
+                CaustiqClient.LOGGER.info("Compiled shader program '{}' ({} linked).", program.name(), COMPILED.size());
+            } catch (IOException | RuntimeException exception) {
+                CaustiqClient.LOGGER.error("Shader program '{}' failed: {}", program.name(), exception.getMessage());
+            }
         }
     }
 
