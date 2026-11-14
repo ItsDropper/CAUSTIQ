@@ -56,6 +56,29 @@ jobs:
           set -o pipefail
           ./gradlew build --stacktrace --info 2>&1 | tee build.log
 
+      - name: Verify Photon terrain audit executed (not skipped)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import xml.etree.ElementTree as ET
+
+          test_name = "auditsThePinnedRealPhotonTerrainProgramWhenCiProvidesItsSource"
+          matches = []
+          for report in glob.glob("build/test-results/test/TEST-*.xml"):
+              root = ET.parse(report).getroot()
+              matches.extend(case for case in root.iter("testcase") if case.attrib.get("name") == test_name)
+
+          if len(matches) != 1:
+              raise SystemExit(f"Expected exactly one executed Photon terrain audit test, found {len(matches)}")
+          if matches[0].find("skipped") is not None:
+              raise SystemExit("Photon terrain audit was skipped instead of running against the pinned source.")
+          if matches[0].find("failure") is not None or matches[0].find("error") is not None:
+              raise SystemExit("Photon terrain audit failed.")
+          print("Verified the pinned Photon terrain compatibility audit executed successfully.")
+          PY
+
       - name: Validate bundled GLSL
         shell: bash
         run: |
