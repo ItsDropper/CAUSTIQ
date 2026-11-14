@@ -56,7 +56,7 @@ public final class NvidiumShaderProgramBridge {
         }
     }
 
-    public static Snapshot lastTerrainProgram() { return LAST_TERRAIN_PROGRAM.get(); }
+    static void resetForTests() {\n        terrainAdapter = null;\n        LAST_TERRAIN_PROGRAM.set(null);\n    }\n\n    public static Snapshot lastTerrainProgram() { return LAST_TERRAIN_PROGRAM.get(); }
     public record StageSnapshot(int sourceLength, int sourceHash) { }
     public record Snapshot(Map<String, StageSnapshot> stages) {
         public Snapshot { stages = Map.copyOf(stages); }
