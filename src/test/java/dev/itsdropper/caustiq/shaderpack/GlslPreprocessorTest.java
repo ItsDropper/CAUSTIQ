@@ -7,7 +7,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class GlslPreprocessorTest {
+class GlslPreprocessorTest {\n    @org.junit.jupiter.api.io.TempDir\n    java.nio.file.Path temporaryDirectory;\n
     private final GlslPreprocessor preprocessor = new GlslPreprocessor();
 
     @Test
@@ -126,7 +126,45 @@ class GlslPreprocessorTest {
         assertTrue(exception.getMessage().contains("source exceeds"));
     }
 
-    private static String require(Map<String, String> files, String path) throws IOException {
+
+    @org.junit.jupiter.api.Test
+    void readsDirectoryPackThroughSafeSourceAdapter() throws IOException {
+        java.nio.file.Path pack = java.nio.file.Files.createDirectories(temporaryDirectory.resolve("DirectoryPack/shaders"));
+        java.nio.file.Files.writeString(pack.resolve("final.fsh"), "#version 120\\nvoid main() {}");
+        ShaderPackDescriptor descriptor = descriptor(
+                temporaryDirectory.resolve("DirectoryPack"), "", ShaderPackSourceType.DIRECTORY);
+
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            GlslPreprocessor.Result result = preprocessor.preprocess("final.fsh", sources);
+            assertTrue(result.source().contains("void main()"));
+            assertEquals("#version 120", result.versionDirective());
+        }
+    }
+
+    @org.junit.jupiter.api.Test
+    void readsWrappedZipPackWithoutExtractingIt() throws IOException {
+        java.nio.file.Path archive = temporaryDirectory.resolve("Wrapped.zip");
+        try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(
+                java.nio.file.Files.newOutputStream(archive))) {
+            zip.putNextEntry(new java.util.zip.ZipEntry("Wrapped/shaders/final.fsh"));
+            zip.write("#version 330\\nvoid main() {}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            zip.closeEntry();
+        }
+        ShaderPackDescriptor descriptor = descriptor(archive, "Wrapped", ShaderPackSourceType.ZIP_ARCHIVE);
+
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            GlslPreprocessor.Result result = preprocessor.preprocess("final.fsh", sources);
+            assertTrue(result.source().contains("void main()"));
+            assertEquals("#version 330", result.versionDirective());
+        }
+    }
+
+    private ShaderPackDescriptor descriptor(java.nio.file.Path source, String shaderRoot,
+                                            ShaderPackSourceType sourceType) {
+        return new ShaderPackDescriptor("test-pack", "Test Pack", source, shaderRoot,
+                sourceType, ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 64);
+    }
+\n    private static String require(Map<String, String> files, String path) throws IOException {
         String source = files.get(path);
         if (source == null) {
             throw new IOException("Missing test source: " + path);
