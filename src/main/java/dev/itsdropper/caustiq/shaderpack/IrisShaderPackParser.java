@@ -179,9 +179,10 @@ public final class IrisShaderPackParser {
         Map<String, String> result = new LinkedHashMap<>();
         properties.forEach((key, value) -> {
             if (!key.startsWith("dimension.")) return;
-            String dimension = key.substring("dimension.".length());
-            for (String directory : value.split("\\s+")) {
-                if (safeSegment(directory)) result.put(dimension, directory);
+            String directory = key.substring("dimension.".length());
+            if (!safeSegment(directory)) return;
+            for (String dimension : value.split("\\s+")) {
+                if (!dimension.isBlank()) result.put(dimension, directory);
             }
         });
         return Map.copyOf(result);
