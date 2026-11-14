@@ -3,6 +3,7 @@ package dev.itsdropper.caustiq.integration.nvidium;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /**
  * Extends Nvidium's native terrain varying ABI with the data needed by a
@@ -15,6 +16,8 @@ import java.util.Objects;
 public final class NvidiumTerrainVaryingAdapter {
     public static final String PROFILE_ID = "caustiq-terrain-varyings-v1";
     private static final String MARKER = "#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 1";
+    private static final Pattern BARYCENTRIC_DEFINE = Pattern.compile(
+            "(?m)^\\s*#\\s*define\\s+USE_NV_FRAGMENT_SHADER_BARYCENTRIC\\b[^\\r\\n]*");
     private static final String MESH_VARYINGS = String.join("\n",
             "    vec2 uv;",
             "    vec3 v_colour;",
@@ -57,8 +60,8 @@ public final class NvidiumTerrainVaryingAdapter {
             throw new IllegalArgumentException("Expected Nvidium TASK, MESH and FRAGMENT stages.");
         }
 
-        String mesh = Objects.requireNonNull(sourceStages.get("MESH"), "MESH source");
-        String fragment = Objects.requireNonNull(sourceStages.get("FRAGMENT"), "FRAGMENT source");
+        String mesh = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("MESH"), "MESH source"));
+        String fragment = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("FRAGMENT"), "FRAGMENT source"));
         if (mesh.contains(MARKER) || fragment.contains(MARKER)) {
             if (mesh.contains(MARKER) && fragment.contains(MARKER)) return Map.copyOf(sourceStages);
             throw new IllegalStateException("Nvidium terrain varying profile is only partially applied.");
@@ -98,6 +101,11 @@ public final class NvidiumTerrainVaryingAdapter {
         adapted.put("MESH", mesh);
         adapted.put("FRAGMENT", fragment);
         return Map.copyOf(adapted);
+    }
+
+    private static String disableBarycentricPath(String source) {
+        return BARYCENTRIC_DEFINE.matcher(source)
+                .replaceAll("// CAUSTIQ terrain varyings require the interpolant path");
     }
 
     private static String replaceOnce(String source, String expected, String replacement, String label) {
