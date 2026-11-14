@@ -82,6 +82,12 @@ class NvidiumTerrainVaryingAdapterTest {
     }
 
     @Test
+    void adaptingAnAlreadyAdaptedProgramIsIdempotent() {
+        Map<String, String> once = NvidiumTerrainVaryingAdapter.adapt(sourceStages());
+        assertEquals(once, NvidiumTerrainVaryingAdapter.adapt(once));
+    }
+
+    @Test
     void rejectsUnexpectedNvidiumShaderLayoutInsteadOfPartiallyPatchingIt() {
         Map<String, String> sources = sourceStages();
         sources = Map.of(
