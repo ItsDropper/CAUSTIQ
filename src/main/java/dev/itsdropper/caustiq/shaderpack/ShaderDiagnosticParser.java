@@ -41,18 +41,20 @@ public final class ShaderDiagnosticParser {
             List<ShaderDiagnostic> output,
             Map<Integer, String> paths,
             boolean nvidia,
-            boolean mesa
+            boolean hasColumn
     ) {
         while (matcher.find()) {
             int sourceId = Integer.parseInt(matcher.group(1));
             int line = Integer.parseInt(matcher.group(2));
-            int column = mesa ? parseOptional(matcher.group(3)) : 0;
-            String severityText = nvidia ? matcher.group(3) : (mesa ? matcher.group(4) : matcher.group(4));
+            int column = hasColumn ? parseOptional(matcher.group(3)) : 0;
+            String severityText = nvidia ? matcher.group(3) : matcher.group(4);
             String message = nvidia ? matcher.group(4) : matcher.group(5);
-            ShaderDiagnostic.Severity severity = severityText.equalsIgnoreCase("warning")
+            ShaderDiagnostic.Severity severity = "warning".equalsIgnoreCase(severityText)
                     ? ShaderDiagnostic.Severity.WARNING : ShaderDiagnostic.Severity.ERROR;
-            output.add(new ShaderDiagnostic(severity, sourceId, line, column,
-                    paths.get(sourceId), message == null || message.isBlank() ? severityText : message.strip()));
+            String detail = message == null || message.isBlank()
+                    ? "Compiler reported " + severity.name().toLowerCase(java.util.Locale.ROOT)
+                    : message.strip();
+            output.add(new ShaderDiagnostic(severity, sourceId, line, column, paths.get(sourceId), detail));
         }
     }
 

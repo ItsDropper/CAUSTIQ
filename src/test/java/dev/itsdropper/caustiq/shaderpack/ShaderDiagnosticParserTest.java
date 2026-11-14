@@ -32,10 +32,18 @@ class ShaderDiagnosticParserTest {
     }
 
     @Test
-    void keepsUnknownSourceIdsWithoutInventingPaths() {
-        List<ShaderDiagnostic> diagnostics = parser.parse("0:9: error: invalid operation", sourceMap);
+    void acceptsMesaLogsWithoutAnExplicitSeverityToken() {
+        List<ShaderDiagnostic> diagnostics = parser.parse("ERROR: 1:4(2): undeclared identifier", sourceMap);
         assertEquals(1, diagnostics.size());
-        assertEquals(0, diagnostics.getFirst().sourceId());
+        assertEquals(ShaderDiagnostic.Severity.ERROR, diagnostics.getFirst().severity());
+        assertEquals("lib/lighting.glsl", diagnostics.getFirst().sourcePath());
+    }
+
+    @Test
+    void keepsUnknownSourceIdsWithoutInventingPaths() {
+        List<ShaderDiagnostic> diagnostics = parser.parse("9:9: error: invalid operation", sourceMap);
+        assertEquals(1, diagnostics.size());
+        assertEquals(9, diagnostics.getFirst().sourceId());
         assertNull(diagnostics.getFirst().sourcePath());
     }
 
