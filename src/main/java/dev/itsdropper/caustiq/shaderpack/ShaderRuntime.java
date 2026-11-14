@@ -2,14 +2,16 @@ package dev.itsdropper.caustiq.shaderpack;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import dev.itsdropper.caustiq.CaustiqClient;
+import dev.itsdropper.caustiq.CaustiqConfig;
 import net.minecraft.client.Minecraft;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** Render-thread coordinator for pack discovery, compilation, and final-frame execution. */
 public final class ShaderRuntime {
     private static final AtomicReference<ShaderPackScanResult> SCAN_RESULT = new AtomicReference<>();
     private static final List<CompiledShaderProgram> COMPILED = new ArrayList<>();
@@ -17,14 +19,34 @@ public final class ShaderRuntime {
     private static boolean discoveryStarted, discoveryFinished;
     private static ShaderPackSources sources;
     private static List<ShaderPackProgramCatalog.Program> pending = List.of();
+    private static Map<String, String> selectedDefines = Map.of();
     private static int nextProgram;
     private static boolean postProcessFailureLogged;
 
     private ShaderRuntime() { }
-    public static void publishScanResult(ShaderPackScanResult result) { SCAN_RESULT.set(result); }
 
-    /** Invoked after Minecraft's world render has produced its main color target. */
+    public static void publishScanResult(ShaderPackScanResult result) {
+        discoveryStarted = false;
+        discoveryFinished = false;
+        SCAN_RESULT.set(result);
+    }
+
+    /** Invalidates compiled resources after a UI/configuration change. Render-thread only. */
+    public static void requestReload() {
+        closeSources();
+        POST_PROCESS.close();
+        COMPILED.forEach(CompiledShaderProgram::close);
+        COMPILED.clear();
+        pending = List.of();
+        selectedDefines = Map.of();
+        nextProgram = 0;
+        discoveryStarted = false;
+        discoveryFinished = false;
+        postProcessFailureLogged = false;
+    }
+
     public static void onWorldRender() {
+        if (!CaustiqConfig.get().enabled()) return;
         if (!discoveryFinished) {
             if (!discoveryStarted) {
                 if (SCAN_RESULT.get() != null) {
@@ -42,12 +64,12 @@ public final class ShaderRuntime {
         if (sources == null || nextProgram >= pending.size()) {
             discoveryFinished = true;
             closeSources();
-            CaustiqClient.LOGGER.info("Caustiq GLSL compilation finished: {} linked program(s).", COMPILED.size());
+            CaustiqClient.LOGGER.info("Caustiq shader compilation finished: {} linked program(s).", COMPILED.size());
             return;
         }
         ShaderPackProgramCatalog.Program program = pending.get(nextProgram++);
         try {
-            COMPILED.add(new ShaderProgramCompiler().compile(program, sources));
+            COMPILED.add(new ShaderProgramCompiler().compile(program, sources, selectedDefines));
             CaustiqClient.LOGGER.info("Compiled shader program '{}' ({} linked).", program.name(), COMPILED.size());
         } catch (IOException | RuntimeException exception) {
             CaustiqClient.LOGGER.error("Shader program '{}' failed: {}", program.name(), exception.getMessage());
@@ -75,19 +97,36 @@ public final class ShaderRuntime {
             discoveryFinished = true;
             return;
         }
-        // Never silently choose between multiple installed packs.
-        if (result.packs().size() != 1) {
-            CaustiqClient.LOGGER.info("Found {} shader packs; compilation is idle until a pack is selected.", result.packs().size());
+        String selectedId = CaustiqConfig.get().selectedPackId();
+        ShaderPackDescriptor selected = result.packs().stream()
+                .filter(pack -> pack.id().equals(selectedId))
+                .findFirst().orElse(null);
+        if (selected == null) {
+            CaustiqClient.LOGGER.info("Shader compilation is idle: select one of the {} discovered packs in Video Settings.",
+                    result.packs().size());
             discoveryFinished = true;
             return;
         }
-        ShaderPackDescriptor selected = result.packs().getFirst();
         try {
             sources = ShaderPackSources.open(selected);
             ShaderPackProgramCatalog.Result catalog = new ShaderPackProgramCatalog().discover(sources);
             pending = catalog.programs();
-            CaustiqClient.LOGGER.info("Preparing '{}': {} conventional program(s), {} unmatched/unsupported stage(s).",
-                    selected.displayName(), pending.size(), catalog.ignoredStages().size());
+
+            Map<String, String> defines = new LinkedHashMap<>();
+            try {
+                ShaderPackMetadata metadata = ShaderPackMetadata.parse(sources.read("shaders.properties"));
+                for (ShaderPackMetadata.Option option : metadata.options()) {
+                    defines.put(option.name(), CaustiqConfig.get().option(
+                            selected.id(), option.name(), option.defaultValue()));
+                }
+            } catch (IOException | IllegalArgumentException exception) {
+                CaustiqClient.LOGGER.info("Shader pack '{}' has no readable shaders.properties options: {}",
+                        selected.displayName(), exception.getMessage());
+            }
+            selectedDefines = Map.copyOf(defines);
+
+            CaustiqClient.LOGGER.info("Preparing '{}': {} conventional program(s), {} unmatched/unsupported stage(s), {} option define(s).",
+                    selected.displayName(), pending.size(), catalog.ignoredStages().size(), selectedDefines.size());
             if (pending.isEmpty()) {
                 discoveryFinished = true;
                 closeSources();
@@ -102,22 +141,15 @@ public final class ShaderRuntime {
     private static void closeSources() {
         if (sources != null) {
             try { sources.close(); }
-            catch (IOException exception) { CaustiqClient.LOGGER.warn("Unable to close shader sources: {}", exception.getMessage()); }
+            catch (IOException exception) {
+                CaustiqClient.LOGGER.warn("Unable to close shader sources: {}", exception.getMessage());
+            }
             sources = null;
         }
     }
 
-    /** Releases GPU objects during renderer shutdown. Must run on the render thread. */
     public static void shutdown() {
-        closeSources();
-        POST_PROCESS.close();
-        COMPILED.forEach(CompiledShaderProgram::close);
-        COMPILED.clear();
-        pending = List.of();
-        nextProgram = 0;
-        discoveryStarted = false;
-        discoveryFinished = false;
-        postProcessFailureLogged = false;
+        requestReload();
         SCAN_RESULT.set(null);
     }
 }

@@ -4,25 +4,23 @@
   "version": "${version}",
   "name": "Caustiq",
   "description": "An independent client-side shader engine for Minecraft.",
-  "authors": [
-    "ItsDropper"
-  ],
+  "authors": ["ItsDropper"],
   "contact": {
     "homepage": "https://github.com/ItsDropper/CAUSTIQ",
     "sources": "https://github.com/ItsDropper/CAUSTIQ"
   },
   "environment": "client",
   "entrypoints": {
-    "client": [
-      "dev.itsdropper.caustiq.CaustiqClient"
-    ]
+    "client": ["dev.itsdropper.caustiq.CaustiqClient"],
+    "sodium:config_api_user": ["dev.itsdropper.caustiq.integration.sodium.CaustiqSodiumConfig"]
   },
-  "mixins": [
-    "caustiq.mixins.json"
-  ],
+  "mixins": ["caustiq.mixins.json"],
   "depends": {
     "fabricloader": ">=0.20.1",
     "minecraft": "~1.21.11",
     "java": ">=21"
+  },
+  "suggests": {
+    "sodium": ">=0.8.0"
   }
 }

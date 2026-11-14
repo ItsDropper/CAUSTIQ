@@ -1,0 +1,10 @@
+{
+  "caustiq.settings.title": "Caustiq Shader Settings",
+  "caustiq.settings.button": "Caustiq Shaders",
+  "caustiq.settings.category": "Shader Packs",
+  "caustiq.settings.enabled": "Shaders: Enabled",
+  "caustiq.settings.disabled": "Shaders: Disabled",
+  "caustiq.settings.refresh": "Rescan Shader Packs",
+  "caustiq.settings.no_selection": "Select a shader pack above to view its options.",
+  "caustiq.settings.no_options": "This pack does not declare configurable options."
+}

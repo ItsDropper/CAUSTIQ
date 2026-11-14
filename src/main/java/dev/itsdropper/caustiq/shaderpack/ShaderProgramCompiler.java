@@ -8,13 +8,17 @@ import net.minecraft.resources.Identifier;
 
 import java.io.IOException;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-/**
- * Preprocesses pack fragment stages and compiles them through Minecraft's GPU pipeline system.
- * Minecraft owns backend compilation and state; this avoids bypassing its 1.21.11 GPU abstraction.
- */
+/** Compiles pack fragment stages through Minecraft's GPU pipeline abstraction. */
 public final class ShaderProgramCompiler {
+    private static final Pattern DEFINE_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]{0,127}");
+    private static final Pattern DEFINE_VALUE = Pattern.compile("[A-Za-z0-9_+./-]{1,128}");
+    private static final Pattern DEFINE_LINE = Pattern.compile("^(\\s*#\\s*define\\s+)([A-Za-z_][A-Za-z0-9_]*)(?:\\s+.*)?$");
     private static final String FULLSCREEN_VERTEX_SHADER = """
             #version 150
             out vec2 texCoord;
@@ -23,14 +27,10 @@ public final class ShaderProgramCompiler {
             out vec2 uv;
             void main() {
                 const vec2 positions[3] = vec2[3](
-                    vec2(-1.0, -1.0),
-                    vec2( 3.0, -1.0),
-                    vec2(-1.0,  3.0)
+                    vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0)
                 );
                 const vec2 coordinates[3] = vec2[3](
-                    vec2(0.0, 0.0),
-                    vec2(2.0, 0.0),
-                    vec2(0.0, 2.0)
+                    vec2(0.0, 0.0), vec2(2.0, 0.0), vec2(0.0, 2.0)
                 );
                 gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
                 texCoord = coordinates[gl_VertexID];
@@ -44,21 +44,24 @@ public final class ShaderProgramCompiler {
             ShaderPackProgramCatalog.Program program,
             GlslPreprocessor.SourceProvider sourceProvider
     ) throws IOException {
+        return compile(program, sourceProvider, Map.of());
+    }
+
+    public CompiledShaderProgram compile(
+            ShaderPackProgramCatalog.Program program,
+            GlslPreprocessor.SourceProvider sourceProvider,
+            Map<String, String> defines
+    ) throws IOException {
         Objects.requireNonNull(program, "program");
         Objects.requireNonNull(sourceProvider, "sourceProvider");
-
-        // The first executable pass uses the pack's fragment stage with a stable fullscreen
-        // triangle vertex stage. The pack's own vertex stage remains catalogued for the
-        // compatibility layer, but is not assumed to match Minecraft's vertex contract.
-        GlslPreprocessor.Result fragment = new GlslPreprocessor()
+        GlslPreprocessor.Result preprocessed = new GlslPreprocessor()
                 .preprocess(program.fragmentSource(), sourceProvider);
+        String fragmentSource = applyDefines(preprocessed.source(), defines);
 
-        String key = program.name().toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9_./-]", "_");
+        String key = program.name().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_./-]", "_");
         Identifier pipelineId = Identifier.fromNamespaceAndPath("caustiq", "dynamic/" + key);
         Identifier vertexId = Identifier.fromNamespaceAndPath("caustiq", "dynamic/" + key + ".vsh");
         Identifier fragmentId = Identifier.fromNamespaceAndPath("caustiq", "dynamic/" + key + ".fsh");
-
         RenderPipeline pipeline = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
                 .withLocation(pipelineId)
                 .withVertexShader(vertexId)
@@ -72,7 +75,7 @@ public final class ShaderProgramCompiler {
 
         ShaderSource shaderSource = (id, type) -> {
             if (vertexId.equals(id)) return FULLSCREEN_VERTEX_SHADER;
-            if (fragmentId.equals(id)) return fragment.source();
+            if (fragmentId.equals(id)) return fragmentSource;
             return null;
         };
         try {
@@ -82,5 +85,40 @@ public final class ShaderProgramCompiler {
                     + exception.getMessage(), exception);
         }
         return new CompiledShaderProgram(program.name(), pipeline);
+    }
+
+    private static String applyDefines(String source, Map<String, String> defines) throws IOException {
+        if (defines == null || defines.isEmpty()) return source;
+        Map<String, String> safe = new TreeMap<>();
+        for (Map.Entry<String, String> entry : defines.entrySet()) {
+            if (!DEFINE_NAME.matcher(entry.getKey()).matches()
+                    || !DEFINE_VALUE.matcher(entry.getValue()).matches()) {
+                throw new IOException("Unsafe shader option macro: " + entry.getKey());
+            }
+            safe.put(entry.getKey(), entry.getValue());
+        }
+
+        StringBuilder rewritten = new StringBuilder(source.length() + safe.size() * 32);
+        java.util.Set<String> replaced = new java.util.HashSet<>();
+        for (String line : source.split("\\R", -1)) {
+            Matcher matcher = DEFINE_LINE.matcher(line);
+            if (matcher.matches() && safe.containsKey(matcher.group(2))) {
+                String name = matcher.group(2);
+                rewritten.append(matcher.group(1)).append(name).append(' ').append(safe.get(name));
+                replaced.add(name);
+            } else {
+                rewritten.append(line);
+            }
+            rewritten.append('\n');
+        }
+
+        StringBuilder missing = new StringBuilder();
+        safe.forEach((name, value) -> {
+            if (!replaced.contains(name)) missing.append("#define ").append(name).append(' ').append(value).append('\n');
+        });
+        String result = rewritten.toString();
+        int versionEnd = result.startsWith("#version") ? result.indexOf('\n') : -1;
+        if (versionEnd >= 0) return result.substring(0, versionEnd + 1) + missing + result.substring(versionEnd + 1);
+        return missing + result;
     }
 }
