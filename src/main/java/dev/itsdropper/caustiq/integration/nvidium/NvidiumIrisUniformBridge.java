@@ -95,6 +95,7 @@ public final class NvidiumIrisUniformBridge {
         float rain = invokeFloat(level, "getRainLevel", 1.0f, 0.0f);
         float wetness = rain;
         float worldAge = invokeLong(level, "getGameTime", 0L);
+        float worldTime = (invokeLong(level, "getDayTime", 0L) % 24_000L) / 24_000.0f;
         float sunAngle = invokeFloat(level, "getSunAngle", 1.0f, 0.0f);
 
         scalar(program, "caustiqNear", near);
@@ -106,6 +107,7 @@ public final class NvidiumIrisUniformBridge {
         vector3(program, "caustiqLightDirection",
                 (float) Math.sin(sunAngle), (float) Math.cos(sunAngle), 0.0f);
         scalar(program, "caustiqWorldAge", worldAge);
+        scalar(program, "caustiqWorldTime", worldTime);
         scalar(program, "caustiqTimeSunrise", 0.0f);
         scalar(program, "caustiqTimeNoon", 0.0f);
         scalar(program, "caustiqTimeSunset", 0.0f);
@@ -118,6 +120,10 @@ public final class NvidiumIrisUniformBridge {
         integer(program, "caustiqCurrentRenderedItemId", 0);
         vector4(program, "caustiqEntityColor", 1.0f, 1.0f, 1.0f, 1.0f);
         integer(program, "caustiqNoiseTexture", 2);
+        integer(program, "caustiqColortex1", 5);
+        integer(program, "caustiqColortex2", 6);
+        integer(program, "caustiqColortex4", 7);
+        integer(program, "caustiqDepthTexture1", 8);
         integer(program, "caustiqNormalTexture", 3);
         integer(program, "caustiqSpecularTexture", 4);
         integer(program, "caustiqColortex15", 15);
