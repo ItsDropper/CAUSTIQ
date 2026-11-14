@@ -41,10 +41,22 @@ class NvidiumShaderProgramBridgeTest {
     }
 
 
-    @Test void rejectsNoOpAdapter() {
+    @Test void permitsNoOpAdapterForNonPrimaryNvidiumPipelines() {
         NvidiumShaderProgramBridge.registerTerrainAdapter(Map::copyOf);
+        Map<Object, String> sources = terrainSources();
+        assertDoesNotThrow(() -> NvidiumShaderProgramBridge.transformBeforeCompile(sources));
+        assertEquals("mesh source content", sources.get(Stage.MESH));
+    }
+
+    @Test void rejectsNoOpAdapterForPrimaryTerrainPipeline() {
+        NvidiumShaderProgramBridge.registerTerrainAdapter(Map::copyOf);
+        Map<Object, String> sources = new LinkedHashMap<>();
+        sources.put(Stage.TASK, "task source");
+        sources.put(Stage.MESH,
+                "#version 460\\nlayout(triangles, max_vertices=64, max_primitives=32) out;");
+        sources.put(Stage.FRAGMENT, "fragment source");
         assertThrows(IllegalStateException.class,
-                () -> NvidiumShaderProgramBridge.transformBeforeCompile(terrainSources()));
+                () -> NvidiumShaderProgramBridge.transformBeforeCompile(sources));
     }
 
     @Test void resetClearsCapturedProgramAndAdapter() {
