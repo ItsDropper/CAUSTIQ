@@ -108,6 +108,9 @@ assert 'Availability.UNAVAILABLE' in abi
 nvidium_repackager = source("src/main/java/me/cortex/nvidium/sodiumCompat/SodiumResultCompatibility.java")
 assert "int formatSize = Nvidium.config.use_sodium_vertex_format" in nvidium_repackager
 assert "copyQuad" in nvidium_repackager
+assert "CompactChunkVertex.STRIDE * 4" in nvidium_repackager
+assert "NvidiumCompactChunkVertex.STRIDE * 4" in nvidium_repackager
+assert "@Constant(intValue = 80)" in stride_mixin, "copyQuad inlines the 20-byte Sodium vertex stride as an 80-byte quad copy"
 vertex_encoder = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
 assert "STRIDE = 40" in vertex_encoder
 for field in ("blockId", "normalTangent", "midpointUv", "midBlock", "nvidiumMaterial"):
