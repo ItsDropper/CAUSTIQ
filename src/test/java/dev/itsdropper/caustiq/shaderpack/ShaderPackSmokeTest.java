@@ -22,6 +22,7 @@ class ShaderPackSmokeTest {
             ShaderPackProgramCatalog.Result catalog = new ShaderPackProgramCatalog().discover(sources);
             assertTrue(catalog.programs().stream().anyMatch(program -> program.name().equals("final")),
                     "Smoke-test pack must expose a paired final program");
+            assertTrue(catalog.isFinalOnly());
             assertEquals(1, catalog.programs().size());
             assertTrue(catalog.ignoredStages().isEmpty());
         }

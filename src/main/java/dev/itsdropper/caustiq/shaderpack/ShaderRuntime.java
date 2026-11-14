@@ -113,6 +113,21 @@ public final class ShaderRuntime {
         try {
             sources = ShaderPackSources.open(selected);
             ShaderPackProgramCatalog.Result catalog = new ShaderPackProgramCatalog().discover(sources);
+            if (!catalog.invalidPrograms().isEmpty()) {
+                CaustiqClient.LOGGER.warn("Shader pack '{}' contains program(s) without a vertex+fragment pair or compute stage: {}",
+                        selected.displayName(), catalog.invalidPrograms());
+            }
+            if (!catalog.isFinalOnly()) {
+                CaustiqClient.LOGGER.warn(
+                        "Shader pack '{}' requires the multi-pass world renderer. CAUSTIQ currently supports only a standalone final pass; skipping activation rather than rendering an incorrect partial pipeline. Detected {} program(s), including {} non-final program(s), {} unsupported stage file(s).",
+                        selected.displayName(), catalog.programs().size(),
+                        catalog.programs().stream().filter(program -> program.group() != ShaderPackProgramCatalog.Group.FINAL).count(),
+                        catalog.ignoredStages().size());
+                pending = List.of();
+                discoveryFinished = true;
+                closeSources();
+                return;
+            }
             pending = catalog.programs();
 
             Map<String, String> defines = new LinkedHashMap<>();
