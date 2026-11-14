@@ -58,11 +58,11 @@ for anchor, label in [
     ("    bool triangle1 = (gl_LocalInvocationIndex & uint(1)) == 1;", "triangle selection"),
     ("    OUT[id].uv = decodeVertexUV(V);\n    OUT[id].v_colour = computeMultiplier(V);", "mesh output assignments"),
 ]:
-    assert anchor in mesh, f"Pinned Nvidium mesh shader lost adapter anchor: {label}"
-assert "    vec2 uv;\n    vec3 v_colour;" in fragment, "Pinned Nvidium fragment varying declaration changed"
+    assert mesh.count(anchor) == 1, f"Pinned Nvidium mesh shader adapter anchor is missing or ambiguous: {label}"
+assert fragment.count("    vec2 uv;\n    vec3 v_colour;") == 1, "Pinned Nvidium fragment varying declaration changed or is ambiguous"
 assert "CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS" in adapter
 assert "decodeLightUV(V)" in adapter and "decodeVertexColour(V).rgb" in adapter
 assert "cross(pb - pa, pc - pa)" in adapter, "Geometric face-normal reconstruction is missing"
 assert "NvidiumTerrainVaryingAdapter.class" in (caustiq_root / ".github/workflows/build.yml").read_text(encoding="utf-8")
 
-print("Nvidium source contract verified: Shader.Builder field/method, Iris gate semantics, active three-stage terrain pipeline, and mesh-to-fragment interface.")
+print("Nvidium source contract verified: compile hook, Iris gate, terrain stage set, and unique varying-adapter anchors.")
