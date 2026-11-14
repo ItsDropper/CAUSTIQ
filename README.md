@@ -52,15 +52,18 @@ This is an architectural compatibility strategy, **not a verified Nvidium compat
 
 ## GPU pipeline and final pass
 
-- Discovers matching .vsh and .fsh stages by relative program name.
-- Preprocesses the final fragment source and compiles it through Minecraft's GPU pipeline abstraction.
+- Inventories Iris/OptiFine-style program groups in pipeline order: setup, begin, shadow, shadowcomp, prepare, gbuffers, deferred, composite, and final.
+- Preserves vertex, fragment, geometry, compute, and tessellation stage paths, including numbered composite/deferred programs.
+- Reports invalid program shapes and unrecognized stages rather than silently treating them as fullscreen passes.
+- Currently preprocesses and compiles only a standalone final fragment pass through Minecraft's GPU pipeline abstraction.
+- Refuses to activate multi-pass packs until their required world-rendering pipeline is implemented, avoiding misleading partial rendering and unnecessary compilation of unused gbuffers/shadow programs.
 - Uses a generated fullscreen triangle vertex stage and common UV varying aliases.
 - Binds common color sampler aliases to the completed main color texture.
 - Renders into a separate Minecraft TextureTarget, then copies the result back after the render pass ends.
 - Avoids raw framebuffer IDs, direct GL framebuffer manipulation, and terrain renderer hooks.
 - Releases Caustiq-owned render targets when the game renderer shuts down.
 
-The pack's own final vertex stage is catalogued but not yet executed. The first pass supports a single color input only; texture layouts, shadow maps, deferred buffers, and full Iris/OptiFine pipeline semantics remain unfinished. Many existing packs will not render unchanged yet.
+The pack's own final vertex stage is catalogued but not yet executed. The first pass supports a single color input only; texture layouts, shadow maps, deferred buffers, geometry-specific gbuffers injection, and full Iris/OptiFine pipeline semantics remain unfinished. Multi-pass packs such as Complementary Reimagined are detected and deliberately left inactive instead of being incorrectly rendered through the final-pass path.
 
 ## Development target
 
@@ -84,7 +87,8 @@ The build runs scanner, preprocessing, metadata, program-catalog, diagnostic, an
 
 ## Next stages
 
-1. Implement profiles, true continuous sliders, option dependencies, and richer metadata semantics.
-2. Execute pack-specific vertex stages and implement Iris/OptiFine compatibility uniforms/macros.
-3. Add the remaining texture targets and world render stages.
-4. Validate vanilla, Sodium, and Nvidium separately on Minecraft 1.21.11.
+1. Implement Iris-compatible render-target allocation, depth attachments, buffer flipping, pack-defined clear/format/scale directives, and sampler binding.
+2. Implement the ordered fullscreen pass graph (setup, begin, shadowcomp, prepare, deferred, composite, final), including compute dispatch where supported.
+3. Integrate geometry gbuffers and shadow rendering with Minecraft 1.21.11's render stages and Sodium's vertex conventions without taking ownership of chunk submission.
+4. Replace regex-only GLSL rewriting with AST-based transformations and implement the pack uniform, macro, include, and compatibility surfaces used by real packs.
+5. Validate Complementary Reimagined, BSL, and other representative packs against Iris output, and benchmark vanilla, Sodium, and Nvidium separately.
