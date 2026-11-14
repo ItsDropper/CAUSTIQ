@@ -41,6 +41,6 @@ class NvidiumIrisTerrainAbiTest {
         assertEquals(NvidiumIrisTerrainAbi.Availability.UNAVAILABLE,
                 NvidiumIrisTerrainAbi.vertexSemantic("gl_Normal").orElseThrow().availability());
         assertTrue(NvidiumIrisTerrainAbi.vertexSemantic("gl_Normal").orElseThrow()
-                .explanation().contains("not a smooth vertex normal"));
+                .explanation().contains("not equivalent to Iris per-vertex/model normals"));
     }
 }
