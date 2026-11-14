@@ -46,7 +46,10 @@ class NvidiumShaderProgramBridgeTest {
     }
 
     @Test void resetClearsCapturedProgramAndAdapter() {
-        NvidiumShaderProgramBridge.registerTerrainAdapter(Map::copyOf);
+        NvidiumShaderProgramBridge.registerTerrainAdapter(sources -> Map.of(
+                "TASK", sources.get("TASK") + "\n// adapter",
+                "MESH", sources.get("MESH") + "\n// adapter",
+                "FRAGMENT", sources.get("FRAGMENT") + "\n// adapter"));
         NvidiumShaderProgramBridge.transformBeforeCompile(terrainSources());
         NvidiumShaderProgramBridge.resetForTests();
         assertNull(NvidiumShaderProgramBridge.lastTerrainProgram());
