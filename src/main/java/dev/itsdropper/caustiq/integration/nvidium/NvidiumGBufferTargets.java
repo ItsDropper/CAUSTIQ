@@ -100,6 +100,7 @@ public final class NvidiumGBufferTargets {
                     + Integer.toHexString(status) + ").");
             return false;
         }
+        clearAuxiliaryAttachments();
 
         activeState = state;
         warnedUnavailable = false;
@@ -155,6 +156,8 @@ public final class NvidiumGBufferTargets {
     }
 
     private static void ensureTargets(int newWidth, int newHeight) {
+        int previousDrawFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
+        int previousReadFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
         if (TARGETS[0] == null) {
             for (int i = 0; i < TARGETS.length; i++) {
                 TARGETS[i] = new TextureTarget("Caustiq Nvidium G-buffer " + (i + 1),
@@ -181,6 +184,22 @@ public final class NvidiumGBufferTargets {
         } finally {
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTextureBinding);
             GL11C.glActiveTexture(previousActiveTexture);
+            GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
+            GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+        }
+    }
+
+    private static void clearAuxiliaryAttachments() {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            for (int i = 0; i < ATTACHMENT_COUNT; i++) {
+                IntBuffer clearValue = stack.mallocInt(4);
+                if (i == 0) {
+                    clearValue.put(0, 0.5f).put(1, 0.5f).put(2, 1.0f).put(3, 0.0f);
+                } else {
+                    clearValue.put(0, 0).put(1, 0).put(2, 0).put(3, 0);
+                }
+                GL30C.glClearBufferfv(GL11C.GL_COLOR, i + 1, clearValue.asFloatBuffer());
+            }
         }
     }
 
