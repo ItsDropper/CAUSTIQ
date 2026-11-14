@@ -61,6 +61,31 @@ jobs:
           echo "Distributable JAR: ${distributable[0]}"
           echo "CAUSTIQ_JAR=${distributable[0]}" >> "$GITHUB_ENV"
 
+      - name: Verify Nvidium distribution and renderer hooks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "${CAUSTIQ_JAR}" <<'PY'
+          import json
+          import sys
+          import zipfile
+
+          jar_path = sys.argv[1]
+          with zipfile.ZipFile(jar_path) as jar:
+              metadata = json.loads(jar.read("fabric.mod.json"))
+              mixins = json.loads(jar.read("caustiq.mixins.json"))
+              required_class = "dev/itsdropper/caustiq/mixin/NvidiumWorldRendererMixin.class"
+
+              assert metadata["id"] == "caustiq", metadata["id"]
+              assert metadata["depends"]["sodium"] == "=0.8.12", metadata["depends"]
+              assert metadata["depends"]["nvidium"] == "=0.4.3-beta13-1.21.11", metadata["depends"]
+              assert "NvidiumWorldRendererMixin" in mixins["client"], mixins["client"]
+              assert required_class in jar.namelist(), required_class
+              assert "caustiq-nvidium" in jar_path, jar_path
+
+          print("Verified Nvidium-specific JAR metadata, pinned renderer dependencies, and packaged mixin.")
+          PY
+
       - name: Verify Stillwater shader ZIP
         shell: bash
         run: |

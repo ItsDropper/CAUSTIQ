@@ -39,7 +39,7 @@ public final class NvidiumRenderBridge {
             long completedSolidPasses,
             long startedTranslucentPasses,
             long completedTranslucentPasses) {
-        public boolean hasCompletedTerrainPass() {
+        public boolean hasCompletedSolidRenderCall() {
             return completedSolidPasses > 0;
         }
 

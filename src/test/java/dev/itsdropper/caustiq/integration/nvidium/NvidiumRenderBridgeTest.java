@@ -14,7 +14,7 @@ class NvidiumRenderBridgeTest {
     @Test
     void recordsCompletedSolidTerrainPasses() {
         NvidiumRenderBridge.solidPassStarted();
-        assertFalse(NvidiumRenderBridge.snapshot().hasCompletedTerrainPass());
+        assertFalse(NvidiumRenderBridge.snapshot().hasCompletedSolidRenderCall());
         NvidiumRenderBridge.solidPassCompleted();
 
         NvidiumRenderBridge.Snapshot snapshot = NvidiumRenderBridge.snapshot();

@@ -3,9 +3,9 @@ package dev.itsdropper.caustiq.shaderpack;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import dev.itsdropper.caustiq.CaustiqClient;
 import dev.itsdropper.caustiq.CaustiqConfig;
-import net.minecraft.client.Minecraft;
-import net.fabricmc.loader.api.FabricLoader;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumRenderBridge;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -107,12 +107,12 @@ public final class ShaderRuntime {
             lastReportedNvidiumSolidFrames = snapshot.completedSolidPasses();
             warnedNvidiumBackendNotObserved = false;
             CaustiqClient.LOGGER.info(
-                    "Nvidium terrain backend observed before CAUSTIQ post-processing: {} completed solid pass(es), {} completed translucent pass(es).",
+                    "Nvidium renderFrame call completed before CAUSTIQ post-processing: {} completed solid pass(es), {} completed translucent pass(es).",
                     snapshot.completedSolidPasses(), snapshot.completedTranslucentPasses());
         } else if (snapshot.startedSolidPasses() == 0 && !warnedNvidiumBackendNotObserved) {
             warnedNvidiumBackendNotObserved = true;
             CaustiqClient.LOGGER.warn(
-                    "Nvidium is installed, but CAUSTIQ has not observed a completed Nvidium terrain pass. Its accelerated backend may be disabled or the active renderer path may differ; CAUSTIQ will not claim Nvidium acceleration is active.");
+                    "Nvidium is installed, but CAUSTIQ has not observed a completed Nvidium renderFrame call. Its accelerated backend may be disabled or the active renderer path may differ; CAUSTIQ will not claim Nvidium acceleration is active.");
         }
     }
 
