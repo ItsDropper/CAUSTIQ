@@ -281,4 +281,28 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 i.code().equals("UNAVAILABLE_VERTEX_INPUT") && i.symbol().equals("gl_FogCoord")));
     }
 
+    @Test
+    void allowsPrimaryLegacyFragmentOutputButRejectsSecondaryAttachments() {
+        String vertex = """
+                #version 400
+                void main() { gl_Position = gl_Vertex; }
+                """;
+        String primary = """
+                #version 400
+                void main() { gl_FragData[0] = vec4(1.0); }
+                """;
+        assertTrue(analyzer.analyze(vertex, primary).compatible());
+
+        String multiple = """
+                #version 400
+                void main() {
+                    gl_FragData[0] = vec4(1.0);
+                    gl_FragData[1] = vec4(0.0);
+                }
+                """;
+        var result = analyzer.analyze(vertex, multiple);
+        assertTrue(result.issues().stream().anyMatch(i ->
+                i.code().equals("MULTIPLE_RENDER_TARGETS") && i.symbol().equals("gl_FragData[1]")));
+    }
+
 }
