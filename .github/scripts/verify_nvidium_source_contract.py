@@ -113,6 +113,8 @@ assert "NvidiumCompactChunkVertex.STRIDE * 4" in nvidium_repackager
 assert "@Constant(intValue = 80)" in stride_mixin, "copyQuad inlines the 20-byte Sodium vertex stride as an 80-byte quad copy"
 vertex_encoder = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
 assert "STRIDE = 40" in vertex_encoder
+assert "ColorABGR.pack(red, green, blue, alpha)" in vertex_encoder
+assert "float((uint(v.color) >> 24u) & 0xFFu) * COLOR_SCALE" in adapter
 for field in ("blockId", "normalTangent", "midpointUv", "midBlock", "nvidiumMaterial"):
     assert field in vertex_encoder
 format_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumExtendedVertexFormatMixin.java").read_text(encoding="utf-8")
