@@ -18,8 +18,8 @@ class NvidiumTerrainVaryingAdapterTest {
         String mesh = adapted.get("MESH");
         String fragment = adapted.get("FRAGMENT");
 
-        assertTrue(mesh.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 2"));
-        assertTrue(fragment.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 2"));
+        assertTrue(mesh.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 3"));
+        assertTrue(fragment.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 3"));
         for (String varying : new String[]{
                 "vec2 uv;", "vec3 v_colour;", "vec3 v_vertexColour;",
                 "vec2 v_lightmapCoord;", "vec3 v_renderPosition;", "vec2 v_quadMidUv;",
@@ -135,7 +135,7 @@ class NvidiumTerrainVaryingAdapterTest {
         Map<String, String> sources = sourceStages();
         Map<String, String> partiallyAdapted = Map.of(
                 "TASK", sources.get("TASK"),
-                "MESH", sources.get("MESH") + "\n#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 2",
+                "MESH", sources.get("MESH") + "\n#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 3",
                 "FRAGMENT", sources.get("FRAGMENT"));
         assertThrows(IllegalStateException.class,
                 () -> NvidiumTerrainVaryingAdapter.adapt(partiallyAdapted));
