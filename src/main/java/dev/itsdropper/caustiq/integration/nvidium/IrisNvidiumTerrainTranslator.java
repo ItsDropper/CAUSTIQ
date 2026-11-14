@@ -26,7 +26,7 @@ public final class IrisNvidiumTerrainTranslator {
     private static final Pattern VERSION = Pattern.compile("(?m)^\\s*#\\s*version[^\\r\\n]*\\R?");
     private static final Pattern PRAGMA = Pattern.compile("(?m)^\\s*#\\s*pragma[^\\r\\n]*\\R?");
     private static final Pattern UNIFORM = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(\\w+)\\s+(\\w+)\\s*;\\s*");
+            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(\\w+)\\s+(\\w+)\\s*(?:=\\s*[^;]+)?;\\s*");
     private static final Pattern ATTRIBUTE = Pattern.compile(
             "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:attribute|in)\\s+(?:(?:lowp|mediump|highp)\\s+)?(\\w+)\\s+(\\w+)\\s*;\\s*");
     private static final Pattern VERTEX_OUTPUT = Pattern.compile(
@@ -56,7 +56,31 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("pixelSize", "(1.0 / (screenSize * 2.0))"),
             Map.entry("viewWidth", "(screenSize.x * 2.0)"),
             Map.entry("viewHeight", "(screenSize.y * 2.0)"),
-            Map.entry("fogColor", "fogColour"));
+            Map.entry("fogColor", "fogColour"),
+            Map.entry("noisetex", "caustiqNoiseTexture"),
+            Map.entry("normals", "caustiqNormalTexture"),
+            Map.entry("specular", "caustiqSpecularTexture"),
+            Map.entry("near", "caustiqNear"),
+            Map.entry("far", "caustiqFar"),
+            Map.entry("atlasSize", "caustiqAtlasSize"),
+            Map.entry("rainStrength", "caustiqRainStrength"),
+            Map.entry("wetness", "caustiqWetness"),
+            Map.entry("taa_offset", "caustiqTaaOffset"),
+            Map.entry("light_dir", "caustiqLightDirection"),
+            Map.entry("world_age", "caustiqWorldAge"),
+            Map.entry("time_sunrise", "caustiqTimeSunrise"),
+            Map.entry("time_noon", "caustiqTimeNoon"),
+            Map.entry("time_sunset", "caustiqTimeSunset"),
+            Map.entry("time_midnight", "caustiqTimeMidnight"),
+            Map.entry("biome_temperature", "caustiqBiomeTemperature"),
+            Map.entry("biome_humidity", "caustiqBiomeHumidity"),
+            Map.entry("alphaTestRef", "caustiqAlphaTestRef"),
+            Map.entry("blockEntityId", "caustiqBlockEntityId"),
+            Map.entry("entityId", "caustiqEntityId"),
+            Map.entry("currentRenderedItemId", "caustiqCurrentRenderedItemId"),
+            Map.entry("entityColor", "caustiqEntityColor"),
+            Map.entry("view_res", "(screenSize * 2.0)"),
+            Map.entry("view_pixel_size", "(1.0 / (screenSize * 2.0)"));
     private static final Set<String> NATIVE_INTERPOLANTS = Set.of(
             "uv", "v_colour", "v_vertexColour", "v_lightmapCoord", "v_renderPosition",
             "v_quadMidUv", "v_quadMidPosition", "v_midBlock", "v_blockEntity",
@@ -407,9 +431,10 @@ public final class IrisNvidiumTerrainTranslator {
             if (!expected.equals(type)) {
                 throw new IllegalArgumentException("Iris terrain uniform '" + name + "' must be " + expected + ", not " + type + ".");
             }
-            if ((name.equals("gtexture") || name.equals("lightmap") || name.equals("viewSize")
-                    || name.equals("pixelSize") || name.equals("viewWidth") || name.equals("viewHeight")
-                    || name.equals("fogColor")) && vertex) {
+            if ((name.equals("gtexture") || name.equals("lightmap") || name.equals("normals")
+                    || name.equals("specular") || name.equals("viewSize") || name.equals("pixelSize")
+                    || name.equals("viewWidth") || name.equals("viewHeight") || name.equals("view_res")
+                    || name.equals("view_pixel_size") || name.equals("fogColor")) && vertex) {
                 throw new IllegalArgumentException("Iris terrain vertex stage cannot use fragment-only uniform '" + name + "'.");
             }
             uniforms.appendReplacement(uniformOutput, "");
@@ -435,7 +460,7 @@ public final class IrisNvidiumTerrainTranslator {
             while (vertexOutputs.find()) vertexOutputs.appendReplacement(vertexOutputBuffer, "");
             vertexOutputs.appendTail(vertexOutputBuffer);
             working = vertexOutputBuffer.toString();
-            if (Pattern.compile("\\b(attribute|varying)\\b").matcher(working).find()) {
+            if (Pattern.compile("(?m)^\\s*(?:attribute|varying)\\s+").matcher(working).find()) {
                 throw new IllegalArgumentException("Iris terrain vertex source contains an unsupported attribute/varying declaration.");
             }
         } else {
@@ -450,7 +475,7 @@ public final class IrisNvidiumTerrainTranslator {
             while (outputs.find()) outputs.appendReplacement(outputBuffer, "");
             outputs.appendTail(outputBuffer);
             working = outputBuffer.toString();
-            if (Pattern.compile("\\b(varying|uniform)\\b").matcher(working).find()) {
+            if (Pattern.compile("(?m)^\\s*(?:varying|uniform)\\s+").matcher(working).find()) {
                 throw new IllegalArgumentException("Iris terrain fragment source contains an unsupported varying/uniform declaration.");
             }
         }
@@ -466,12 +491,16 @@ public final class IrisNvidiumTerrainTranslator {
 
     private static String expectedUniformType(String name) {
         return switch (name) {
-            case "gtexture", "lightmap" -> "sampler2D";
+            case "gtexture", "lightmap", "noisetex", "normals", "specular" -> "sampler2D";
             case "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse" -> "mat4";
-            case "cameraPosition", "fogColor" -> "vec3";
-            case "frameTimeCounter", "viewWidth", "viewHeight" -> "float";
-            case "frameCounter" -> "int";
-            case "viewSize", "pixelSize" -> "vec2";
+            case "cameraPosition", "fogColor", "light_dir", "eyePosition" -> "vec3";
+            case "frameTimeCounter", "viewWidth", "viewHeight", "near", "far", "rainStrength",
+                    "wetness", "world_age", "time_sunrise", "time_noon", "time_sunset",
+                    "time_midnight", "biome_temperature", "biome_humidity", "alphaTestRef" -> "float";
+            case "frameCounter", "blockEntityId", "entityId", "currentRenderedItemId" -> "int";
+            case "viewSize", "pixelSize", "view_res", "view_pixel_size", "taa_offset" -> "vec2";
+            case "atlasSize" -> "ivec2";
+            case "entityColor" -> "vec4";
             default -> null;
         };
     }
