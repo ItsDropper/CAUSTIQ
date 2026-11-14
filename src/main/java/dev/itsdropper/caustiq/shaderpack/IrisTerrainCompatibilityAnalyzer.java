@@ -121,32 +121,11 @@ public final class IrisTerrainCompatibilityAnalyzer {
         }
 
         auditFragmentOutputs(fragment, issues);
-        Matcher samplers = SAMPLER.matcher(vertex + "\\n" + fragment);
-        while (samplers.find()) {
-            String sampler = samplers.group(2);
-            if (!AVAILABLE_SAMPLERS.contains(sampler)) {
-                issues.add(new Issue("UNBOUND_SAMPLER", sampler,
-                        "The sampler has no binding in Nvidium's current terrain shader pipeline."));
-            }
-        }
-
-        String combinedSources = vertex + "\\n" + fragment;
-        Matcher uniforms = UNIFORM.matcher(combinedSources);
-        while (uniforms.find()) {
-            String type = uniforms.group(1);
-            String name = uniforms.group(2);
-            if (type.startsWith("sampler") || type.startsWith("isampler")
-                    || type.startsWith("usampler") || type.startsWith("image")) {
-                continue;
-            }
-            if (UNAVAILABLE_TRANSFORMS.contains(name)
-                    || NvidiumIrisTerrainAbi.fragmentSemantic(name).isPresent()) {
-                continue;
-            }
-            issues.add(new Issue("UNBOUND_UNIFORM", name,
-                    "No value or binding for this Iris uniform is exposed by Nvidium's terrain pipeline."));
-        }
-        if (UNIFORM_BLOCK.matcher(combinedSources).find()) {
+        auditSamplers(vertex, "vertex", issues);
+        auditSamplers(fragment, "fragment", issues);
+        auditUniforms(vertex, "vertex", issues);
+        auditUniforms(fragment, "fragment", issues);
+        if (UNIFORM_BLOCK.matcher(vertex).find() || UNIFORM_BLOCK.matcher(fragment).find()) {
             issues.add(new Issue("UNSUPPORTED_UNIFORM_BLOCK", "uniform block",
                     "Iris uniform blocks require layout and binding integration that the Nvidium terrain bridge does not provide."));
         }
@@ -173,6 +152,37 @@ public final class IrisTerrainCompatibilityAnalyzer {
         }
 
         return new Result(deduplicate(issues));
+    }
+
+    private static void auditSamplers(String source, String stage, List<Issue> issues) {
+        Matcher samplers = SAMPLER.matcher(source);
+        while (samplers.find()) {
+            String sampler = samplers.group(2);
+            if (stage.equals("vertex") || !AVAILABLE_SAMPLERS.contains(sampler)) {
+                issues.add(new Issue("UNBOUND_SAMPLER", sampler,
+                        stage.equals("vertex")
+                                ? "Nvidium does not bind Iris terrain samplers to the mesh/vertex stage."
+                                : "The sampler has no binding in Nvidium's current terrain fragment pipeline."));
+            }
+        }
+    }
+
+    private static void auditUniforms(String source, String stage, List<Issue> issues) {
+        Matcher uniforms = UNIFORM.matcher(source);
+        while (uniforms.find()) {
+            String type = uniforms.group(1);
+            String name = uniforms.group(2);
+            if (type.startsWith("sampler") || type.startsWith("isampler")
+                    || type.startsWith("usampler") || type.startsWith("image")) {
+                continue;
+            }
+            if (UNAVAILABLE_TRANSFORMS.contains(name)
+                    || (stage.equals("fragment") && NvidiumIrisTerrainAbi.fragmentSemantic(name).isPresent())) {
+                continue;
+            }
+            issues.add(new Issue("UNBOUND_UNIFORM", name,
+                    "No value or binding for this Iris " + stage + " uniform is exposed by Nvidium's terrain pipeline."));
+        }
     }
 
     private static void auditFragmentOutputs(String source, List<Issue> issues) {
