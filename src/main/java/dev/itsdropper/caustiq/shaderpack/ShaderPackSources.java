@@ -127,9 +127,10 @@ public final class ShaderPackSources implements GlslPreprocessor.SourceProvider,
             }
         } else {
             try (Stream<Path> walk = Files.walk(directoryRoot, 32)) {
-                List<Path> files = walk.limit(maximumEntries + 1L)
+                List<Path> files = walk
                         .filter(path -> !path.equals(directoryRoot))
                         .filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
+                        .limit(maximumEntries + 1L)
                         .toList();
                 if (files.size() > maximumEntries) {
                     throw new IOException("Shader directory contains more than " + maximumEntries + " entries.");
