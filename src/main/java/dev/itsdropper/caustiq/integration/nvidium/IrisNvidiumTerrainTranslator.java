@@ -61,7 +61,8 @@ public final class IrisNvidiumTerrainTranslator {
             "uv", "v_colour", "v_vertexColour", "v_lightmapCoord", "v_renderPosition",
             "v_quadMidUv", "v_quadMidPosition", "v_midBlock", "v_blockEntity",
             "v_normal", "v_tangent", "v_tbn", "v_materialFlags",
-            "v_irisTexCoord0", "v_irisTexCoord1");
+            "v_irisTexCoord0", "v_irisTexCoord1", "v_irisTexCoord2", "v_irisTexCoord3",
+            "v_irisTexCoord4", "v_irisTexCoord5", "v_irisTexCoord6", "v_irisTexCoord7");
 
     private final String vertexSource;
     private final String fragmentSource;
@@ -146,7 +147,9 @@ public final class IrisNvidiumTerrainTranslator {
 
     private String varyingBlockMembers() {
         StringBuilder members = new StringBuilder();
-        members.append("    vec4 v_irisTexCoord0;\n    vec4 v_irisTexCoord1;\n");
+        for (int index = 0; index < 8; index++) {
+            members.append("    vec4 v_irisTexCoord").append(index).append(";\n");
+        }
         for (Varying varying : varyings) {
             if (NATIVE_INTERPOLANTS.contains(varying.name())) {
                 throw new IllegalArgumentException("Iris varying collides with Nvidium ABI member: " + varying.name());
@@ -185,6 +188,9 @@ public final class IrisNvidiumTerrainTranslator {
                 .append("    caustiqIrisTexCoord[0] = vec4(decodeVertexUV(V), 0.0, 1.0);\n")
                 .append("    caustiqIrisTexCoord[1] = vec4(decodeLightUV(V), 0.0, 1.0);\n")
                 .append("    caustiqIrisClipPosition = gl_MeshVerticesNV[id].gl_Position;\n");
+        for (int index = 2; index < 8; index++) {
+            invocation.append("    caustiqIrisTexCoord[").append(index).append("] = vec4(0.0);\n");
+        }
         for (Varying varying : varyings) {
             invocation.append("    caustiqIrisVarying_").append(varying.name())
                     .append(" = ").append(varying.type()).append("(0);\n");
@@ -199,6 +205,10 @@ public final class IrisNvidiumTerrainTranslator {
                 .append("    OUT[id].uv = caustiqIrisTexCoord[0].xy;\n")
                 .append("    OUT[id].v_irisTexCoord0 = caustiqIrisTexCoord[0];\n")
                 .append("    OUT[id].v_irisTexCoord1 = caustiqIrisTexCoord[1];\n");
+        for (int index = 2; index < 8; index++) {
+            invocation.append("    OUT[id].v_irisTexCoord").append(index)
+                    .append(" = caustiqIrisTexCoord[").append(index).append("];\n");
+        }
         for (Varying varying : varyings) {
             invocation.append("    OUT[id].").append(varying.name()).append(" = caustiqIrisVarying_")
                     .append(varying.name()).append(";\n");
@@ -235,8 +245,10 @@ public final class IrisNvidiumTerrainTranslator {
 
     private String fragmentInvocation() {
         StringBuilder invocation = new StringBuilder();
-        invocation.append("    caustiqIrisTexCoord[0] = v_irisTexCoord0;\n")
-                .append("    caustiqIrisTexCoord[1] = v_irisTexCoord1;\n");
+        for (int index = 0; index < 8; index++) {
+            invocation.append("    caustiqIrisTexCoord[").append(index)
+                    .append("] = v_irisTexCoord").append(index).append(";\n");
+        }
         if (usesFragData) {
             invocation.append("    for (int caustiqIndex = 0; caustiqIndex < 8; caustiqIndex++) caustiqIrisFragData[caustiqIndex] = vec4(0.0);\n");
         }
