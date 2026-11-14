@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
  *
  * <p>This does not execute arbitrary Iris GLSL. It exposes only values that
  * can be reconstructed from Nvidium's packed terrain vertices: UV, raw vertex
- * tint, lightmap UV, world position, and a geometric face normal.</p>
+ * tint, lightmap UV, region-transformed camera-relative position, material flags, and a geometric face normal.</p>
  */
 public final class NvidiumTerrainVaryingAdapter {
     public static final String PROFILE_ID = "caustiq-terrain-varyings-v1";
