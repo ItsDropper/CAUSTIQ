@@ -110,6 +110,14 @@ assert "int formatSize = Nvidium.config.use_sodium_vertex_format" in nvidium_rep
 assert "copyQuad" in nvidium_repackager
 assert "CompactChunkVertex.STRIDE * 4" in nvidium_repackager
 assert "NvidiumCompactChunkVertex.STRIDE * 4" in nvidium_repackager
+translator = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/IrisNvidiumTerrainTranslator.java").read_text(encoding="utf-8")
+uniform_bridge = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisUniformBridge.java").read_text(encoding="utf-8")
+texture_bridge = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisTextureBridge.java").read_text(encoding="utf-8")
+assert "photonUniformDeclarations()" in translator
+assert 'Map.entry("noisetex", "caustiqNoiseTexture")' in translator
+assert "layout(binding = 2) uniform sampler2D caustiqNoiseTexture;" in translator
+assert "NvidiumIrisTextureBridge.bindForTerrain()" in uniform_bridge
+assert "GL_TEXTURE2" in texture_bridge and "GL_TEXTURE3" in texture_bridge and "GL_TEXTURE4" in texture_bridge
 vertex_encoder = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
 assert "STRIDE = 40" in vertex_encoder
 assert "ColorABGR.pack(red, green, blue, alpha)" in vertex_encoder
