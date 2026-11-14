@@ -1,0 +1,100 @@
+package dev.itsdropper.caustiq.integration.nvidium;
+
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * Audited data contract exposed by Nvidium 0.4.3-beta13-1.21.11 to a CAUSTIQ
+ * terrain shader. This is deliberately a capability description, not a claim
+ * that arbitrary Iris uniforms or vertex attributes exist in Nvidium.
+ */
+public final class NvidiumIrisTerrainAbi {
+    public static final String NVIDIUM_VERSION = "0.4.3-beta13-1.21.11";
+    public static final int DIFFUSE_ATLAS_TEXTURE_UNIT = 0;
+    public static final int LIGHTMAP_TEXTURE_UNIT = 1;
+
+    public enum Availability {
+        EXACT,
+        DERIVED,
+        UNAVAILABLE
+    }
+
+    public record Semantic(String irisSemantic, Availability availability,
+                           String meshExpression, String explanation) { }
+
+    private static final Map<String, Semantic> VERTEX_SEMANTICS = Map.ofEntries(
+            Map.entry("position", new Semantic("gl_Vertex", Availability.DERIVED,
+                    "decodeVertexPosition(V) + origin",
+                    "Packed terrain position, relative to the camera chunk before the region transform.")),
+            Map.entry("textureCoordinate", new Semantic("gl_MultiTexCoord0", Availability.EXACT,
+                    "decodeVertexUV(V)",
+                    "Nvidium's atlas UV including its texture-coordinate shrink correction.")),
+            Map.entry("vertexColor", new Semantic("gl_Color", Availability.EXACT,
+                    "decodeVertexColour(V).rgb",
+                    "Packed vertex tint; Nvidium's pre-lit multiplier is separately available.")),
+            Map.entry("lightmapCoordinate", new Semantic("lmcoord", Availability.EXACT,
+                    "decodeLightUV(V)",
+                    "Packed block/sky light coordinates in Nvidium's normalized lightmap convention.")),
+            Map.entry("normal", new Semantic("gl_Normal", Availability.DERIVED,
+                    "caustiqTriangleNormal",
+                    "Geometric face normal reconstructed after the region transform; not a smooth vertex normal.")),
+            Map.entry("renderPosition", new Semantic("viewSpacePosition", Availability.DERIVED,
+                    "(transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)).xyz",
+                    "Region-transformed camera-relative position; not absolute world coordinates.")),
+            Map.entry("materialFlags", new Semantic("mc_Entity", Availability.UNAVAILABLE,
+                    "",
+                    "Nvidium stores mip and alpha-cutoff flags, but does not preserve Minecraft block/entity IDs.")),
+            Map.entry("midTextureCoordinate", new Semantic("at_midTexCoord", Availability.UNAVAILABLE,
+                    "",
+                    "The compact Nvidium vertex formats do not retain the quad midpoint UV.")),
+            Map.entry("midBlockPosition", new Semantic("at_midBlock", Availability.UNAVAILABLE,
+                    "",
+                    "The compact Nvidium vertex formats do not retain the midpoint block position.")),
+            Map.entry("tangent", new Semantic("at_tangent", Availability.UNAVAILABLE,
+                    "",
+                    "Neither supported packed vertex format contains a tangent basis."))
+    );
+
+    private static final Map<String, Semantic> FRAGMENT_UNIFORMS = Map.ofEntries(
+            Map.entry("viewWidth", new Semantic("viewWidth", Availability.DERIVED,
+                    "screenSize.x * 2.0",
+                    "Nvidium stores half the framebuffer width in SceneData.screenSize.x.")),
+            Map.entry("viewHeight", new Semantic("viewHeight", Availability.DERIVED,
+                    "screenSize.y * 2.0",
+                    "Nvidium stores half the framebuffer height in SceneData.screenSize.y.")),
+            Map.entry("fogColor", new Semantic("fogColor", Availability.EXACT,
+                    "fogColour",
+                    "Copied from Sodium FogParameters for this Nvidium terrain pass.")),
+            Map.entry("gtexture", new Semantic("gtexture", Availability.EXACT,
+                    "tex_diffuse (texture unit 0)",
+                    "The active Sodium TerrainRenderPass block atlas.")),
+            Map.entry("lightmap", new Semantic("lightmap", Availability.EXACT,
+                    "tex_light (texture unit 1)",
+                    "Minecraft's active light texture."))
+    );
+
+    private NvidiumIrisTerrainAbi() { }
+
+    public static Optional<Semantic> vertexSemantic(String name) {
+        return VERTEX_SEMANTICS.values().stream()
+                .filter(value -> value.irisSemantic().equals(name))
+                .findFirst();
+    }
+
+    public static Optional<Semantic> fragmentSemantic(String name) {
+        return FRAGMENT_UNIFORMS.values().stream()
+                .filter(value -> value.irisSemantic().equals(name))
+                .findFirst();
+    }
+
+    public static Map<String, Semantic> vertexSemantics() { return VERTEX_SEMANTICS; }
+    public static Map<String, Semantic> fragmentSemantics() { return FRAGMENT_UNIFORMS; }
+
+    public static boolean canRepresentRequiredVertexInputs(Iterable<String> requiredInputs) {
+        for (String input : requiredInputs) {
+            Semantic semantic = vertexSemantic(input).orElse(null);
+            if (semantic == null || semantic.availability() == Availability.UNAVAILABLE) return false;
+        }
+        return true;
+    }
+}
