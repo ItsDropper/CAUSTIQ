@@ -27,6 +27,7 @@ public abstract class NvidiumWorldRendererMixin {
             double z,
             @Coerce Object terrainSampler,
             CallbackInfo callbackInfo) {
+        NvidiumRenderBridge.attachWorldRenderer(this);
         NvidiumIrisUniformBridge.capture(matrices, x, y, z);
     }
 
