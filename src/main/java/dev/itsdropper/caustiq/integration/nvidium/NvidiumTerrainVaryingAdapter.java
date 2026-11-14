@@ -72,8 +72,12 @@ public final class NvidiumTerrainVaryingAdapter {
         String mesh = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("MESH"), "MESH source"));
         String fragment = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("FRAGMENT"), "FRAGMENT source"));
         if (mesh.contains(MARKER) || fragment.contains(MARKER)) {
-            if (mesh.contains(MARKER) && fragment.contains(MARKER)) return Map.copyOf(sourceStages);
-            throw new IllegalStateException("Nvidium terrain varying profile is only partially applied.");
+            boolean complete = mesh.contains(MARKER) && fragment.contains(MARKER)
+                    && mesh.contains(MESH_VARYINGS) && fragment.contains(FRAGMENT_VARYINGS)
+                    && mesh.contains(MESH_ASSIGNMENTS) && mesh.contains(NORMAL_HELPER)
+                    && fragment.contains(FRAGMENT_UNIFORM_ALIASES);
+            if (complete) return Map.copyOf(sourceStages);
+            throw new IllegalStateException("Nvidium terrain varying profile is only partially applied or has an incompatible ABI.");
         }
 
         mesh = replaceOnce(mesh,
