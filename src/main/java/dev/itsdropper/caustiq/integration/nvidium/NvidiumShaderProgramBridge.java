@@ -49,9 +49,9 @@ public final class NvidiumShaderProgramBridge {
         LAST_TERRAIN_PROGRAM.set(Snapshot.from(original));
         Map<String, String> transformed = original;
         UnaryOperator<Map<String, String>> nativeAdapter = nativeSourceAdapter;
-        if (nativeAdapter != null) transformed = applyAdapter(nativeAdapter, transformed, "native Nvidium");
+        if (nativeAdapter != null) transformed = applyAdapter(nativeAdapter, transformed, "native Nvidium", false);
         UnaryOperator<Map<String, String>> irisAdapter = irisTerrainAdapter;
-        if (irisAdapter != null) transformed = applyAdapter(irisAdapter, transformed, "Iris terrain");
+        if (irisAdapter != null) transformed = applyAdapter(irisAdapter, transformed, "Iris terrain", true);
 
         if (transformed.equals(original)) return;
         for (Map.Entry<?, String> entry : shaderSources.entrySet()) {
@@ -66,7 +66,7 @@ public final class NvidiumShaderProgramBridge {
     }
 
     private static Map<String, String> applyAdapter(
-            UnaryOperator<Map<String, String>> adapter, Map<String, String> input, String label) {
+            UnaryOperator<Map<String, String>> adapter, Map<String, String> input, String label, boolean rejectNoOp) {
         Map<String, String> transformed = Objects.requireNonNull(
                 adapter.apply(Map.copyOf(input)), label + " adapter result");
         if (!transformed.keySet().equals(input.keySet())) {
