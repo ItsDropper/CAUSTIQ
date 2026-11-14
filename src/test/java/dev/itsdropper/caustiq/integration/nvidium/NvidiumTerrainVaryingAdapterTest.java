@@ -36,6 +36,24 @@ class NvidiumTerrainVaryingAdapterTest {
     }
 
     @Test
+    void adaptsThePinnedNvidiumTerrainShaderSourcesWhenAvailable() throws IOException {
+        String sourceDirectory = System.getenv("NVIDIUM_SOURCE_DIR");
+        Assumptions.assumeTrue(sourceDirectory != null && !sourceDirectory.isBlank(),
+                "Pinned Nvidium source checkout is supplied by CI only");
+        Path shaderRoot = Path.of(sourceDirectory, "src/main/resources/assets/nvidium/shaders/terrain");
+        Map<String, String> sources = Map.of(
+                "TASK", Files.readString(shaderRoot.resolve("task.glsl")),
+                "MESH", Files.readString(shaderRoot.resolve("mesh.glsl")),
+                "FRAGMENT", Files.readString(shaderRoot.resolve("frag.frag")));
+
+        Map<String, String> adapted = NvidiumTerrainVaryingAdapter.adapt(sources);
+        assertTrue(adapted.get("MESH").contains("caustiqComputeTriangleNormal(quadId, triangle1)"));
+        assertTrue(adapted.get("MESH").contains("OUT[id].v_lightmapCoord = decodeLightUV(V);"));
+        assertTrue(adapted.get("FRAGMENT").contains("vec3 v_worldPosition;"));
+        assertEquals(sources.get("TASK"), adapted.get("TASK"));
+    }
+
+    @Test
     void rejectsUnexpectedNvidiumShaderLayoutInsteadOfPartiallyPatchingIt() {
         Map<String, String> sources = sourceStages();
         sources = Map.of(
