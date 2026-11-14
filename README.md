@@ -6,7 +6,7 @@ This branch is the dedicated CAUSTIQ distribution target for Minecraft 1.21.11 w
 
 Experimental — Nvidium terrain integration is not implemented or verified.
 
-This branch targets the Nvidium 0.4.3-beta13-1.21.11 release and its required Sodium 0.8.12 build. Update both dependency pins together when moving to another Nvidium release. It retains the same caustiq mod ID as main and produces a separately named caustiq-nvidium artifact. The branch starts with explicit renderer-stack validation and the existing final-colour post-process; it does not hook Nvidium's internal terrain renderer or adapt its mesh-shader output into Iris-style render targets. A successful build or detected Nvidium installation is not proof that Nvidium's accelerated terrain path remains active while shaders run.
+This branch pins Nvidium 0.4.3-beta13-1.21.11 and Sodium 0.8.12. The Nvidium-specific mixin targets that exact Nvidium renderer method surface; update the pin and verify mixin application before upgrading Nvidium. Update both dependency pins together when moving to another Nvidium release. It retains the same caustiq mod ID as main and produces a separately named caustiq-nvidium artifact. The branch starts with explicit renderer-stack validation and the existing final-colour post-process; it does not hook Nvidium's internal terrain renderer or adapt its mesh-shader output into Iris-style render targets. A successful build or detected Nvidium installation is not proof that Nvidium's accelerated terrain path remains active while shaders run.
 
 Nvidium uses a separate mesh-shader terrain pipeline. Full Iris-level support requires a real bridge for terrain colour/depth, gbuffers, shadow rendering, and pipeline synchronization. Do not bypass Nvidium's own shader compatibility behavior or claim support until those paths are implemented and tested in-game.
 
@@ -56,7 +56,7 @@ The option UI currently exposes discrete declared values as cycle buttons. Conti
 
 ## Nvidium and renderer compatibility
 
-The current final-pass hook consumes Minecraft's main color texture after GameRenderer.renderLevel has completed. The exact ordering and framebuffer contract with Nvidium's renderer still require an in-game trace and visual test. This branch currently detects the required mod stack only; it does not access Nvidium internals or preserve its accelerated terrain path by an implemented bridge.
+The current integration now observes Nvidium's actual `NvidiumWorldRenderer.renderFrame` and `renderTranslucent` entrypoints through optional mixins. CAUSTIQ records start/completion counts and reports whether a completed solid terrain pass was observed before its final-colour post-process. It does not replace or modify Nvidium's task/mesh/fragment shaders. Nvidium's `MixinRenderSectionManager` binds each Sodium `TerrainRenderPass` target and invokes its mesh-shader renderer for solid terrain; CAUSTIQ's final pass runs after `GameRenderer.renderLevel` returns. This is a concrete post-process integration path, not yet an Iris-equivalent multi-pass pipeline. In-game validation is still required to confirm that the Nvidium mixins apply cleanly and that the accelerated renderer remains active during shader-pack rendering.
 
 Nvidium's terrain backend is a GPU-driven mesh-shader renderer integrated into Sodium. Its terrain pipeline owns terrain rasterization, so full Iris-level shader support requires an explicit bridge for terrain colour/depth, gbuffers, shadow rendering, and pipeline synchronization. This branch does not yet provide that bridge.
 

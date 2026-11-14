@@ -4,6 +4,8 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import dev.itsdropper.caustiq.CaustiqClient;
 import dev.itsdropper.caustiq.CaustiqConfig;
 import net.minecraft.client.Minecraft;
+import net.fabricmc.loader.api.FabricLoader;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumRenderBridge;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -22,6 +24,8 @@ public final class ShaderRuntime {
     private static Map<String, String> selectedDefines = Map.of();
     private static int nextProgram;
     private static boolean postProcessFailureLogged;
+    private static long lastReportedNvidiumSolidFrames;
+    private static boolean warnedNvidiumBackendNotObserved;
 
     private ShaderRuntime() { }
 
@@ -85,12 +89,30 @@ public final class ShaderRuntime {
                 .filter(program -> program.name().equalsIgnoreCase("final"))
                 .findFirst().orElse(null);
         if (finalProgram == null) return;
+        observeNvidiumTerrainBackend();
         try {
             RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
             POST_PROCESS.render(mainTarget, finalProgram);
         } catch (RuntimeException exception) {
             postProcessFailureLogged = true;
             CaustiqClient.LOGGER.error("Caustiq disabled its final pass after a render-target failure.", exception);
+        }
+    }
+
+    /** Reports actual Nvidium terrain-renderer calls, not merely the presence of its mod jar. */
+    private static void observeNvidiumTerrainBackend() {
+        if (!FabricLoader.getInstance().isModLoaded("nvidium")) return;
+        NvidiumRenderBridge.Snapshot snapshot = NvidiumRenderBridge.snapshot();
+        if (snapshot.completedSolidPasses() > lastReportedNvidiumSolidFrames) {
+            lastReportedNvidiumSolidFrames = snapshot.completedSolidPasses();
+            warnedNvidiumBackendNotObserved = false;
+            CaustiqClient.LOGGER.info(
+                    "Nvidium terrain backend observed before CAUSTIQ post-processing: {} completed solid pass(es), {} completed translucent pass(es).",
+                    snapshot.completedSolidPasses(), snapshot.completedTranslucentPasses());
+        } else if (snapshot.startedSolidPasses() == 0 && !warnedNvidiumBackendNotObserved) {
+            warnedNvidiumBackendNotObserved = true;
+            CaustiqClient.LOGGER.warn(
+                    "Nvidium is installed, but CAUSTIQ has not observed a completed Nvidium terrain pass. Its accelerated backend may be disabled or the active renderer path may differ; CAUSTIQ will not claim Nvidium acceleration is active.");
         }
     }
 
