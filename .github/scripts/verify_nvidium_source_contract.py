@@ -19,6 +19,7 @@ render_section = source("src/main/java/me/cortex/nvidium/mixin/sodium/MixinRende
 mesh = source("src/main/resources/assets/nvidium/shaders/terrain/mesh.glsl")
 fragment = source("src/main/resources/assets/nvidium/shaders/terrain/frag.frag")
 primary = source("src/main/java/me/cortex/nvidium/renderers/PrimaryTerrainRasterizer.java")
+adapter = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumTerrainVaryingAdapter.java").read_text(encoding="utf-8")
 
 # The mixin shadows this exact private field and injects at this exact method.
 assert "private final Map<ShaderType, String> sources" in shader, "Shader.Builder.sources signature changed"
@@ -47,5 +48,21 @@ assert "layout(triangles, max_vertices=64, max_primitives=32) out;" in mesh
 assert "layout(location=1) out Interpolants" in mesh
 assert "layout(location = 1) in Interpolants" in fragment
 assert "gl_PrimitiveID" in fragment
+
+# The native varying adapter must target real, unique anchors in the pinned
+# upstream sources. The Java integration test runs the transformation itself.
+for anchor, label in [
+    ("#version 460", "GLSL version"),
+    ("    vec2 uv;\\n    vec3 v_colour;", "interpolant declaration"),
+    ("vec4 transformVertex(Vertex V) {", "mesh helper insertion"),
+    ("    bool triangle1 = (gl_LocalInvocationIndex & uint(1)) == 1;", "triangle selection"),
+    ("    OUT[id].uv = decodeVertexUV(V);\\n    OUT[id].v_colour = computeMultiplier(V);", "mesh output assignments"),
+]:
+    assert anchor in mesh, f"Pinned Nvidium mesh shader lost adapter anchor: {label}"
+assert "    vec2 uv;\\n    vec3 v_colour;" in fragment, "Pinned Nvidium fragment varying declaration changed"
+assert "CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS" in adapter
+assert "decodeLightUV(V)" in adapter and "decodeVertexColour(V).rgb" in adapter
+assert "cross(pb - pa, pc - pa)" in adapter, "Geometric face-normal reconstruction is missing"
+assert "NvidiumTerrainVaryingAdapter.class" in (caustiq_root / ".github/workflows/build.yml").read_text(encoding="utf-8")
 
 print("Nvidium source contract verified: Shader.Builder field/method, Iris gate semantics, active three-stage terrain pipeline, and mesh-to-fragment interface.")
