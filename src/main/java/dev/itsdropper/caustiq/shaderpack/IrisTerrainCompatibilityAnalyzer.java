@@ -31,6 +31,8 @@ public final class IrisTerrainCompatibilityAnalyzer {
             "layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)");
     private static final Pattern TEXTURE_COORDINATE_INDEX = Pattern.compile(
             "\\bgl_TexCoord\\s*\\[\\s*([0-9]+)\\s*]");
+    private static final Pattern DYNAMIC_TEXTURE_COORDINATE_INDEX = Pattern.compile(
+            "\\bgl_TexCoord\\s*\\[(?!\\s*[0-9]+\\s*])");
     private static final Pattern SAMPLER = Pattern.compile(
             "\\buniform\\s+(?:(?:highp|mediump|lowp)\\s+)?"
                     + "([iu]?sampler[A-Za-z0-9_]*|image[A-Za-z0-9_]*)\\s+"
@@ -41,10 +43,15 @@ public final class IrisTerrainCompatibilityAnalyzer {
             "mc_Entity", "mc_midTexCoord", "at_midTexCoord", "at_midBlock",
             "at_tangent", "gl_Normal", "vaNormal");
     private static final Set<String> UNAVAILABLE_TRANSFORMS = Set.of(
-            "gl_ModelViewMatrix", "gl_ModelViewMatrixInverse", "gl_ProjectionMatrix",
-            "gl_ProjectionMatrixInverse", "gl_TextureMatrix", "gbufferModelView",
+            "gl_ModelViewMatrix", "gl_ModelViewMatrixInverse", "gl_ModelViewMatrixTranspose",
+            "gl_ModelViewMatrixInverseTranspose", "gl_ProjectionMatrix", "gl_ProjectionMatrixInverse",
+            "gl_ProjectionMatrixTranspose", "gl_ProjectionMatrixInverseTranspose",
+            "gl_ModelViewProjectionMatrix", "gl_TextureMatrix", "gbufferModelView",
             "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
-            "cameraPosition", "gbufferPreviousModelView", "gbufferPreviousProjection");
+            "gbufferPreviousModelView", "gbufferPreviousModelViewInverse",
+            "gbufferPreviousProjection", "gbufferPreviousProjectionInverse",
+            "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse",
+            "cameraPosition", "previousCameraPosition");
     private static final Set<String> AVAILABLE_SAMPLERS = Set.of(
             "gtexture", "lightmap", "tex_diffuse", "tex_light");
     private static final Map<String, String> AVAILABLE_VERTEX_ATTRIBUTES = Map.ofEntries(
@@ -128,7 +135,7 @@ public final class IrisTerrainCompatibilityAnalyzer {
                         "Only texture coordinate set 0 (terrain UV) and set 1 (lightmap UV) are represented."));
             }
         }
-        if ((vertex + fragment).matches("(?s).*\\bgl_TexCoord\\s*\\[(?!\\s*[01]\\s*]).*")) {
+        if (DYNAMIC_TEXTURE_COORDINATE_INDEX.matcher(vertex + "\\n" + fragment).find()) {
             issues.add(new Issue("DYNAMIC_TEXTURE_COORDINATE_INDEX", "gl_TexCoord",
                     "A dynamic texture-coordinate index cannot be mapped to Nvidium's fixed UV/lightmap attributes."));
         }
