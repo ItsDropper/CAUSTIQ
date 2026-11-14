@@ -45,6 +45,9 @@ public final class NvidiumShaderProgramBridge {
             throw new IllegalStateException("Nvidium terrain adapter must preserve shader stages. Expected "
                     + namedSources.keySet() + " but received " + transformed.keySet());
         }
+        if (transformed.equals(namedSources)) {
+            throw new IllegalStateException("Nvidium terrain adapter did not transform any shader stage.");
+        }
         for (Map.Entry<?, String> entry : shaderSources.entrySet()) {
             if (entry.getKey() instanceof Enum<?> stage) {
                 String replacement = transformed.get(stage.name());
@@ -56,7 +59,12 @@ public final class NvidiumShaderProgramBridge {
         }
     }
 
-    static void resetForTests() {\n        terrainAdapter = null;\n        LAST_TERRAIN_PROGRAM.set(null);\n    }\n\n    public static Snapshot lastTerrainProgram() { return LAST_TERRAIN_PROGRAM.get(); }
+    static void resetForTests() {
+        terrainAdapter = null;
+        LAST_TERRAIN_PROGRAM.set(null);
+    }
+
+    public static Snapshot lastTerrainProgram() { return LAST_TERRAIN_PROGRAM.get(); }
     public record StageSnapshot(int sourceLength, int sourceHash) { }
     public record Snapshot(Map<String, StageSnapshot> stages) {
         public Snapshot { stages = Map.copyOf(stages); }
