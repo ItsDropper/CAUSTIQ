@@ -2,7 +2,6 @@ package dev.itsdropper.caustiq.mixin;
 
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumGBufferTargets;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
-import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
