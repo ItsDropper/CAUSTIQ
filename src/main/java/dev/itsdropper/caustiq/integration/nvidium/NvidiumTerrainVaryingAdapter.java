@@ -7,13 +7,13 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Extends Nvidium's native terrain interpolant ABI with values reconstructible
- * from its packed quad data. All generated values are explicitly geometric;
- * this adapter does not invent block IDs, model normals, or world transforms.
+ * Extends Nvidium's Sodium-compatible terrain vertex ABI with Iris-style
+ * block IDs, packed normal/tangent data, midpoint UV/block offsets, and the
+ * Nvidium material flags kept separate from tangent handedness.
  */
 public final class NvidiumTerrainVaryingAdapter {
-    public static final String PROFILE_ID = "caustiq-terrain-varyings-v2";
-    private static final String MARKER = "#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 2";
+    public static final String PROFILE_ID = "caustiq-iris-vertex-abi-v3";
+    private static final String MARKER = "#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 3";
     private static final Pattern BARYCENTRIC_DEFINE = Pattern.compile(
             "(?m)^\\s*#\\s*define\\s+USE_NV_FRAGMENT_SHADER_BARYCENTRIC\\b[^\\r\\n]*");
     private static final Pattern PRIMARY_FRAGMENT_INTERFACE = Pattern.compile(
@@ -180,17 +180,8 @@ public final class NvidiumTerrainVaryingAdapter {
         fragment = replaceOnce(fragment, "layout(location = 0) out vec4 colour;",
                 "layout(location = 0) out vec4 colour;\n" + FRAGMENT_GBUFFER_OUTPUTS,
                 "G-buffer fragment outputs");
-        mesh = replaceOnce(mesh, "void putVertex(uint id, Vertex V) {",
-                "void putVertex(uint id, Vertex V, uint quadId) {", "mesh varying writer signature");
-        mesh = replaceOnce(mesh, "putVertex(qId+uint(triangle1), Vc);",
-                "putVertex(qId+uint(triangle1), Vc, quadId);", "common vertex varying call");
-        mesh = replaceOnce(mesh, "putVertex(uId, V);",
-                "putVertex(uId, V, quadId);", "unique vertex varying call");
         mesh = replaceOnce(mesh, "vec4 transformVertex(Vertex V) {",
                 NORMAL_HELPER + "\n\nvec4 transformVertex(Vertex V) {", "terrain basis helper insertion point");
-        mesh = replaceOnce(mesh, "    bool triangle1 = (gl_LocalInvocationIndex & uint(1)) == 1;",
-                "    bool triangle1 = (gl_LocalInvocationIndex & uint(1)) == 1;\n"
-                        + "    caustiqComputeTriangleBasis(quadId, triangle1);", "triangle selection");
         mesh = replaceOnce(mesh, "    OUT[id].uv = decodeVertexUV(V);\n    OUT[id].v_colour = computeMultiplier(V);",
                 MESH_ASSIGNMENTS, "mesh varying assignments");
         fragment = appendBeforeFinalBrace(fragment, FRAGMENT_GBUFFER_WRITES);
