@@ -67,7 +67,7 @@ public final class GlslCompatibilityTranslator {
         for (String extension : extensions) body.add(insertion++, extension);
 
         StringBuilder translated = new StringBuilder(source.length() + 96);
-        translated.append(String.join("\\n", body));
+        translated.append(String.join("\n", body));
         String result = translated.toString()
                 .replaceAll("\\btexture2D\\s*\\(", "texture(")
                 .replaceAll("\\btextureCube\\s*\\(", "texture(")
@@ -76,12 +76,12 @@ public final class GlslCompatibilityTranslator {
                 .replaceAll("\\bgl_FragColor\\b", "caustiq_FragColor");
 
         if (result.contains("caustiq_FragColor")) {
-            int declaration = result.indexOf("#version 150");
-            declaration = result.indexOf('\\n', declaration);
+            declaration = result.indexOf('\n', declaration);
+            declaration = result.indexOf('\n', declaration);
             if (declaration < 0) declaration = 0;
             else declaration++;
             result = result.substring(0, declaration)
-                    + "out vec4 caustiq_FragColor;\\n" + result.substring(declaration);
+                    + "out vec4 caustiq_FragColor;\n" + result.substring(declaration);
         }
         return result;
     }

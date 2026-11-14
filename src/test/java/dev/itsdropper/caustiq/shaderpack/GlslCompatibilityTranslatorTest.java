@@ -44,14 +44,14 @@ class GlslCompatibilityTranslatorTest {
 
     @Test
     void leavesModernGlslUntouched() throws IOException {
-        String source = "#version 330 core\\nout vec4 color;\\nvoid main() { color = vec4(1.0); }";
+        String source = "#version 330 core\nout vec4 color;\nvoid main() { color = vec4(1.0); }";
         assertEquals(source, translator.translateLegacyFragment(source));
     }
 
     @Test
     void rejectsMultipleRenderTargetOutputInsteadOfSilentlyCorruptingIt() {
         IOException exception = assertThrows(IOException.class, () ->
-                translator.translateLegacyFragment("#version 120\\nvoid main() { gl_FragData[0] = vec4(1.0); }"));
+                translator.translateLegacyFragment("#version 120\nvoid main() { gl_FragData[0] = vec4(1.0); }"));
         assertTrue(exception.getMessage().contains("multiple-render-target"));
     }
 }
