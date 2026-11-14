@@ -35,6 +35,7 @@ jobs:
             "https://github.com/MCRcortex/nvidium/archive/e600501ab840ba821bbea8bb36616feec8e476ef.tar.gz" \
             | tar -xz --strip-components=1 -C "$nvidium_dir"
           python3 .github/scripts/verify_nvidium_source_contract.py "$nvidium_dir" "$GITHUB_WORKSPACE"
+          echo "NVIDIUM_SOURCE_DIR=$nvidium_dir" >> "$GITHUB_ENV"
 
       - name: Build mod and package example shader pack
         shell: bash
@@ -90,6 +91,7 @@ jobs:
                   "dev/itsdropper/caustiq/mixin/NvidiumShaderBuilderMixin.class",
                   "dev/itsdropper/caustiq/mixin/NvidiumIrisCheckMixin.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumShaderProgramBridge.class",
+                  "dev/itsdropper/caustiq/integration/nvidium/NvidiumTerrainVaryingAdapter.class",
               }
 
               assert metadata["id"] == "caustiq", metadata["id"]
