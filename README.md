@@ -89,7 +89,7 @@ The pack's own final vertex stage is catalogued but not yet executed. The first 
 - JDK 25 for the current Loom build process
 - Fabric Loader 0.20.1
 - Sodium 0.8.12 public config API at compile time only (Sodium itself is required at runtime)
-- Nvidium required at runtime
+- Nvidium 0.4.3-beta13-1.21.11 required at runtime
 - Official Mojang mappings
 
 ## Build and test
