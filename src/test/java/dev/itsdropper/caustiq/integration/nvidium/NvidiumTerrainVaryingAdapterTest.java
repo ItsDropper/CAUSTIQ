@@ -1,0 +1,91 @@
+package dev.itsdropper.caustiq.integration.nvidium;
+
+import org.junit.jupiter.api.Test;
+
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class NvidiumTerrainVaryingAdapterTest {
+    @Test
+    void addsUvTintLightmapWorldPositionAndFaceNormalToMeshFragmentAbi() {
+        Map<String, String> adapted = NvidiumTerrainVaryingAdapter.adapt(sourceStages());
+        String mesh = adapted.get("MESH");
+        String fragment = adapted.get("FRAGMENT");
+
+        assertTrue(mesh.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 1"));
+        assertTrue(fragment.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 1"));
+        for (String varying : new String[]{
+                "vec2 uv;", "vec3 v_colour;", "vec3 v_vertexColour;",
+                "vec2 v_lightmapCoord;", "vec3 v_worldPosition;", "vec3 v_normal;"
+        }) {
+            assertTrue(mesh.contains(varying), "Mesh output missing " + varying);
+            assertTrue(fragment.contains(varying), "Fragment input missing " + varying);
+        }
+        assertTrue(mesh.contains("decodeVertexColour(V).rgb"));
+        assertTrue(mesh.contains("decodeLightUV(V)"));
+        assertTrue(mesh.contains("decodeVertexPosition(V) + origin"));
+        assertTrue(mesh.contains("cross(pb - pa, pc - pa)"));
+        assertTrue(mesh.contains("caustiqComputeTriangleNormal(quadId, triangle1)"));
+        assertEquals("task source", adapted.get("TASK"));
+    }
+
+    @Test
+    void rejectsUnexpectedNvidiumShaderLayoutInsteadOfPartiallyPatchingIt() {
+        Map<String, String> sources = sourceStages();
+        sources = Map.of(
+                "TASK", sources.get("TASK"),
+                "MESH", sources.get("MESH").replace("vec3 v_colour;", "vec4 changedColour;"),
+                "FRAGMENT", sources.get("FRAGMENT"));
+        Map<String, String> unsupported = sources;
+        assertThrows(IllegalStateException.class, () -> NvidiumTerrainVaryingAdapter.adapt(unsupported));
+    }
+
+    @Test
+    void rejectsIncompleteStageSets() {
+        assertThrows(IllegalArgumentException.class,
+                () -> NvidiumTerrainVaryingAdapter.adapt(Map.of("MESH", "mesh")));
+    }
+
+    @Test
+    void detectsPartiallyAppliedProfile() {
+        Map<String, String> sources = sourceStages();
+        Map<String, String> partiallyAdapted = Map.of(
+                "TASK", sources.get("TASK"),
+                "MESH", sources.get("MESH") + "\n#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 1",
+                "FRAGMENT", sources.get("FRAGMENT"));
+        assertThrows(IllegalStateException.class,
+                () -> NvidiumTerrainVaryingAdapter.adapt(partiallyAdapted));
+    }
+
+    private static Map<String, String> sourceStages() {
+        String mesh = """
+                #version 460
+                layout(location=1) out Interpolants {
+                    vec2 uv;
+                    vec3 v_colour;
+                } OUT[];
+                Vertex Vc;
+                Vertex V;
+                vec4 transformVertex(Vertex V) {
+                    return vec4(0.0);
+                }
+                void putVertex(uint id, Vertex V) {
+                    OUT[id].uv = decodeVertexUV(V);
+                    OUT[id].v_colour = computeMultiplier(V);
+                }
+                void main() {
+                    bool triangle1 = (gl_LocalInvocationIndex & uint(1)) == 1;
+                }
+                """;
+        String fragment = """
+                #version 460
+                layout(location = 1) in Interpolants {
+                    vec2 uv;
+                    vec3 v_colour;
+                };
+                void main() {}
+                """;
+        return Map.of("TASK", "task source", "MESH", mesh, "FRAGMENT", fragment);
+    }
+}
