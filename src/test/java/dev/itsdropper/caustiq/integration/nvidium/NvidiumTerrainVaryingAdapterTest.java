@@ -179,8 +179,8 @@ class NvidiumTerrainVaryingAdapterTest {
     void leavesNvidiumNonPrimaryTerrainProgramsUntouched() {
         Map<String, String> sources = Map.of(
                 "TASK", "translucent task",
-                "MESH", "#version 460\nvoid main() { gl_PrimitiveCountNV = 0; }",
-                "FRAGMENT", "#version 460\nlayout(location = 0) out vec4 outputColor;\nvoid main() {}");
+                "MESH", "#version 460\nlayout(triangles, max_vertices=128, max_primitives=64) out;\nvoid main() { gl_PrimitiveCountNV = 0; }",
+                "FRAGMENT", "#version 460\nlayout(location = 0) out vec4 colour;\nlayout(location = 1) in Interpolants { vec2 uv; vec3 v_colour; };\nvoid main() {}");
         assertEquals(sources, NvidiumTerrainVaryingAdapter.adapt(sources));
     }
 
