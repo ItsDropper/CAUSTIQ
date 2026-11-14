@@ -60,8 +60,8 @@ class NvidiumShaderProgramBridgeTest {
     @Test void nativeVaryingAdapterDoesNotEnableIrisCompatibility() {
         NvidiumShaderProgramBridge.registerNativeSourceAdapter(sources -> Map.of(
                 "TASK", sources.get("TASK"),
-                "MESH", sources.get("MESH") + "\\n// native varying profile",
-                "FRAGMENT", sources.get("FRAGMENT") + "\\n// native varying profile"));
+                "MESH", sources.get("MESH") + "\n// native varying profile",
+                "FRAGMENT", sources.get("FRAGMENT") + "\n// native varying profile"));
         Map<Object, String> sources = terrainSources();
         NvidiumShaderProgramBridge.transformBeforeCompile(sources);
         assertTrue(sources.get(Stage.MESH).endsWith("// native varying profile"));
@@ -72,15 +72,15 @@ class NvidiumShaderProgramBridgeTest {
     @Test void nativeAndIrisAdaptersRunInOrder() {
         NvidiumShaderProgramBridge.registerNativeSourceAdapter(sources -> Map.of(
                 "TASK", sources.get("TASK"),
-                "MESH", sources.get("MESH") + "\\n// native",
-                "FRAGMENT", sources.get("FRAGMENT") + "\\n// native"));
+                "MESH", sources.get("MESH") + "\n// native",
+                "FRAGMENT", sources.get("FRAGMENT") + "\n// native"));
         NvidiumShaderProgramBridge.registerTerrainAdapter(sources -> Map.of(
                 "TASK", sources.get("TASK"),
-                "MESH", sources.get("MESH") + "\\n// iris",
-                "FRAGMENT", sources.get("FRAGMENT") + "\\n// iris"));
+                "MESH", sources.get("MESH") + "\n// iris",
+                "FRAGMENT", sources.get("FRAGMENT") + "\n// iris"));
         Map<Object, String> sources = terrainSources();
         NvidiumShaderProgramBridge.transformBeforeCompile(sources);
-        assertTrue(sources.get(Stage.MESH).endsWith("// native\\n// iris"));
+        assertTrue(sources.get(Stage.MESH).endsWith("// native\n// iris"));
         assertTrue(NvidiumShaderProgramBridge.hasTerrainAdapter());
     }
 
