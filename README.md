@@ -4,7 +4,19 @@ Caustiq is an independent, client-side Minecraft shader engine. Its primary goal
 
 ## Project status
 
-**Early development — pack discovery, source preprocessing, program discovery, Minecraft GPU pipeline compilation, a first executable final fragment pass, pack option metadata parsing, and video-settings integration are implemented.** This is not yet broad shader-pack compatibility.
+**Early development — pack discovery, source preprocessing, program discovery, Minecraft GPU pipeline compilation, an executable single-input final fragment pass, pack option metadata parsing, and video-settings integration are implemented.** This is not yet broad shader-pack compatibility.
+
+## First in-game shader smoke test
+
+A known-purpose test pack is included at examples/caustiq-smoke-test.
+
+1. Build Caustiq and install its development JAR in a Minecraft 1.21.11 Fabric instance.
+2. Copy the caustiq-smoke-test folder into that instance's shaderpacks directory.
+3. Open Options → Video Settings → Caustiq Shaders.
+4. Select caustiq-smoke-test and ensure Caustiq is enabled.
+5. Enter a world. The final pass should visibly rotate the scene's color channels.
+
+The effect is intentionally unmistakable. If the world colors do not change, collect the Caustiq log lines around shader discovery, compilation, and final-pass execution. This smoke test validates only the current final color pass, not compatibility with arbitrary shader packs.
 
 ## Video settings integration
 
@@ -26,9 +38,9 @@ The option UI currently exposes discrete declared values as cycle buttons. Conti
 
 ## Nvidium and renderer compatibility
 
-Caustiq does not replace Minecraft's chunk renderer, alter terrain vertex formats, intercept chunk submissions, or depend on Sodium APIs for rendering. The post-process hook consumes Minecraft's main color texture after world rendering. Nvidium remains responsible for producing the terrain image; Caustiq only processes the completed color result.
+Caustiq does not replace Minecraft's chunk renderer, alter terrain vertex formats, intercept chunk submissions, or depend on Sodium APIs for rendering. The final-pass hook consumes Minecraft's main color texture after GameRenderer.renderLevel has completed. Nvidium remains responsible for producing the terrain image; Caustiq only processes the completed color result.
 
-This is an architectural compatibility strategy, **not a verified Nvidium compatibility claim**. In-game validation with Nvidium and without Sodium is still required to confirm that the main color texture contains the completed accelerated frame at this injection point.
+This is an architectural compatibility strategy, **not a verified Nvidium compatibility claim**. In-game validation with Nvidium, with Sodium, and with neither renderer integration is still required to confirm that the main color texture contains the completed accelerated frame at this injection point.
 
 ## GPU pipeline and final pass
 
@@ -60,7 +72,7 @@ Windows: gradlew.bat build
 
 Linux/macOS: ./gradlew build
 
-The build runs scanner, preprocessing, metadata, program-catalog, and diagnostic tests. The distributable JAR is written to build/libs/.
+The build runs scanner, preprocessing, metadata, program-catalog, diagnostic, and bundled smoke-pack discovery tests. The distributable JAR is written to build/libs/.
 
 ## Next stages
 
