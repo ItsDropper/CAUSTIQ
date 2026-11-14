@@ -1,9 +1,9 @@
+import org.gradle.api.tasks.bundling.Zip
+import java.util.zip.ZipFile
+
 plugins {
     id("net.fabricmc.fabric-loom-remap") version "1.19-SNAPSHOT"
 }
-
-import org.gradle.api.tasks.bundling.Zip
-import java.util.zip.ZipFile
 
 group = property("maven_group") as String
 version = property("mod_version") as String
