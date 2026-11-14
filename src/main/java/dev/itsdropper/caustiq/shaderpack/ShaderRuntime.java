@@ -170,6 +170,26 @@ public final class ShaderRuntime {
                 CaustiqClient.LOGGER.warn("Shader pack '{}' contains program(s) without a vertex+fragment pair or compute stage: {}",
                         selected.displayName(), invalidPrograms);
             }
+            if (!packModel.diagnostics().isEmpty()) {
+                CaustiqClient.LOGGER.warn(
+                        "Shader pack '{}' uses Iris features that CAUSTIQ has parsed but cannot execute yet: {}. Refusing partial activation.",
+                        selected.displayName(), packModel.diagnostics());
+                pending = List.of();
+                discoveryFinished = true;
+                closeSources();
+                return;
+            }
+            IrisShaderPackModel.Program finalProgram = packModel.base().programs().get("final");
+            if (packModel.base().programs().size() != 1 || finalProgram == null
+                    || !finalProgram.hasVertexAndFragment() || finalProgram.stages().size() != 2) {
+                CaustiqClient.LOGGER.warn(
+                        "Shader pack '{}' does not have the exact standalone final.vsh + final.fsh program shape supported by the current post-process path. Refusing partial activation.",
+                        selected.displayName());
+                pending = List.of();
+                discoveryFinished = true;
+                closeSources();
+                return;
+            }
             if (!catalog.isFinalOnly()) {
                 CaustiqClient.LOGGER.warn(
                         "Shader pack '{}' requires the multi-pass world renderer. CAUSTIQ currently supports only a standalone final pass; skipping activation rather than rendering an incorrect partial pipeline. Detected {} base program(s), {} dimension override(s), {} parser diagnostic(s).",
