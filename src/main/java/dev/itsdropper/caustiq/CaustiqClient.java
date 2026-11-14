@@ -3,6 +3,7 @@ package dev.itsdropper.caustiq;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanner;
+import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
@@ -42,7 +43,12 @@ public final class CaustiqClient implements ClientModInitializer {
         // Keep filesystem work off Minecraft's client initialization thread.
         CompletableFuture
                 .supplyAsync(() -> new ShaderPackScanner().scan(shaderPackDirectory))
-                .whenComplete((result, failure) -> logScanResult(result, failure, shaderPackDirectory));
+                .whenComplete((result, failure) -> {
+                    if (failure == null) {
+                        ShaderRuntime.publishScanResult(result);
+                    }
+                    logScanResult(result, failure, shaderPackDirectory);
+                });
     }
 
     private void logScanResult(ShaderPackScanResult result, Throwable failure, Path directory) {
