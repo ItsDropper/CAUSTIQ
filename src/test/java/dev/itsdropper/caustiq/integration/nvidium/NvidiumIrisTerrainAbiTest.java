@@ -10,7 +10,8 @@ class NvidiumIrisTerrainAbiTest {
     @Test
     void exposesOnlyAttributesPresentOrDerivableFromPinnedNvidiumFormat() {
         assertTrue(NvidiumIrisTerrainAbi.canRepresentRequiredVertexInputs(List.of(
-                "gl_Vertex", "gl_MultiTexCoord0", "gl_Color", "lmcoord")));
+                "gl_Vertex", "gl_MultiTexCoord0", "gl_MultiTexCoord1",
+                "vaPosition", "vaUV0", "vaUV2", "vaColor", "gl_Color", "lmcoord")));
         assertFalse(NvidiumIrisTerrainAbi.canRepresentRequiredVertexInputs(List.of("gl_Normal")));
         assertFalse(NvidiumIrisTerrainAbi.canRepresentRequiredVertexInputs(List.of("viewSpacePosition")));
         assertFalse(NvidiumIrisTerrainAbi.canRepresentRequiredVertexInputs(List.of("mc_Entity")));
