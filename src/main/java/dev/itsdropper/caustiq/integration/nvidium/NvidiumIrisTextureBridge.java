@@ -23,8 +23,11 @@ public final class NvidiumIrisTextureBridge {
         ensureTextures();
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
         int[] previousBindings = new int[3];
-        int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE3, GL13C.GL_TEXTURE4, GL13C.GL_TEXTURE15};
-        int[] textures = {noiseTexture, normalTexture, specularTexture, noiseTexture};
+        int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE3, GL13C.GL_TEXTURE4,
+                GL13C.GL_TEXTURE10, GL13C.GL_TEXTURE11, GL13C.GL_TEXTURE12, GL13C.GL_TEXTURE13,
+                GL13C.GL_TEXTURE15};
+        int[] textures = {noiseTexture, normalTexture, specularTexture,
+                noiseTexture, noiseTexture, noiseTexture, noiseTexture, noiseTexture};
         for (int i = 0; i < units.length; i++) {
             GL13C.glActiveTexture(units[i]);
             previousBindings[i] = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
