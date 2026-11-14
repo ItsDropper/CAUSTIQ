@@ -2,6 +2,7 @@ package dev.itsdropper.caustiq.mixin;
 
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumGBufferTargets;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTextureBridge;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -32,5 +33,6 @@ public abstract class NvidiumTerrainRasterizerMixin {
     @Inject(method = "raster", at = @At("RETURN"), remap = false, require = 1)
     private void caustiq$restoreTerrainFramebuffer(CallbackInfo callbackInfo) {
         NvidiumGBufferTargets.end();
+        NvidiumIrisTextureBridge.restoreBindings();
     }
 }
