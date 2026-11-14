@@ -5,7 +5,7 @@ out/
 .kotlin/
 
 # Keep the Gradle wrapper JAR committed.
-!.gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.jar
 
 # IntelliJ IDEA
 .idea/modules.xml
