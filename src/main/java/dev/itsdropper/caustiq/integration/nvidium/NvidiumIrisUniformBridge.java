@@ -1,6 +1,8 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
 import dev.itsdropper.caustiq.CaustiqClient;
+import org.joml.Matrix3f;
+import org.joml.Matrix3fc;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL20C;
@@ -31,6 +33,7 @@ public final class NvidiumIrisUniformBridge {
             Matrix4fc modelView = (Matrix4fc) invoke(chunkRenderMatrices, "modelView");
             Matrix4f projectionInverse = new Matrix4f(projection).invert();
             Matrix4f modelViewInverse = new Matrix4f(modelView).invert();
+            Matrix3f normalMatrix = new Matrix3f(modelView).invert().transpose();
             long now = System.nanoTime();
             if (worldStartNanos == 0L) worldStartNanos = now;
 
@@ -39,6 +42,7 @@ public final class NvidiumIrisUniformBridge {
                     matrix(modelView),
                     matrix(projectionInverse),
                     matrix(modelViewInverse),
+                    matrix3(normalMatrix),
                     (float) cameraX,
                     (float) cameraY,
                     (float) cameraZ,
@@ -65,6 +69,7 @@ public final class NvidiumIrisUniformBridge {
             matrix(program, "caustiqModelView", snapshot.modelView());
             matrix(program, "caustiqProjectionInverse", snapshot.projectionInverse());
             matrix(program, "caustiqModelViewInverse", snapshot.modelViewInverse());
+            matrix3(program, "caustiqNormalMatrix", snapshot.normalMatrix());
             vector3(program, "caustiqCameraPosition",
                     snapshot.cameraX(), snapshot.cameraY(), snapshot.cameraZ());
             int timeLocation = GL20C.glGetUniformLocation(program, "caustiqFrameTimeCounter");
@@ -97,9 +102,18 @@ public final class NvidiumIrisUniformBridge {
         return matrix.get(new float[16]);
     }
 
+    private static float[] matrix3(Matrix3fc matrix) {
+        return matrix.get(new float[9]);
+    }
+
     private static void matrix(int program, String name, float[] values) {
         int location = GL20C.glGetUniformLocation(program, name);
         if (location >= 0) GL20C.glUniformMatrix4fv(location, false, values);
+    }
+
+    private static void matrix3(int program, String name, float[] values) {
+        int location = GL20C.glGetUniformLocation(program, name);
+        if (location >= 0) GL20C.glUniformMatrix3fv(location, false, values);
     }
 
     private static void vector3(int program, String name, float x, float y, float z) {
@@ -112,6 +126,7 @@ public final class NvidiumIrisUniformBridge {
             float[] modelView,
             float[] projectionInverse,
             float[] modelViewInverse,
+            float[] normalMatrix,
             float cameraX,
             float cameraY,
             float cameraZ,
@@ -122,6 +137,7 @@ public final class NvidiumIrisUniformBridge {
             modelView = modelView.clone();
             projectionInverse = projectionInverse.clone();
             modelViewInverse = modelViewInverse.clone();
+            normalMatrix = normalMatrix.clone();
         }
     }
 }
