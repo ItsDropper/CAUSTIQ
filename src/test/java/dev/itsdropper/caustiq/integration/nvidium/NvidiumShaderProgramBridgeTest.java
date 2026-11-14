@@ -38,6 +38,21 @@ class NvidiumShaderProgramBridgeTest {
                 () -> NvidiumShaderProgramBridge.transformBeforeCompile(terrainSources()));
     }
 
+
+    @Test void rejectsNoOpAdapter() {
+        NvidiumShaderProgramBridge.registerTerrainAdapter(Map::copyOf);
+        assertThrows(IllegalStateException.class,
+                () -> NvidiumShaderProgramBridge.transformBeforeCompile(terrainSources()));
+    }
+
+    @Test void resetClearsCapturedProgramAndAdapter() {
+        NvidiumShaderProgramBridge.registerTerrainAdapter(Map::copyOf);
+        NvidiumShaderProgramBridge.transformBeforeCompile(terrainSources());
+        NvidiumShaderProgramBridge.resetForTests();
+        assertNull(NvidiumShaderProgramBridge.lastTerrainProgram());
+        assertFalse(NvidiumShaderProgramBridge.hasTerrainAdapter());
+    }
+
     @Test void ignoresNonTerrainPrograms() {
         Map<Object, String> sources = new LinkedHashMap<>();
         sources.put(Stage.COMPUTE, "compute source");
