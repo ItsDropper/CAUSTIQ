@@ -18,7 +18,7 @@ public abstract class NvidiumRepackagedStrideMixin {
         return NvidiumIrisChunkVertex.isEnabled() ? NvidiumIrisChunkVertex.STRIDE : original;
     }
 
-    @ModifyConstant(method = "copyQuad", constant = @Constant(intValue = 20),
+    @ModifyConstant(method = "copyQuad", constant = @Constant(intValue = 80),
             remap = false, require = 1)
     private static int caustiq$copyFullExtendedQuad(int original) {
         return NvidiumIrisChunkVertex.isEnabled() ? NvidiumIrisChunkVertex.STRIDE : original;
