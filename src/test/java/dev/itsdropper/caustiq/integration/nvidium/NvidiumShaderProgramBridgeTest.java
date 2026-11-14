@@ -69,6 +69,19 @@ class NvidiumShaderProgramBridgeTest {
                 "Native varying support must not bypass Nvidium's Iris safety gate");
     }
 
+    @Test void nativeAdapterCanSafelySeeAlreadyAdaptedSources() {
+        NvidiumShaderProgramBridge.registerNativeSourceAdapter(sources -> {
+            if (sources.get("MESH").contains("native-profile")) return sources;
+            return Map.of(
+                    "TASK", sources.get("TASK"),
+                    "MESH", sources.get("MESH") + "\n// native-profile",
+                    "FRAGMENT", sources.get("FRAGMENT") + "\n// native-profile");
+        });
+        Map<Object, String> sources = terrainSources();
+        NvidiumShaderProgramBridge.transformBeforeCompile(sources);
+        assertDoesNotThrow(() -> NvidiumShaderProgramBridge.transformBeforeCompile(sources));
+    }
+
     @Test void nativeAndIrisAdaptersRunInOrder() {
         NvidiumShaderProgramBridge.registerNativeSourceAdapter(sources -> Map.of(
                 "TASK", sources.get("TASK"),
