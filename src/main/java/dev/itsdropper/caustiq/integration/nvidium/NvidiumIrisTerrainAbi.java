@@ -80,7 +80,21 @@ public final class NvidiumIrisTerrainAbi {
                     "The active Sodium TerrainRenderPass block atlas.")),
             Map.entry("lightmap", new Semantic("lightmap", Availability.EXACT,
                     "tex_light (texture unit 1)",
-                    "Minecraft's active light texture."))
+                    "Minecraft's active light texture.")),
+            Map.entry("gbufferModelView", new Semantic("gbufferModelView", Availability.EXACT,
+                    "caustiqModelView", "Sodium's current camera view matrix captured at Nvidium renderFrame entry.")),
+            Map.entry("gbufferModelViewInverse", new Semantic("gbufferModelViewInverse", Availability.DERIVED,
+                    "inverse(caustiqModelView)", "Inverse of the captured camera view matrix.")),
+            Map.entry("gbufferProjection", new Semantic("gbufferProjection", Availability.EXACT,
+                    "caustiqProjection", "Sodium's current projection matrix captured at Nvidium renderFrame entry.")),
+            Map.entry("gbufferProjectionInverse", new Semantic("gbufferProjectionInverse", Availability.DERIVED,
+                    "inverse(caustiqProjection)", "Inverse of the captured projection matrix.")),
+            Map.entry("cameraPosition", new Semantic("cameraPosition", Availability.EXACT,
+                    "caustiqCameraPosition", "World-space camera coordinates passed to Nvidium renderFrame.")),
+            Map.entry("frameTimeCounter", new Semantic("frameTimeCounter", Availability.DERIVED,
+                    "caustiqFrameTimeCounter", "Monotonic elapsed seconds since CAUSTIQ first observed the Nvidium world renderer.")),
+            Map.entry("frameCounter", new Semantic("frameCounter", Availability.EXACT,
+                    "caustiqFrameCounter", "Monotonic count of Nvidium world renderFrame captures."))
     );
 
     private NvidiumIrisTerrainAbi() { }
@@ -109,7 +123,14 @@ public final class NvidiumIrisTerrainAbi {
                 "#define CAUSTIQ_IRIS_VIEW_HEIGHT (screenSize.y * 2.0)",
                 "#define CAUSTIQ_IRIS_FOG_COLOR fogColour",
                 "#define CAUSTIQ_IRIS_GTEXTURE tex_diffuse",
-                "#define CAUSTIQ_IRIS_LIGHTMAP tex_light") + "\n";
+                "#define CAUSTIQ_IRIS_LIGHTMAP tex_light",
+                "#define gbufferModelView caustiqModelView",
+                "#define gbufferModelViewInverse caustiqModelViewInverse",
+                "#define gbufferProjection caustiqProjection",
+                "#define gbufferProjectionInverse caustiqProjectionInverse",
+                "#define cameraPosition caustiqCameraPosition",
+                "#define frameTimeCounter caustiqFrameTimeCounter",
+                "#define frameCounter caustiqFrameCounter") + "\n";
     }
 
     public static Map<String, Semantic> vertexSemantics() { return VERTEX_SEMANTICS; }
