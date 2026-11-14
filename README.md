@@ -56,9 +56,9 @@ The option UI currently exposes discrete declared values as cycle buttons. Conti
 
 ## Nvidium and renderer compatibility
 
-Caustiq does not replace Minecraft's chunk renderer, alter terrain vertex formats, intercept chunk submissions, or depend on Sodium APIs for rendering. The final-pass hook consumes Minecraft's main color texture after GameRenderer.renderLevel has completed. Nvidium remains responsible for producing the terrain image; Caustiq only processes the completed color result.
+The current final-pass hook consumes Minecraft's main color texture after GameRenderer.renderLevel has completed. The exact ordering and framebuffer contract with Nvidium's renderer still require an in-game trace and visual test. This branch currently detects the required mod stack only; it does not access Nvidium internals or preserve its accelerated terrain path by an implemented bridge.
 
-This is an architectural compatibility strategy, **not a verified Nvidium compatibility claim**. In-game validation with Nvidium, with Sodium, and with neither renderer integration is still required to confirm that the main color texture contains the completed accelerated frame at this injection point.
+Nvidium's terrain backend is a GPU-driven mesh-shader renderer integrated into Sodium. Its terrain pipeline owns terrain rasterization, so full Iris-level shader support requires an explicit bridge for terrain colour/depth, gbuffers, shadow rendering, and pipeline synchronization. This branch does not yet provide that bridge.
 
 ## GPU pipeline and final pass
 
@@ -88,9 +88,9 @@ The pack's own final vertex stage is catalogued but not yet executed. The first 
 - Java 21 bytecode target
 - JDK 25 for the current Loom build process
 - Fabric Loader 0.20.1
-- Sodium 0.8.0 public config API at compile time only
+- Sodium 0.8.0 public config API at compile time only (Sodium itself is required at runtime)
+- Nvidium required at runtime
 - Official Mojang mappings
-- No required third-party runtime mod dependencies
 
 ## Build and test
 
