@@ -3,6 +3,6 @@
   "minVersion": "0.8",
   "package": "dev.itsdropper.caustiq.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": ["GameRendererMixin", "VideoSettingsScreenMixin"],
+  "client": ["GameRendererMixin", "ScreenAccessor", "VideoSettingsScreenMixin"],
   "injectors": {"defaultRequire": 1}
 }

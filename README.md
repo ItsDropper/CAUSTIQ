@@ -8,16 +8,18 @@ Caustiq is an independent, client-side Minecraft shader engine. Its primary goal
 
 ## Bundled shader-pack example
 
-The build now produces a real, installable example shader ZIP: **CAUSTIQ Stillwater**.
+The build produces an installable example shader ZIP: **CAUSTIQ Stillwater**.
 
 - Gradle task: `packageStillwater` (also included in `build`).
 - Local output: `build/distributions/caustiq-stillwater-<version>.zip`.
-- GitHub Actions uploads it separately from the mod JAR as `caustiq-stillwater-<commit-sha>`.
+- GitHub Actions uploads the ZIP as an artifact named `caustiq-stillwater-<commit-sha>`.
 - CI validates both GLSL stages with `glslangValidator` and checks the ZIP root layout.
+
+**Important when downloading from GitHub Actions:** GitHub wraps uploaded artifacts in an outer download ZIP. Extract that outer archive first. It contains the actual `caustiq-stillwater-<version>.zip`; copy that inner ZIP into `.minecraft/shaderpacks/`. Do not put the GitHub artifact-download ZIP itself in `shaderpacks`.
 
 Stillwater is a deliberately restrained cinematic grade: compact highlight bloom, a soft filmic shoulder, subtle cool shadows/warm highlights, mild contrast, restrained vignette and low-level dithering. It is authored for Caustiq's current final-colour pass, not presented as a full Iris/OptiFine shader pack.
 
-To install, copy the generated ZIP directly into `.minecraft/shaderpacks/`, launch Minecraft with Caustiq, then select **caustiq-stillwater** in Options → Video Settings → Caustiq Shaders.
+To install, copy the inner generated shader ZIP directly into `.minecraft/shaderpacks/`, launch Minecraft with Caustiq, then select **caustiq-stillwater** in Options → Video Settings → Caustiq Shaders.
 
 ## First in-game pipeline smoke test
 
@@ -30,11 +32,12 @@ A deliberately obvious channel-rotation test pack remains included at `examples/
 - Sodium's category uses a red accent (hex D9364F) and intentionally has no icon yet.
 - Sodium is compile-only/optional; Caustiq does not require Sodium to launch.
 - Both settings paths open the same renderer-independent Caustiq screen.
+- The Video Settings integration uses a Screen invoker for widget registration because `addRenderableWidget` is declared on `Screen`, not on the `VideoSettingsScreen` subclass.
 
 ## Pack settings and metadata
 
 - Persistent local settings are stored in config/caustiq.properties.
-- The screen supports enabling/disabling Caustiq, selecting a discovered pack, rescanning, and cycling declared pack options.
+- The screen supports enabling/disabling Caustiq, selecting a pack, rescanning, and cycling declared pack options.
 - Parses bounded shaders.properties metadata, including screen, nested screen.*, sliders, and option.* declarations.
 - Selected option values are applied as GLSL preprocessor defines to fragment sources at compile time.
 - Directory and ZIP pack access continues to use the existing bounded, traversal-safe source provider.
