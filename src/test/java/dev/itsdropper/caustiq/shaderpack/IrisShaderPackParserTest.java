@@ -85,4 +85,44 @@ class IrisShaderPackParserTest {
             assertThrows(IOException.class, () -> new IrisShaderPackParser().parse(sources));
         }
     }
+    @Test
+    void reportsExactNvidiumTerrainAbiGapsForIrisPrograms() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("TerrainPack/shaders"));
+        Files.writeString(shaders.resolve("gbuffers_terrain.vsh"), """
+                #version 400 compatibility
+                attribute vec4 at_tangent;
+                attribute vec3 mc_Entity;
+                uniform mat4 gbufferModelView;
+                uniform vec3 cameraPosition;
+                out vec3 scene_pos;
+                void main() {
+                    scene_pos = (gbufferModelView * gl_Vertex).xyz + cameraPosition;
+                    gl_Position = gl_ProjectionMatrix * vec4(scene_pos, 1.0);
+                }
+                """);
+        Files.writeString(shaders.resolve("gbuffers_terrain.fsh"), """
+                #version 400 compatibility
+                in vec3 scene_pos;
+                uniform sampler2D noisetex;
+                layout(location = 0) out vec4 gbuffer0;
+                layout(location = 1) out vec4 gbuffer1;
+                void main() {
+                    gbuffer0 = texture(noisetex, scene_pos.xy);
+                    gbuffer1 = vec4(scene_pos, 1.0);
+                }
+                """);
+
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("terrain", "TerrainPack",
+                temporaryDirectory.resolve("TerrainPack"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 2, 2, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            assertTrue(model.diagnostics().stream().anyMatch(issue -> issue.contains("at_tangent")));
+            assertTrue(model.diagnostics().stream().anyMatch(issue -> issue.contains("mc_Entity")));
+            assertTrue(model.diagnostics().stream().anyMatch(issue -> issue.contains("cameraPosition")));
+            assertTrue(model.diagnostics().stream().anyMatch(issue -> issue.contains("MULTIPLE_RENDER_TARGETS")));
+            assertTrue(model.diagnostics().stream().anyMatch(issue -> issue.contains("noisetex")));
+        }
+    }
+
 }
