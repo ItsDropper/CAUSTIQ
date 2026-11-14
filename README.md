@@ -30,7 +30,9 @@ A deliberately obvious channel-rotation test pack remains included at `examples/
 - Vanilla Minecraft exposes a conventional Caustiq Shaders button in Video Settings.
 - Sodium exposes a separate Shader Packs category through its public Config API.
 - Sodium's category uses a red accent (hex D9364F) and intentionally has no icon yet.
-- Sodium is compile-only/optional; Caustiq does not require Sodium to launch.
+- Sodium's public Config API is a compile-only integration; Sodium is not a required runtime dependency.
+- Sodium discovers the `sodium:config_api_user` entrypoint lazily. Without Sodium, CAUSTIQ's normal Minecraft Video Settings integration remains available and no Sodium classes are loaded by CAUSTIQ's common startup path.
+- CAUSTIQ detects the active renderer stack (vanilla, Sodium, or Sodium + Nvidium) through Fabric Loader mod IDs without linking common code to renderer implementation classes.
 - Both settings paths open the same renderer-independent Caustiq screen.
 - The Video Settings integration uses a Screen invoker for widget registration because `addRenderableWidget` is declared on `Screen`, not on the `VideoSettingsScreen` subclass.
 

@@ -1,6 +1,7 @@
 package dev.itsdropper.caustiq;
 
 import dev.itsdropper.caustiq.gui.CaustiqSettingsScreen;
+import dev.itsdropper.caustiq.integration.RendererEnvironment;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanner;
@@ -35,6 +36,9 @@ public final class CaustiqClient implements ClientModInitializer {
             LOGGER.error("Unable to create shader-pack directory at {}", shaderPackDirectory, exception);
             return;
         }
+        RendererEnvironment renderer = RendererEnvironment.detect(FabricLoader.getInstance()::isModLoaded);
+        LOGGER.info("Renderer stack detected: {} (Sodium: {}, Nvidium: {}).",
+                renderer.stack(), renderer.sodiumLoaded(), renderer.nvidiumLoaded());
         LOGGER.info("Caustiq initialized for Minecraft 1.21.11. Shader-pack directory: {}",
                 shaderPackDirectory.toAbsolutePath());
         refreshShaderPacks();
