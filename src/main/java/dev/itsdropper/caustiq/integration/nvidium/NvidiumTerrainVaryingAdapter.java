@@ -122,14 +122,14 @@ public final class NvidiumTerrainVaryingAdapter {
 
         String mesh = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("MESH"), "MESH source"));
         String fragment = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("FRAGMENT"), "FRAGMENT source"));
+        boolean primaryMeshSignature = mesh.contains("layout(triangles, max_vertices=64, max_primitives=32) out;");
+        if (!primaryMeshSignature && !mesh.contains(MARKER) && !fragment.contains(MARKER)) {
+            return Map.copyOf(sourceStages);
+        }
         boolean hasPrimaryMeshAnchors = mesh.contains("void putVertex(uint id, Vertex V) {")
                 && mesh.contains("    OUT[id].uv = decodeVertexUV(V);");
         boolean hasPrimaryFragmentAnchor = fragment.contains("layout(location = 0) out vec4 colour;")
                 && fragment.contains("layout(location = 1) in Interpolants");
-        if (!hasPrimaryMeshAnchors && !hasPrimaryFragmentAnchor
-                && !mesh.contains(MARKER) && !fragment.contains(MARKER)) {
-            return Map.copyOf(sourceStages);
-        }
         if (!hasPrimaryMeshAnchors || !hasPrimaryFragmentAnchor) {
             throw new IllegalStateException("Nvidium primary terrain shader has a partial or incompatible source layout.");
         }
