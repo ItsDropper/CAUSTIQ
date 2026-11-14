@@ -305,4 +305,23 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 i.code().equals("MULTIPLE_RENDER_TARGETS") && i.symbol().equals("gl_FragData[1]")));
     }
 
+    @Test
+    void reportsConditionalCompilationThatTheAuditCannotEvaluate() {
+        String vertex = """
+                #version 400
+                #ifdef USE_TANGENT
+                attribute vec4 at_tangent;
+                #endif
+                void main() { gl_Position = gl_Vertex; }
+                """;
+        String fragment = """
+                #version 400
+                layout(location = 0) out vec4 color;
+                void main() { color = vec4(1.0); }
+                """;
+        var result = analyzer.analyze(vertex, fragment);
+        assertTrue(result.issues().stream().anyMatch(i ->
+                i.code().equals("UNRESOLVED_PREPROCESSOR_CONDITION")));
+    }
+
 }
