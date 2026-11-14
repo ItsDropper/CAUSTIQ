@@ -152,4 +152,22 @@ class IrisShaderPackParserTest {
         }
     }
 
+    @Test
+    void diagnosesTerrainProgramWithMissingFragmentStage() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("IncompletePack/shaders"));
+        Files.writeString(shaders.resolve("gbuffers_terrain.vsh"), """
+                #version 400
+                void main() { gl_Position = gl_Vertex; }
+                """);
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("incomplete", "IncompletePack",
+                temporaryDirectory.resolve("IncompletePack"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            assertTrue(model.diagnostics().stream().anyMatch(issue ->
+                    issue.contains("gbuffers_terrain ABI: incomplete program")
+                            && issue.contains("fragment (.fsh)")), model.diagnostics().toString());
+        }
+    }
+
 }
