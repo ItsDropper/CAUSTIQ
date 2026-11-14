@@ -26,6 +26,10 @@ public final class NvidiumShaderProgramBridge {
         irisTerrainAdapter = Objects.requireNonNull(adapter, "adapter");
     }
 
+    public static void unregisterTerrainAdapter() {
+        irisTerrainAdapter = null;
+    }
+
     public static void unregisterTerrainAdapters() {
         nativeSourceAdapter = null;
         irisTerrainAdapter = null;
