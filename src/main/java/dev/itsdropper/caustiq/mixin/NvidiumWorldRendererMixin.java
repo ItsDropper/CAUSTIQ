@@ -18,6 +18,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Pseudo
 @Mixin(targets = "me.cortex.nvidium.NvidiumWorldRenderer", remap = false)
 public abstract class NvidiumWorldRendererMixin {
+    @Inject(method = "<init>", at = @At("TAIL"), remap = false, require = 1)
+    private void caustiq$attachWorldRenderer(CallbackInfo callbackInfo) {
+        NvidiumRenderBridge.attachWorldRenderer(this);
+    }
+
+    @Inject(method = "delete", at = @At("TAIL"), remap = false, require = 1)
+    private void caustiq$releaseShaderTextures(CallbackInfo callbackInfo) {
+        NvidiumIrisTextureBridge.destroy();
+    }
+
     @ModifyArg(
             method = "<init>",
             at = @At(value = "INVOKE",
