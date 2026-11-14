@@ -35,8 +35,17 @@ public final class ShaderPackSources implements GlslPreprocessor.SourceProvider,
         String wrapper = descriptor.shaderRoot().isEmpty() ? "" : descriptor.shaderRoot() + "/";
         if (descriptor.sourceType() == ShaderPackSourceType.DIRECTORY) {
             Path shaderRoot = packRoot.resolve(wrapper).resolve("shaders").normalize();
-            if (!shaderRoot.startsWith(packRoot) || Files.isSymbolicLink(packRoot)
-                    || Files.isSymbolicLink(shaderRoot) || !Files.isDirectory(shaderRoot, LinkOption.NOFOLLOW_LINKS)) {
+            if (!shaderRoot.startsWith(packRoot) || Files.isSymbolicLink(packRoot)) {
+                throw new IOException("Shader source directory is missing or unsafe: " + shaderRoot);
+            }
+            Path current = packRoot;
+            for (Path segment : packRoot.relativize(shaderRoot)) {
+                current = current.resolve(segment);
+                if (Files.isSymbolicLink(current)) {
+                    throw new IOException("Symbolic links are not permitted in shader source roots: " + current);
+                }
+            }
+            if (!Files.isDirectory(shaderRoot, LinkOption.NOFOLLOW_LINKS)) {
                 throw new IOException("Shader source directory is missing or unsafe: " + shaderRoot);
             }
             return new ShaderPackSources(shaderRoot, null, null);
