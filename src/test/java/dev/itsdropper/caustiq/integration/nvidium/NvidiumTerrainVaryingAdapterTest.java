@@ -94,7 +94,7 @@ class NvidiumTerrainVaryingAdapterTest {
                 "FRAGMENT", Files.readString(shaderRoot.resolve("frag.frag")));
 
         Map<String, String> adapted = NvidiumTerrainVaryingAdapter.adapt(sources);
-        assertTrue(adapted.get("MESH").contains("caustiqComputeTriangleNormal(quadId, triangle1)"));
+        assertTrue(adapted.get("MESH").contains("caustiqComputeTriangleBasis(quadId, triangle1)"));
         assertTrue(adapted.get("MESH").contains("OUT[id].v_lightmapCoord = decodeLightUV(V);"));
         assertTrue(adapted.get("MESH").contains("OUT[id].v_quadMidUv = caustiqQuadMidUv(quadId);"));
         assertTrue(adapted.get("MESH").contains("OUT[id].v_tbn = caustiqTriangleTbn;"));
