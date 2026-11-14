@@ -126,6 +126,8 @@ jobs:
                   "dev/itsdropper/caustiq/mixin/NvidiumWorldRendererMixin.class",
                   "dev/itsdropper/caustiq/mixin/NvidiumShaderBuilderMixin.class",
                   "dev/itsdropper/caustiq/mixin/NvidiumIrisCheckMixin.class",
+                  "dev/itsdropper/caustiq/mixin/NvidiumTerrainRasterizerMixin.class",
+                  "dev/itsdropper/caustiq/integration/nvidium/NvidiumGBufferTargets.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumShaderProgramBridge.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumTerrainVaryingAdapter.class",
               }
@@ -137,6 +139,7 @@ jobs:
                   "NvidiumWorldRendererMixin",
                   "NvidiumShaderBuilderMixin",
                   "NvidiumIrisCheckMixin",
+                  "NvidiumTerrainRasterizerMixin",
               }), mixins["client"]
               assert required_classes.issubset(set(jar.namelist())), required_classes - set(jar.namelist())
               assert "caustiq-nvidium" in jar_path, jar_path
