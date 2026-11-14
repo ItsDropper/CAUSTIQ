@@ -36,6 +36,10 @@ public final class IrisTerrainCompatibilityAnalyzer {
             "\\bgl_TexCoord\\s*\\[\\s*([0-9]+)\\s*]");
     private static final Pattern DYNAMIC_TEXTURE_COORDINATE_INDEX = Pattern.compile(
             "\\bgl_TexCoord\\s*\\[(?!\\s*[0-9]+\\s*])");
+    private static final Pattern FRAGMENT_DATA_INDEX = Pattern.compile(
+            "\\bgl_FragData\\s*\\[\\s*([0-9]+)\\s*]");
+    private static final Pattern DYNAMIC_FRAGMENT_DATA_INDEX = Pattern.compile(
+            "\\bgl_FragData\\s*\\[(?!\\s*[0-9]+\\s*])");
     private static final Pattern SAMPLER = Pattern.compile(
             "\\buniform\\s+(?:(?:highp|mediump|lowp)\\s+)?"
                     + "([iu]?sampler[A-Za-z0-9_]*|image[A-Za-z0-9_]*)\\s+"
@@ -145,9 +149,17 @@ public final class IrisTerrainCompatibilityAnalyzer {
             issues.add(new Issue("DYNAMIC_TEXTURE_COORDINATE_INDEX", "gl_TexCoord",
                     "A dynamic texture-coordinate index cannot be mapped to Nvidium's fixed UV/lightmap attributes."));
         }
-        if (fragmentIdentifiers.contains("gl_FragData")) {
-            issues.add(new Issue("MULTIPLE_RENDER_TARGETS", "gl_FragData",
-                    "Nvidium's current terrain fragment pipeline does not provide Iris MRT attachment routing."));
+        Matcher fragmentData = FRAGMENT_DATA_INDEX.matcher(fragment);
+        while (fragmentData.find()) {
+            int index = Integer.parseInt(fragmentData.group(1));
+            if (index != 0) {
+                issues.add(new Issue("MULTIPLE_RENDER_TARGETS", "gl_FragData[" + index + "]",
+                        "Nvidium's current terrain fragment pipeline only exposes the primary color target (index 0)."));
+            }
+        }
+        if (DYNAMIC_FRAGMENT_DATA_INDEX.matcher(fragment).find()) {
+            issues.add(new Issue("DYNAMIC_FRAGMENT_OUTPUT_INDEX", "gl_FragData",
+                    "A dynamic fragment output index cannot be routed to Nvidium's single color attachment."));
         }
         if (fragmentIdentifiers.contains("gl_FragDepth")) {
             issues.add(new Issue("CUSTOM_FRAGMENT_DEPTH", "gl_FragDepth",
