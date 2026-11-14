@@ -22,11 +22,13 @@ public final class IrisTerrainCompatibilityAnalyzer {
     private static final String LAYOUT = "(?:layout\\s*\\([^)]*\\)\\s*)*";
     private static final Pattern INTERFACE_DECLARATION = Pattern.compile(
             "(?m)^\\s*" + LAYOUT + QUALIFIERS
-                    + "(in|out|attribute|varying)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+"
+                    + "(in|out|attribute|varying)\\s+(?:(?:highp|mediump|lowp)\\s+)?"
+                    + "([A-Za-z_][A-Za-z0-9_]*)\\s+"
                     + "([A-Za-z_][A-Za-z0-9_]*)\\s*(?:\\[[^]]*])?\\s*;");
     private static final Pattern FRAGMENT_OUTPUT = Pattern.compile(
             "(?m)^\\s*(" + LAYOUT + ")" + QUALIFIERS
-                    + "out\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)"
+                    + "out\\s+(?:(?:highp|mediump|lowp)\\s+)?"
+                    + "([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)"
                     + "\\s*(?:\\[[^]]*])?\\s*;");
     private static final Pattern LOCATION = Pattern.compile(
             "layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)");
