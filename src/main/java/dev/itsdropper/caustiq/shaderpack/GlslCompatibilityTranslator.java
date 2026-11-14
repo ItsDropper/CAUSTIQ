@@ -2,9 +2,7 @@ package dev.itsdropper.caustiq.shaderpack;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,7 +24,7 @@ public final class GlslCompatibilityTranslator {
         }
 
         String[] lines = source.split("\\R", -1);
-        int version = 150;
+        int version = 120;
         int versionLine = -1;
         for (int i = 0; i < lines.length; i++) {
             Matcher matcher = VERSION.matcher(lines[i]);
@@ -59,7 +57,7 @@ public final class GlslCompatibilityTranslator {
         int insertion = 0;
         if (versionLine >= 0) {
             // The version directive must remain the first directive.
-            String versionDirective = body.remove(versionLine);
+            body.remove(versionLine);
             body.add(0, "#version 150");
             insertion = 1;
         } else {
