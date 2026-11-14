@@ -92,6 +92,10 @@ public final class NvidiumTerrainVaryingAdapter {
                 "    vec2 uv;\n    vec3 v_colour;",
                 FRAGMENT_VARYINGS,
                 "fragment interpolant declaration");
+        fragment = replaceOnce(fragment,
+                "#version 460\\n",
+                "#version 460\\n" + FRAGMENT_UNIFORM_ALIASES,
+                "fragment uniform aliases");
         mesh = replaceOnce(mesh,
                 "vec4 transformVertex(Vertex V) {",
                 NORMAL_HELPER + "\nvec4 transformVertex(Vertex V) {",
