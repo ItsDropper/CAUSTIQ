@@ -173,7 +173,12 @@ public final class IrisNvidiumTerrainTranslator {
             source.append(varying.type()).append(" caustiqIrisVarying_")
                     .append(varying.name()).append(";\n");
         }
-        String translated = translateVertexBuiltins(vertexSource);
+        String translated = vertexSource;
+        if (MAIN.matcher(translated).find()) translated = renameMain(translated, "caustiqIrisVertexMain");
+        translated = translateVertexBuiltins(translated);
+        if (!translated.contains("caustiqIrisVertexMain")) {
+            throw new IllegalStateException("Translated Iris vertex stage lost its main entry point.");
+        }
         for (Varying varying : varyings) {
             translated = replaceIdentifier(translated, varying.name(),
                     "caustiqIrisVarying_" + varying.name());
@@ -235,7 +240,12 @@ public final class IrisNvidiumTerrainTranslator {
         StringBuilder source = new StringBuilder();
         source.append("vec4 caustiqIrisTexCoord[8];\n")
                 .append("vec4 caustiqIrisFragData[8];\n");
-        String translated = translateFragmentBuiltins(fragmentSource);
+        String translated = fragmentSource;
+        if (MAIN.matcher(translated).find()) translated = renameMain(translated, "caustiqIrisFragmentMain");
+        translated = translateFragmentBuiltins(translated);
+        if (!translated.contains("caustiqIrisFragmentMain")) {
+            throw new IllegalStateException("Translated Iris fragment stage lost its main entry point.");
+        }
         for (FragmentOutput output : outputs) {
             translated = replaceIdentifier(translated, output.name(),
                     output.location() == 0 ? "colour" : "caustiqIrisOutput" + output.location());
@@ -310,7 +320,7 @@ public final class IrisNvidiumTerrainTranslator {
         }
         String working = stripStageDirectives(removeUniformsAndAttributes(clean, false));
         return new StageSource(renameMain(working, "caustiqIrisFragmentMain"),
-                List.of(), outputs, fragData, fragDataCount);
+                varyings, outputs, fragData, fragDataCount);
     }
 
     private static List<Varying> parseVertexVaryings(String source) {
