@@ -3,6 +3,7 @@ package dev.itsdropper.caustiq.shaderpack;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import dev.itsdropper.caustiq.CaustiqClient;
 import dev.itsdropper.caustiq.CaustiqConfig;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumGBufferTargets;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumRenderBridge;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
@@ -251,6 +252,7 @@ public final class ShaderRuntime {
 
     public static void shutdown() {
         requestReload();
+        NvidiumGBufferTargets.destroy();
         SCAN_RESULT.set(null);
     }
 }
