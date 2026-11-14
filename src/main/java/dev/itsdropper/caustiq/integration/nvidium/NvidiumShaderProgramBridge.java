@@ -73,8 +73,8 @@ public final class NvidiumShaderProgramBridge {
             throw new IllegalStateException(label + " adapter must preserve shader stages. Expected "
                     + input.keySet() + " but received " + transformed.keySet());
         }
-        if (rejectNoOp && transformed.equals(input)) {
-            throw new IllegalStateException(label + " adapter did not transform any shader stage.");
+        if (rejectNoOp && transformed.equals(input) && NvidiumTerrainVaryingAdapter.isPrimary(input)) {
+            throw new IllegalStateException(label + " adapter did not transform the primary terrain shader stages.");
         }
         for (Map.Entry<String, String> entry : transformed.entrySet()) {
             if (entry.getValue() == null || entry.getValue().isBlank()) {
