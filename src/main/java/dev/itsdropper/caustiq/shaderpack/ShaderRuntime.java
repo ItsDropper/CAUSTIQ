@@ -42,6 +42,7 @@ public final class ShaderRuntime {
     public static void requestReload() {
         closeSources();
         POST_PROCESS.close();
+        NvidiumGBufferTargets.configureTargets(Map.of());
         COMPILED.forEach(CompiledShaderProgram::close);
         COMPILED.clear();
         pending = List.of();
@@ -165,6 +166,7 @@ public final class ShaderRuntime {
             }
             IrisShaderPackModel packModel = new IrisShaderPackParser().parse(sources);
             activePassPlan = new IrisTerrainPassScheduler().schedule(packModel, null);
+            NvidiumGBufferTargets.configureTargets(activePassPlan.targets());
             CaustiqClient.LOGGER.info(
                     "Built Iris pass schedule for '{}': {} ordered program pass(es), {} declared render target(s): {}.",
                     selected.displayName(), activePassPlan.passes().size(), activePassPlan.targets().size(),
