@@ -213,7 +213,8 @@ public final class IrisNvidiumTerrainTranslator {
 
     private String vertexProgramSource() {
         StringBuilder source = new StringBuilder();
-        source.append(photonUniformDeclarations())\n                .append("Vertex caustiqCurrentVertex;\n")
+        source.append(photonUniformDeclarations())
+                .append("Vertex caustiqCurrentVertex;\n")
                 .append("uint caustiqCurrentVertexId;\n")
                 .append("vec4 caustiqIrisClipPosition;\n")
                 .append("vec4 caustiqIrisTexCoord[8];\n");
@@ -286,7 +287,8 @@ public final class IrisNvidiumTerrainTranslator {
 
     private String fragmentProgramSource() {
         StringBuilder source = new StringBuilder();
-        source.append(photonUniformDeclarations())\n                .append("vec4 caustiqIrisTexCoord[8];\n")
+        source.append(photonUniformDeclarations())
+                .append("vec4 caustiqIrisTexCoord[8];\n")
                 .append("vec4 caustiqIrisFragData[8];\n");
         String translated = fragmentSource;
         if (MAIN.matcher(translated).find()) translated = renameMain(translated, "caustiqIrisFragmentMain");
