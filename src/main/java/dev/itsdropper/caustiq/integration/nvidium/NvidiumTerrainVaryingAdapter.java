@@ -139,7 +139,7 @@ public final class NvidiumTerrainVaryingAdapter {
         boolean hasPrimaryMeshAnchors = mesh.contains("void putVertex(uint id, Vertex V) {")
                 && mesh.contains("    OUT[id].uv = decodeVertexUV(V);");
         boolean hasPrimaryFragmentAnchor = fragment.contains("layout(location = 0) out vec4 colour;")
-                && fragment.contains("layout(location = 1) in Interpolants"); 
+                && fragment.contains("in Interpolants {"); 
         if (!hasPrimaryMeshAnchors || !hasPrimaryFragmentAnchor) {
             throw new IllegalStateException("Nvidium primary terrain shader has a partial or incompatible source layout.");
         }
