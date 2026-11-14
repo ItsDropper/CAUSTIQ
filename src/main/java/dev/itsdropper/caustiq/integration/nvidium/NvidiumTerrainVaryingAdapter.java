@@ -28,7 +28,7 @@ public final class NvidiumTerrainVaryingAdapter {
             "    OUT[id].v_colour = computeMultiplier(V);",
             "    OUT[id].v_vertexColour = decodeVertexColour(V).rgb;",
             "    OUT[id].v_lightmapCoord = decodeLightUV(V);",
-            "    OUT[id].v_worldPosition = decodeVertexPosition(V) + origin;",
+            "    OUT[id].v_worldPosition = (transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)).xyz;",
             "    OUT[id].v_normal = caustiqTriangleNormal;");
     private static final String NORMAL_HELPER = String.join("\n",
             "vec3 caustiqTriangleNormal;",
@@ -37,9 +37,9 @@ public final class NvidiumTerrainVaryingAdapter {
             "    Vertex a = terrainData[(quadId << 2) + (triangle1 ? 2u : 0u)];",
             "    Vertex b = terrainData[(quadId << 2) + (triangle1 ? 3u : 1u)];",
             "    Vertex c = terrainData[(quadId << 2) + (triangle1 ? 0u : 2u)];",
-            "    vec3 pa = decodeVertexPosition(a);",
-            "    vec3 pb = decodeVertexPosition(b);",
-            "    vec3 pc = decodeVertexPosition(c);",
+            "    vec3 pa = (transformMat * vec4(decodeVertexPosition(a) + origin, 1.0)).xyz;",
+            "    vec3 pb = (transformMat * vec4(decodeVertexPosition(b) + origin, 1.0)).xyz;",
+            "    vec3 pc = (transformMat * vec4(decodeVertexPosition(c) + origin, 1.0)).xyz;",
             "    return normalize(cross(pb - pa, pc - pa));",
             "}") + "\n";
 
