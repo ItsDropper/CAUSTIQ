@@ -37,6 +37,17 @@ class NvidiumTerrainVaryingAdapterTest {
         assertTrue(fragment.contains("#define CAUSTIQ_IRIS_VIEW_HEIGHT (screenSize.y * 2.0)"));
         assertTrue(fragment.contains("#define CAUSTIQ_IRIS_GTEXTURE tex_diffuse"));
         assertTrue(fragment.contains("#define CAUSTIQ_IRIS_LIGHTMAP tex_light"));
+        for (String output : new String[]{
+                "layout(location = 1) out vec4 caustiqGBufferNormal;",
+                "layout(location = 2) out vec4 caustiqGBufferPosition;",
+                "layout(location = 3) out vec4 caustiqGBufferMaterial;",
+                "layout(location = 4) out vec4 caustiqGBufferLightmap;",
+                "caustiqGBufferNormal = vec4(normalize(v_normal) * 0.5 + 0.5, 1.0);",
+                "caustiqGBufferPosition = vec4(v_renderPosition, 1.0);",
+                "caustiqGBufferMaterial = vec4(v_vertexColour, float(v_materialFlags) / 255.0);",
+                "caustiqGBufferLightmap = vec4(v_lightmapCoord, 0.0, 1.0);"}) {
+            assertTrue(fragment.contains(output), "Fragment G-buffer ABI missing " + output);
+        }
         assertTrue(mesh.contains("transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)"));
         assertTrue(mesh.contains("cross(edge1, edge2)"));
         assertTrue(mesh.contains("caustiqQuadMidUv(uint quadId)"));
@@ -89,6 +100,7 @@ class NvidiumTerrainVaryingAdapterTest {
         assertTrue(adapted.get("MESH").contains("OUT[id].v_tbn = caustiqTriangleTbn;"));
         assertTrue(adapted.get("FRAGMENT").contains("vec3 v_renderPosition;"));
         assertTrue(adapted.get("FRAGMENT").contains("flat mat3 v_tbn;"));
+        assertTrue(adapted.get("FRAGMENT").contains("layout(location = 4) out vec4 caustiqGBufferLightmap;"));
         assertTrue(adapted.get("FRAGMENT").contains("flat uint v_materialFlags;"));
         assertEquals(sources.get("TASK"), adapted.get("TASK"));
     }
