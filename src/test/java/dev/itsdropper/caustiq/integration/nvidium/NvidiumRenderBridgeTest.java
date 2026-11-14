@@ -20,7 +20,7 @@ class NvidiumRenderBridgeTest {
         NvidiumRenderBridge.Snapshot snapshot = NvidiumRenderBridge.snapshot();
         assertEquals(1, snapshot.startedSolidPasses());
         assertEquals(1, snapshot.completedSolidPasses());
-        assertTrue(snapshot.hasCompletedTerrainPass());
+        assertTrue(snapshot.hasCompletedSolidRenderCall());
         assertFalse(snapshot.hasUnfinishedPass());
     }
 
@@ -39,6 +39,6 @@ class NvidiumRenderBridgeTest {
         NvidiumRenderBridge.Snapshot snapshot = NvidiumRenderBridge.snapshot();
         assertEquals(1, snapshot.startedTranslucentPasses());
         assertEquals(1, snapshot.completedTranslucentPasses());
-        assertFalse(snapshot.hasCompletedTerrainPass());
+        assertFalse(snapshot.hasCompletedSolidRenderCall());
     }
 }
