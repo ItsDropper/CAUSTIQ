@@ -53,13 +53,13 @@ assert "gl_PrimitiveID" in fragment
 # upstream sources. The Java integration test runs the transformation itself.
 for anchor, label in [
     ("#version 460", "GLSL version"),
-    ("    vec2 uv;\\n    vec3 v_colour;", "interpolant declaration"),
+    ("    vec2 uv;\n    vec3 v_colour;", "interpolant declaration"),
     ("vec4 transformVertex(Vertex V) {", "mesh helper insertion"),
     ("    bool triangle1 = (gl_LocalInvocationIndex & uint(1)) == 1;", "triangle selection"),
-    ("    OUT[id].uv = decodeVertexUV(V);\\n    OUT[id].v_colour = computeMultiplier(V);", "mesh output assignments"),
+    ("    OUT[id].uv = decodeVertexUV(V);\n    OUT[id].v_colour = computeMultiplier(V);", "mesh output assignments"),
 ]:
     assert anchor in mesh, f"Pinned Nvidium mesh shader lost adapter anchor: {label}"
-assert "    vec2 uv;\\n    vec3 v_colour;" in fragment, "Pinned Nvidium fragment varying declaration changed"
+assert "    vec2 uv;\n    vec3 v_colour;" in fragment, "Pinned Nvidium fragment varying declaration changed"
 assert "CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS" in adapter
 assert "decodeLightUV(V)" in adapter and "decodeVertexColour(V).rgb" in adapter
 assert "cross(pb - pa, pc - pa)" in adapter, "Geometric face-normal reconstruction is missing"
