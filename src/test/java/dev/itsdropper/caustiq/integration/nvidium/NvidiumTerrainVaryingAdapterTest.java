@@ -36,6 +36,23 @@ class NvidiumTerrainVaryingAdapterTest {
     }
 
     @Test
+    void disablesNvidiumBarycentricDefineWhenAdditionalInterpolantsAreRequired() {
+        Map<String, String> base = sourceStages();
+        Map<String, String> sources = Map.of(
+                "TASK", base.get("TASK"),
+                "MESH", base.get("MESH").replace("#version 460",
+                        "#version 460\\n#define USE_NV_FRAGMENT_SHADER_BARYCENTRIC"),
+                "FRAGMENT", base.get("FRAGMENT").replace("#version 460",
+                        "#version 460\\n#define USE_NV_FRAGMENT_SHADER_BARYCENTRIC"));
+
+        Map<String, String> adapted = NvidiumTerrainVaryingAdapter.adapt(sources);
+        assertFalse(adapted.get("MESH").contains("#define USE_NV_FRAGMENT_SHADER_BARYCENTRIC"));
+        assertFalse(adapted.get("FRAGMENT").contains("#define USE_NV_FRAGMENT_SHADER_BARYCENTRIC"));
+        assertTrue(adapted.get("MESH").contains("layout(location=1) out Interpolants"));
+        assertTrue(adapted.get("FRAGMENT").contains("layout(location = 1) in Interpolants"));
+    }
+
+    @Test
     void adaptsThePinnedNvidiumTerrainShaderSourcesWhenAvailable() throws IOException {
         String sourceDirectory = System.getenv("NVIDIUM_SOURCE_DIR");
         Assumptions.assumeTrue(sourceDirectory != null && !sourceDirectory.isBlank(),
