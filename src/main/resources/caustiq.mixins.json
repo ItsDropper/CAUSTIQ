@@ -10,7 +10,11 @@
     "NvidiumWorldRendererMixin",
     "NvidiumShaderBuilderMixin",
     "NvidiumIrisCheckMixin",
-    "NvidiumTerrainRasterizerMixin"
+    "NvidiumTerrainRasterizerMixin",
+    "NvidiumExtendedVertexFormatMixin",
+    "NvidiumRepackagedStrideMixin",
+    "NvidiumBlockRendererVertexContextMixin",
+    "NvidiumFluidRendererVertexContextMixin"
   ],
   "injectors": {
     "defaultRequire": 1
