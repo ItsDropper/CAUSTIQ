@@ -40,6 +40,12 @@ public final class IrisTerrainCompatibilityAnalyzer {
             "\\buniform\\s+(?:(?:highp|mediump|lowp)\\s+)?"
                     + "([iu]?sampler[A-Za-z0-9_]*|image[A-Za-z0-9_]*)\\s+"
                     + "([A-Za-z_][A-Za-z0-9_]*)");
+    private static final Pattern UNIFORM = Pattern.compile(
+            "\\buniform\\s+(?:(?:highp|mediump|lowp)\\s+)?"
+                    + "([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)"
+                    + "\\s*(?:\\[[^]]*])?\\s*;");
+    private static final Pattern UNIFORM_BLOCK = Pattern.compile(
+            "\\buniform\\s+[A-Za-z_][A-Za-z0-9_]*\\s*\\{");
     private static final Pattern IDENTIFIER = Pattern.compile("\\b[A-Za-z_][A-Za-z0-9_]*\\b");
 
     private static final Set<String> UNAVAILABLE_VERTEX_INPUTS = Set.of(
@@ -122,6 +128,27 @@ public final class IrisTerrainCompatibilityAnalyzer {
                 issues.add(new Issue("UNBOUND_SAMPLER", sampler,
                         "The sampler has no binding in Nvidium's current terrain shader pipeline."));
             }
+        }
+
+        String combinedSources = vertex + "\\n" + fragment;
+        Matcher uniforms = UNIFORM.matcher(combinedSources);
+        while (uniforms.find()) {
+            String type = uniforms.group(1);
+            String name = uniforms.group(2);
+            if (type.startsWith("sampler") || type.startsWith("isampler")
+                    || type.startsWith("usampler") || type.startsWith("image")) {
+                continue;
+            }
+            if (UNAVAILABLE_TRANSFORMS.contains(name)
+                    || NvidiumIrisTerrainAbi.fragmentSemantic(name).isPresent()) {
+                continue;
+            }
+            issues.add(new Issue("UNBOUND_UNIFORM", name,
+                    "No value or binding for this Iris uniform is exposed by Nvidium's terrain pipeline."));
+        }
+        if (UNIFORM_BLOCK.matcher(combinedSources).find()) {
+            issues.add(new Issue("UNSUPPORTED_UNIFORM_BLOCK", "uniform block",
+                    "Iris uniform blocks require layout and binding integration that the Nvidium terrain bridge does not provide."));
         }
 
         Matcher textureCoordinates = TEXTURE_COORDINATE_INDEX.matcher(vertex + "\n" + fragment);
