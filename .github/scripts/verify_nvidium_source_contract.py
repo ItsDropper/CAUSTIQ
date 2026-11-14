@@ -79,8 +79,11 @@ assert 'NVIDIUM_VERSION = "0.4.3-beta13-1.21.11"' in abi
 assert 'DIFFUSE_ATLAS_TEXTURE_UNIT = 0' in abi and 'LIGHTMAP_TEXTURE_UNIT = 1' in abi
 assert 'Availability.UNAVAILABLE' in abi
 vertex_format = source("src/main/resources/assets/nvidium/shaders/terrain/vertex_format/vertex_format.glsl")
+nvidium_vertex_format = source("src/main/resources/assets/nvidium/shaders/terrain/vertex_format/nvidium_vertex_format.glsl")
+sodium_vertex_format = source("src/main/resources/assets/nvidium/shaders/terrain/vertex_format/sodium_vertex_format.glsl")
 scene = source("src/main/resources/assets/nvidium/shaders/occlusion/scene.glsl")
-assert "decodeVertexUV" in vertex_format and "decodeLightUV" in vertex_format and "decodeVertexColour" in vertex_format
+assert "decodeVertexUV" in nvidium_vertex_format and "decodeLightUV" in nvidium_vertex_format and "decodeVertexColour" in nvidium_vertex_format
+assert "decodeVertexUV" in sodium_vertex_format and "decodeLightUV" in sodium_vertex_format and "decodeVertexColour" in sodium_vertex_format
 assert "mat4 MVP;" in scene and "vec4 fogColour;" in scene and "vec2 screenSize;" in scene
 assert "NvidiumTerrainVaryingAdapter.class" in (caustiq_root / ".github/workflows/build.yml").read_text(encoding="utf-8")
 
