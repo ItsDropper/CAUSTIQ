@@ -74,16 +74,25 @@ jobs:
           with zipfile.ZipFile(jar_path) as jar:
               metadata = json.loads(jar.read("fabric.mod.json"))
               mixins = json.loads(jar.read("caustiq.mixins.json"))
-              required_class = "dev/itsdropper/caustiq/mixin/NvidiumWorldRendererMixin.class"
+              required_classes = {
+                  "dev/itsdropper/caustiq/mixin/NvidiumWorldRendererMixin.class",
+                  "dev/itsdropper/caustiq/mixin/NvidiumShaderBuilderMixin.class",
+                  "dev/itsdropper/caustiq/mixin/NvidiumIrisCheckMixin.class",
+                  "dev/itsdropper/caustiq/integration/nvidium/NvidiumShaderProgramBridge.class",
+              }
 
               assert metadata["id"] == "caustiq", metadata["id"]
               assert metadata["depends"]["sodium"] == "=0.8.12", metadata["depends"]
               assert metadata["depends"]["nvidium"] == "=0.4.3-beta13-1.21.11", metadata["depends"]
-              assert "NvidiumWorldRendererMixin" in mixins["client"], mixins["client"]
-              assert required_class in jar.namelist(), required_class
+              assert set(mixins["client"]).issuperset({
+                  "NvidiumWorldRendererMixin",
+                  "NvidiumShaderBuilderMixin",
+                  "NvidiumIrisCheckMixin",
+              }), mixins["client"]
+              assert required_classes.issubset(set(jar.namelist())), required_classes - set(jar.namelist())
               assert "caustiq-nvidium" in jar_path, jar_path
 
-          print("Verified Nvidium-specific JAR metadata, pinned renderer dependencies, and packaged mixin.")
+          print("Verified Nvidium metadata, renderer hooks, shader compile interception, and Iris safety gate.")
           PY
 
       - name: Verify Stillwater shader ZIP
