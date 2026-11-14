@@ -35,6 +35,12 @@ assert 'method = "raster"' in rasterizer_mixin
 gbuffer_manager = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumGBufferTargets.java").read_text(encoding="utf-8")
 assert "GL_COLOR_ATTACHMENT1" in gbuffer_manager and "GL_COLOR_ATTACHMENT0 + i" in gbuffer_manager
 assert "glCheckFramebufferStatus" in gbuffer_manager and "glDrawBuffers" in gbuffer_manager
+assert "GL_RGBA16F" in gbuffer_manager and "getColorTextureView()" in gbuffer_manager
+postprocess = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/ShaderPostProcessPass.java").read_text(encoding="utf-8")
+compiler = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/ShaderProgramCompiler.java").read_text(encoding="utf-8")
+for index in range(1, 5):
+    assert f'.withSampler("colortex{index}")' in compiler
+    assert f'pass.bindTexture("colortex{index}"' in postprocess
 builder_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumShaderBuilderMixin.java").read_text()
 assert 'me.cortex.nvidium.gl.shader.Shader$Builder' in builder_mixin
 assert '@Shadow @Final private Map<?, String> sources' in builder_mixin
