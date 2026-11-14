@@ -38,6 +38,8 @@ public final class IrisNvidiumTerrainTranslator {
     private static final Pattern MAIN = Pattern.compile("\\bvoid\\s+main\\s*\\(\\s*\\)");
     private static final Pattern TEXTURE_FUNCTION = Pattern.compile("\\b(texture2DProj|texture2DLod|texture2DGradARB|texture2D|textureCube)\\b");
     private static final Pattern FRAG_DATA_INDEX = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]");
+    private static final Pattern RENDERTARGETS = Pattern.compile(
+            "(?s)/\\*\\s*RENDERTARGETS\\s*:\\s*([0-9,\\s]+)\\s*\\*/");
     private static final Set<String> SUPPORTED_ATTRIBUTES = Set.of(
             "mc_Entity", "at_midBlock", "mc_midTexCoord", "at_midTexCoord",
             "iris_Normal", "at_tangent", "vaPosition", "vaUV0", "vaUV2", "vaColor",
@@ -96,6 +98,7 @@ public final class IrisNvidiumTerrainTranslator {
     private final List<FragmentOutput> outputs;
     private final boolean usesFragData;
     private final int fragDataCount;
+    private final List<Integer> renderTargetIndices;
 
     private IrisNvidiumTerrainTranslator(String vertexSource, String fragmentSource) {
         StageSource vertex = prepareVertex(Objects.requireNonNull(vertexSource, "vertexSource"));
@@ -106,6 +109,7 @@ public final class IrisNvidiumTerrainTranslator {
         this.outputs = fragment.outputs();
         this.usesFragData = fragment.usesFragData();
         this.fragDataCount = fragment.fragDataCount();
+        this.renderTargetIndices = parseRenderTargetIndices(fragmentSource);
     }
 
     public static IrisNvidiumTerrainTranslator from(IrisShaderPackModel model) {
@@ -148,6 +152,29 @@ public final class IrisNvidiumTerrainTranslator {
             throw new IllegalArgumentException("gbuffers_terrain references a missing preprocessed shader stage.");
         }
         return new IrisNvidiumTerrainTranslator(vertex, fragment);
+    }
+
+    public List<Integer> renderTargetIndices() {
+        return renderTargetIndices;
+    }
+
+    private static List<Integer> parseRenderTargetIndices(String source) {
+        Matcher matcher = RENDERTARGETS.matcher(source);
+        if (!matcher.find()) return List.of(0, 1, 2, 3, 4, 5, 6, 7);
+        List<Integer> targets = new ArrayList<>();
+        for (String token : matcher.group(1).split("[,\\s]+")) {
+            if (token.isBlank()) continue;
+            int target = Integer.parseInt(token);
+            if (target < 0 || target > 7) {
+                throw new IllegalArgumentException("Nvidium terrain MRT supports Iris colortex0 through colortex7; got colortex" + target + ".");
+            }
+            if (targets.contains(target)) {
+                throw new IllegalArgumentException("Iris RENDERTARGETS contains duplicate colortex" + target + ".");
+            }
+            targets.add(target);
+        }
+        if (targets.isEmpty()) throw new IllegalArgumentException("Iris RENDERTARGETS directive is empty.");
+        return List.copyOf(targets);
     }
 
     /** Adapts only Nvidium's primary opaque terrain pipeline; other pipelines remain native. */
