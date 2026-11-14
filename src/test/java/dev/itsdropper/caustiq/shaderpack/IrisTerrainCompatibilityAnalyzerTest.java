@@ -44,12 +44,14 @@ class IrisTerrainCompatibilityAnalyzerTest {
 
         var result = analyzer.analyze(vertex, fragment);
         assertFalse(result.compatible());
-        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNAVAILABLE_VERTEX_INPUT")
+        assertFalse(result.issues().stream().anyMatch(i -> i.code().equals("UNAVAILABLE_VERTEX_INPUT")
                 && i.symbol().equals("at_tangent")));
-        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNAVAILABLE_VERTEX_INPUT")
+        assertFalse(result.issues().stream().anyMatch(i -> i.code().equals("UNAVAILABLE_VERTEX_INPUT")
                 && i.symbol().equals("mc_Entity")));
-        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNAVAILABLE_TRANSFORM")
+        assertFalse(result.issues().stream().anyMatch(i -> i.code().equals("UNAVAILABLE_TRANSFORM")
                 && i.symbol().equals("cameraPosition")));
+        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNBOUND_UNIFORM")
+                && i.symbol().equals("viewSize")));
         assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("MULTIPLE_RENDER_TARGETS")));
     }
 
@@ -107,10 +109,16 @@ class IrisTerrainCompatibilityAnalyzerTest {
             String fragment = preprocessor.preprocess("world0/gbuffers_terrain.fsh", sources).source();
             var result = analyzer.analyze(vertex, fragment);
             assertFalse(result.compatible(), "Photon must not be reported compatible with the incomplete Nvidium ABI");
-            assertTrue(result.issues().stream().anyMatch(i -> i.symbol().equals("at_tangent")));
-            assertTrue(result.issues().stream().anyMatch(i -> i.symbol().equals("mc_Entity")));
-            assertTrue(result.issues().stream().anyMatch(i -> i.symbol().equals("mc_midTexCoord")));
-            assertTrue(result.issues().stream().anyMatch(i -> i.symbol().equals("cameraPosition")));
+            assertFalse(result.issues().stream().anyMatch(i -> i.code().equals("UNAVAILABLE_VERTEX_INPUT")
+                    && i.symbol().equals("at_tangent")));
+            assertFalse(result.issues().stream().anyMatch(i -> i.code().equals("UNAVAILABLE_VERTEX_INPUT")
+                    && i.symbol().equals("mc_Entity")));
+            assertFalse(result.issues().stream().anyMatch(i -> i.code().equals("UNMAPPED_VERTEX_INPUT")
+                    && i.symbol().equals("mc_midTexCoord")));
+            assertFalse(result.issues().stream().anyMatch(i -> i.code().equals("UNAVAILABLE_TRANSFORM")
+                    && i.symbol().equals("cameraPosition")));
+            assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNBOUND_SAMPLER")
+                    && i.symbol().equals("noisetex")));
             assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("MULTIPLE_RENDER_TARGETS")));
         }
     }
