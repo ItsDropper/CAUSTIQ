@@ -1,6 +1,7 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
 import dev.itsdropper.caustiq.integration.RendererEnvironment;
+import java.lang.reflect.Field;
 import java.util.Objects;
 import java.util.function.Predicate;
 
@@ -8,6 +9,25 @@ import java.util.function.Predicate;
 public final class NvidiumCompatibility {
     public enum Status { MISSING_SODIUM, MISSING_NVIDIUM, SODIUM_AND_NVIDIUM_PRESENT }
     private NvidiumCompatibility() { }
+    /**
+     * Nvidium's native compact format has no room for Iris terrain attributes.
+     * Force its Sodium-compatible base format before Sodium creates the chunk
+     * builder; CAUSTIQ then supplies a stride-extended ChunkVertexType.
+     */
+    public static boolean enableExtendedVertexFormat() {
+        try {
+            Class<?> nvidium = Class.forName("me.cortex.nvidium.Nvidium");
+            Field configField = nvidium.getField("config");
+            Object config = configField.get(null);
+            Field formatField = config.getClass().getField("use_sodium_vertex_format");
+            formatField.setBoolean(config, true);
+            NvidiumIrisChunkVertex.enable();
+            return true;
+        } catch (ReflectiveOperationException | RuntimeException exception) {
+            return false;
+        }
+    }
+
     public static Status inspect(Predicate<String> isModLoaded) {
         Objects.requireNonNull(isModLoaded, "isModLoaded");
         RendererEnvironment environment = RendererEnvironment.detect(isModLoaded);
