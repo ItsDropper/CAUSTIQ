@@ -85,6 +85,26 @@ public final class NvidiumIrisUniformBridge {
         }
     }
 
+    /** Uploads the captured camera/time state to a CAUSTIQ OpenGL post-process program. */
+    public static void uploadProgram(int program) {
+        Snapshot snapshot = CURRENT.get();
+        if (snapshot == null || program == 0) return;
+        matrix(program, "gbufferProjection", snapshot.projection());
+        matrix(program, "gbufferModelView", snapshot.modelView());
+        matrix(program, "gbufferProjectionInverse", snapshot.projectionInverse());
+        matrix(program, "gbufferModelViewInverse", snapshot.modelViewInverse());
+        matrix(program, "gl_ProjectionMatrix", snapshot.projection());
+        matrix(program, "gl_ModelViewMatrix", snapshot.modelView());
+        matrix(program, "gl_ProjectionMatrixInverse", snapshot.projectionInverse());
+        matrix(program, "gl_ModelViewMatrixInverse", snapshot.modelViewInverse());
+        matrix3(program, "gl_NormalMatrix", snapshot.normalMatrix());
+        vector3(program, "cameraPosition", snapshot.cameraX(), snapshot.cameraY(), snapshot.cameraZ());
+        int timeLocation = GL20C.glGetUniformLocation(program, "frameTimeCounter");
+        if (timeLocation >= 0) GL20C.glUniform1f(timeLocation, snapshot.frameTimeCounter());
+        int frameLocation = GL20C.glGetUniformLocation(program, "frameCounter");
+        if (frameLocation >= 0) GL20C.glUniform1i(frameLocation, snapshot.frameCounter());
+    }
+
     static Snapshot snapshot() { return CURRENT.get(); }
 
     static void resetForTests() {
