@@ -73,7 +73,7 @@ public final class NvidiumShaderProgramBridge {
             throw new IllegalStateException(label + " adapter must preserve shader stages. Expected "
                     + input.keySet() + " but received " + transformed.keySet());
         }
-        if (transformed.equals(input)) {
+        if (rejectNoOp && transformed.equals(input)) {
             throw new IllegalStateException(label + " adapter did not transform any shader stage.");
         }
         for (Map.Entry<String, String> entry : transformed.entrySet()) {
