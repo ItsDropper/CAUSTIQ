@@ -5,6 +5,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -20,7 +21,10 @@ public final class NvidiumIrisVertexContext {
         Objects.requireNonNull(position, "position");
         BlockData previous = CURRENT.get();
         String key = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
-        int blockId = BLOCK_IDS.get().getOrDefault(key, BuiltInRegistries.BLOCK.getId(state.getBlock()));
+        Map<String, Integer> mappings = BLOCK_IDS.get();
+        int blockId = mappings.isEmpty()
+                ? BuiltInRegistries.BLOCK.getId(state.getBlock())
+                : mappings.getOrDefault(stateKey(state, key), mappings.getOrDefault(key, -1));
         CURRENT.set(new BlockData(blockId, fluid ? 1 : 0, state.getLightEmission(),
                 position.getX() & 15, position.getY() & 15, position.getZ() & 15));
         return () -> {
@@ -32,6 +36,19 @@ public final class NvidiumIrisVertexContext {
     /** Replaces registry fallback IDs with the selected pack's block.properties IDs. */
     public static void setBlockIds(Map<String, Integer> blockIds) {
         BLOCK_IDS.set(Map.copyOf(blockIds));
+    }
+
+    private static String stateKey(BlockState state, String blockId) {
+        if (state.getValues().isEmpty()) return blockId;
+        TreeMap<String, String> properties = new TreeMap<>();
+        state.getValues().forEach((property, value) ->
+                properties.put(property.getName(), String.valueOf(value)));
+        StringBuilder key = new StringBuilder(blockId).append('[');
+        properties.forEach((name, value) -> {
+            if (key.charAt(key.length() - 1) != '[') key.append(',');
+            key.append(name).append('=').append(value);
+        });
+        return key.append(']').toString();
     }
 
     static BlockData current() {
