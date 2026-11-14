@@ -107,28 +107,31 @@ public final class IrisShaderPackParser {
         IrisTerrainCompatibilityAnalyzer terrainAnalyzer = new IrisTerrainCompatibilityAnalyzer();
         for (Map.Entry<String, Map<String, Map<ShaderPackProgramCatalog.Stage, String>>> inventory
                 : inventories.entrySet()) {
-            Map<ShaderPackProgramCatalog.Stage, String> terrainStages =
-                    inventory.getValue().get("gbuffers_terrain");
-            if (terrainStages == null) continue;
-
             String scope = inventory.getKey().isEmpty() ? "" : inventory.getKey() + " ";
-            boolean hasVertex = terrainStages.containsKey(ShaderPackProgramCatalog.Stage.VERTEX);
-            boolean hasFragment = terrainStages.containsKey(ShaderPackProgramCatalog.Stage.FRAGMENT);
-            if (!hasVertex || !hasFragment) {
-                List<String> missing = new ArrayList<>();
-                if (!hasVertex) missing.add("vertex (.vsh)");
-                if (!hasFragment) missing.add("fragment (.fsh)");
-                diagnostics.add("Nvidium " + scope + "gbuffers_terrain ABI: incomplete program; missing "
-                        + String.join(" and ", missing) + ".");
-                continue;
-            }
+            for (Map.Entry<String, Map<ShaderPackProgramCatalog.Stage, String>> program
+                    : inventory.getValue().entrySet()) {
+                String programName = program.getKey();
+                if (!isTerrainProgram(programName)) continue;
 
-            String vertexPath = terrainStages.get(ShaderPackProgramCatalog.Stage.VERTEX);
-            String fragmentPath = terrainStages.get(ShaderPackProgramCatalog.Stage.FRAGMENT);
-            IrisTerrainCompatibilityAnalyzer.Result terrainCompatibility = terrainAnalyzer.analyze(
-                    preprocessed.get(vertexPath), preprocessed.get(fragmentPath));
-            terrainCompatibility.issues().forEach(issue ->
-                    diagnostics.add("Nvidium " + scope + "gbuffers_terrain ABI: " + issue));
+                Map<ShaderPackProgramCatalog.Stage, String> terrainStages = program.getValue();
+                boolean hasVertex = terrainStages.containsKey(ShaderPackProgramCatalog.Stage.VERTEX);
+                boolean hasFragment = terrainStages.containsKey(ShaderPackProgramCatalog.Stage.FRAGMENT);
+                if (!hasVertex || !hasFragment) {
+                    List<String> missing = new ArrayList<>();
+                    if (!hasVertex) missing.add("vertex (.vsh)");
+                    if (!hasFragment) missing.add("fragment (.fsh)");
+                    diagnostics.add("Nvidium " + scope + programName + " ABI: incomplete program; missing "
+                            + String.join(" and ", missing) + ".");
+                    continue;
+                }
+
+                String vertexPath = terrainStages.get(ShaderPackProgramCatalog.Stage.VERTEX);
+                String fragmentPath = terrainStages.get(ShaderPackProgramCatalog.Stage.FRAGMENT);
+                IrisTerrainCompatibilityAnalyzer.Result terrainCompatibility = terrainAnalyzer.analyze(
+                        preprocessed.get(vertexPath), preprocessed.get(fragmentPath));
+                terrainCompatibility.issues().forEach(issue ->
+                        diagnostics.add("Nvidium " + scope + programName + " ABI: " + issue));
+            }
         }
         if (!conditionalPrograms.isEmpty()) {
             diagnostics.add("Conditional program enablement was parsed but Iris option-expression evaluation is not implemented.");
@@ -172,6 +175,10 @@ public final class IrisShaderPackParser {
                 preprocessed,
                 diagnostics
         );
+    }
+
+    private static boolean isTerrainProgram(String name) {
+        return name.equals("gbuffers_terrain") || name.startsWith("gbuffers_terrain_");
     }
 
     private static Map<String, IrisShaderPackModel.Program> freeze(
