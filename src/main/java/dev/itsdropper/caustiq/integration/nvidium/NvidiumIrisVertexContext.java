@@ -34,8 +34,9 @@ public final class NvidiumIrisVertexContext {
     }
 
     /** Replaces registry fallback IDs with the selected pack's block.properties IDs. */
-    public static void setBlockIds(Map<String, Integer> blockIds) {
-        BLOCK_IDS.set(Map.copyOf(blockIds));
+    public static boolean setBlockIds(Map<String, Integer> blockIds) {
+        Map<String, Integer> replacement = Map.copyOf(blockIds);
+        return !BLOCK_IDS.getAndSet(replacement).equals(replacement);
     }
 
     private static String stateKey(BlockState state, String blockId) {
