@@ -9,7 +9,10 @@
     "VideoSettingsScreenMixin",
     "NvidiumWorldRendererMixin",
     "NvidiumShaderBuilderMixin",
-    "NvidiumIrisCheckMixin"
+    "NvidiumIrisCheckMixin",
+    "NvidiumTerrainRasterizerMixin"
   ],
-  "injectors": {"defaultRequire": 1}
+  "injectors": {
+    "defaultRequire": 1
+  }
 }
