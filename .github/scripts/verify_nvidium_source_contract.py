@@ -120,7 +120,13 @@ format_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/Nvidi
 stride_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumRepackagedStrideMixin.java").read_text(encoding="utf-8")
 assert "NvidiumIrisChunkVertex.INSTANCE" in format_mixin
 assert "NvidiumIrisChunkVertex.STRIDE" in stride_mixin
-assert "@Constant(intValue = 80)" in stride_mixin, "copyQuad inlines the 20-byte Sodium vertex stride as an 80-byte quad copy"
+assert "@Redirect(" in stride_mixin and "CompactChunkVertex;STRIDE:I" in stride_mixin
+assert "NvidiumIrisChunkVertex.STRIDE" in stride_mixin, "copyQuad must multiply the extended 40-byte vertex stride by four vertices"
+world_renderer = source("src/main/java/me/cortex/nvidium/NvidiumWorldRenderer.java")
+world_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumWorldRendererMixin.java").read_text(encoding="utf-8")
+assert "new SectionManager(device, max_geometry_memory*1024*1024, uploadStream" in world_renderer
+assert "SectionManager;<init>(Lme/cortex/nvidium/gl/RenderDevice;JLme/cortex/nvidium/util/UploadingBufferStream;ILme/cortex/nvidium/NvidiumWorldRenderer;)V" in world_mixin
+assert "caustiq$allocateExtendedTerrainStride" in world_mixin and "NvidiumIrisChunkVertex.STRIDE" in world_mixin
 for mixin in ("NvidiumExtendedVertexFormatMixin", "NvidiumRepackagedStrideMixin",
               "NvidiumBlockRendererVertexContextMixin", "NvidiumFluidRendererVertexContextMixin"):
     assert mixin in mixins_json["client"]
