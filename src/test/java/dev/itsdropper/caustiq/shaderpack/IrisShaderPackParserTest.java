@@ -125,4 +125,31 @@ class IrisShaderPackParserTest {
         }
     }
 
+    @Test
+    void auditsTerrainCompatibilityForDimensionSpecificProgramSets() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("DimensionPack/shaders/world0"));
+        Files.writeString(shaders.resolve("gbuffers_terrain.vsh"), """
+                #version 400
+                attribute vec4 at_tangent;
+                out vec2 uv;
+                void main() { uv = vec2(0.0); gl_Position = vec4(0.0); }
+                """);
+        Files.writeString(shaders.resolve("gbuffers_terrain.fsh"), """
+                #version 400
+                in vec2 uv;
+                layout(location = 0) out vec4 color;
+                void main() { color = vec4(uv, 0.0, 1.0); }
+                """);
+
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("dimension", "DimensionPack",
+                temporaryDirectory.resolve("DimensionPack"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 2, 2, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            assertTrue(model.diagnostics().stream().anyMatch(issue ->
+                    issue.contains("world0 gbuffers_terrain ABI") && issue.contains("at_tangent")),
+                    model.diagnostics().toString());
+        }
+    }
+
 }
