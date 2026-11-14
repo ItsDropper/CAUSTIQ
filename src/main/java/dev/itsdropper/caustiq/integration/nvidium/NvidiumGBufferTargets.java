@@ -43,6 +43,7 @@ public final class NvidiumGBufferTargets {
     private static boolean warnedUnavailable;
     private static Map<Integer, IrisTerrainPassScheduler.RenderTarget> targetSpecs = Map.of();
     private static boolean formatsDirty = true;
+    private static int[] outputRouting = {0, 1, 2, 3, 4, 5, 6, 7};
 
     private NvidiumGBufferTargets() { }
 
@@ -52,6 +53,25 @@ public final class NvidiumGBufferTargets {
         formatsDirty = true;
     }
 
+    /** Maps fragment output locations to Iris colortex indices for the active terrain program. */
+    public static void configureOutputRouting(java.util.List<Integer> targetIndices) {
+        int[] routing = new int[REQUIRED_DRAW_BUFFERS];
+        Arrays.fill(routing, -1);
+        for (int location = 0; location < targetIndices.size() && location < routing.length; location++) {
+            int target = targetIndices.get(location);
+            if (target < 0 || target > MAX_ATTACHMENT) {
+                throw new IllegalArgumentException("Nvidium supports Iris colortex0 through colortex7.");
+            }
+            routing[location] = target;
+        }
+        outputRouting = routing;
+    }
+
+    /** Restores Nvidium's native location-to-attachment mapping. */
+    public static void resetOutputRouting() {
+        outputRouting = new int[]{0, 1, 2, 3, 4, 5, 6, 7};
+    }
+
     /** Called at the Nvidium primary terrain rasterizer boundary, on the render thread. */
     public static boolean begin() {
         if (activeState != null) end();
@@ -59,9 +79,11 @@ public final class NvidiumGBufferTargets {
         if (framebuffer == 0) return false;
 
         int drawBufferCount = GL11C.glGetInteger(GL20C.GL_MAX_DRAW_BUFFERS);
-        if (drawBufferCount < REQUIRED_DRAW_BUFFERS) {
-            warnUnavailable("OpenGL exposes only " + drawBufferCount
-                    + " draw buffers; CAUSTIQ needs " + REQUIRED_DRAW_BUFFERS + ".");
+        int colorAttachmentCount = GL11C.glGetInteger(GL30C.GL_MAX_COLOR_ATTACHMENTS);
+        if (drawBufferCount < REQUIRED_DRAW_BUFFERS || colorAttachmentCount < REQUIRED_DRAW_BUFFERS) {
+            warnUnavailable("OpenGL exposes " + drawBufferCount + " draw buffers and "
+                    + colorAttachmentCount + " color attachments; CAUSTIQ needs at least "
+                    + REQUIRED_DRAW_BUFFERS + " of each.");
             return false;
         }
 
@@ -103,21 +125,35 @@ public final class NvidiumGBufferTargets {
                     GL11C.GL_TEXTURE_2D, TEXTURES[i], 0);
         }
         int[] drawBuffers = new int[REQUIRED_DRAW_BUFFERS];
-        for (int i = 0; i < drawBuffers.length; i++) drawBuffers[i] = GL30C.GL_COLOR_ATTACHMENT0 + i;
-        GL20C.glDrawBuffers(drawBuffers);
-
-        int status = GL30C.glCheckFramebufferStatus(GL30C.GL_DRAW_FRAMEBUFFER);
-        if (status != GL30C.GL_FRAMEBUFFER_COMPLETE) {
-            restore(state);
-            warnUnavailable("Nvidium's active framebuffer cannot accept CAUSTIQ G-buffer attachments (status 0x"
-                    + Integer.toHexString(status) + ").");
-            return false;
+        Arrays.fill(drawBuffers, GL11C.GL_NONE);
+        for (int location = 0; location < outputRouting.length; location++) {
+            int target = outputRouting[location];
+            if (target >= 0) drawBuffers[location] = GL30C.GL_COLOR_ATTACHMENT0 + target;
         }
-        clearAuxiliaryAttachments();
 
-        activeState = state;
-        warnedUnavailable = false;
-        return true;
+        int[] identityDrawBuffers = new int[REQUIRED_DRAW_BUFFERS];
+        for (int i = 0; i < identityDrawBuffers.length; i++) {
+            identityDrawBuffers[i] = GL30C.GL_COLOR_ATTACHMENT0 + i;
+        }
+        try {
+            // Completeness and clears use identity routing so every colortex attachment can be cleared.
+            GL20C.glDrawBuffers(identityDrawBuffers);
+            int status = GL30C.glCheckFramebufferStatus(GL30C.GL_DRAW_FRAMEBUFFER);
+            if (status != GL30C.GL_FRAMEBUFFER_COMPLETE) {
+                restore(state);
+                warnUnavailable("Nvidium's active framebuffer cannot accept CAUSTIQ G-buffer attachments (status 0x"
+                        + Integer.toHexString(status) + ").");
+                return false;
+            }
+            clearAuxiliaryAttachments();
+            GL20C.glDrawBuffers(drawBuffers);
+            activeState = state;
+            warnedUnavailable = false;
+            return true;
+        } catch (RuntimeException exception) {
+            restore(state);
+            throw exception;
+        }
     }
 
     /** Restores the exact draw-buffer routing and attachments captured by begin(). */
@@ -167,6 +203,7 @@ public final class NvidiumGBufferTargets {
         width = 0;
         height = 0;
         targetSpecs = Map.of();
+        resetOutputRouting();
         formatsDirty = true;
     }
 
