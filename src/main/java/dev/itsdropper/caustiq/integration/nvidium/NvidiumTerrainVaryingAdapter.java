@@ -122,19 +122,10 @@ public final class NvidiumTerrainVaryingAdapter {
 
         String mesh = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("MESH"), "MESH source"));
         String fragment = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("FRAGMENT"), "FRAGMENT source"));
-        boolean primaryMeshSignature = mesh.contains("layout(triangles, max_vertices=64, max_primitives=32) out;");
-        if (!primaryMeshSignature && !mesh.contains(MARKER) && !fragment.contains(MARKER)) {
-            return Map.copyOf(sourceStages);
-        }
-        boolean hasPrimaryMeshAnchors = mesh.contains("void putVertex(uint id, Vertex V) {")
-                && mesh.contains("    OUT[id].uv = decodeVertexUV(V);");
-        boolean hasPrimaryFragmentAnchor = fragment.contains("layout(location = 0) out vec4 colour;")
-                && fragment.contains("layout(location = 1) in Interpolants");
-        if (!hasPrimaryMeshAnchors || !hasPrimaryFragmentAnchor) {
-            throw new IllegalStateException("Nvidium primary terrain shader has a partial or incompatible source layout.");
-        }
-        if (mesh.contains(MARKER) || fragment.contains(MARKER)) {
-            boolean complete = mesh.contains(MARKER) && fragment.contains(MARKER)
+        boolean meshMarked = mesh.contains(MARKER);
+        boolean fragmentMarked = fragment.contains(MARKER);
+        if (meshMarked || fragmentMarked) {
+            boolean complete = meshMarked && fragmentMarked
                     && mesh.contains(MESH_VARYINGS) && fragment.contains(FRAGMENT_VARYINGS)
                     && mesh.contains(MESH_ASSIGNMENTS) && mesh.contains(NORMAL_HELPER)
                     && fragment.contains(FRAGMENT_UNIFORM_ALIASES)
@@ -143,7 +134,15 @@ public final class NvidiumTerrainVaryingAdapter {
             if (complete) return Map.copyOf(sourceStages);
             throw new IllegalStateException("Nvidium terrain varying profile is only partially applied or has an incompatible ABI.");
         }
-
+        boolean primaryMeshSignature = mesh.contains("layout(triangles, max_vertices=64, max_primitives=32) out;");
+        if (!primaryMeshSignature) return Map.copyOf(sourceStages);
+        boolean hasPrimaryMeshAnchors = mesh.contains("void putVertex(uint id, Vertex V) {")
+                && mesh.contains("    OUT[id].uv = decodeVertexUV(V);");
+        boolean hasPrimaryFragmentAnchor = fragment.contains("layout(location = 0) out vec4 colour;")
+                && fragment.contains("layout(location = 1) in Interpolants"); 
+        if (!hasPrimaryMeshAnchors || !hasPrimaryFragmentAnchor) {
+            throw new IllegalStateException("Nvidium primary terrain shader has a partial or incompatible source layout.");
+        }
         mesh = replaceOnce(mesh, "#version 460", "#version 460\n" + MARKER, "mesh version");
         fragment = replaceOnce(fragment, "#version 460", "#version 460\n" + MARKER, "fragment version");
         mesh = replaceOnce(mesh, "    vec2 uv;\n    vec3 v_colour;", MESH_VARYINGS, "mesh interpolant declaration");
