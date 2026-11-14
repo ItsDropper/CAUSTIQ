@@ -81,7 +81,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("currentRenderedItemId", "caustiqCurrentRenderedItemId"),
             Map.entry("entityColor", "caustiqEntityColor"),
             Map.entry("view_res", "(screenSize * 2.0)"),
-            Map.entry("view_pixel_size", "(1.0 / (screenSize * 2.0)"));
+            Map.entry("view_pixel_size", "(1.0 / (screenSize * 2.0))"));
     private static final Set<String> NATIVE_INTERPOLANTS = Set.of(
             "uv", "v_colour", "v_vertexColour", "v_lightmapCoord", "v_renderPosition",
             "v_quadMidUv", "v_quadMidPosition", "v_midBlock", "v_blockEntity",
