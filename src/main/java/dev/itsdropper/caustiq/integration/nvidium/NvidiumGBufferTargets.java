@@ -9,6 +9,7 @@ import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL30C;
 import org.lwjgl.system.MemoryStack;
 
+import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
 
@@ -192,13 +193,13 @@ public final class NvidiumGBufferTargets {
     private static void clearAuxiliaryAttachments() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             for (int i = 0; i < ATTACHMENT_COUNT; i++) {
-                IntBuffer clearValue = stack.mallocInt(4);
+                FloatBuffer clearValue = stack.mallocFloat(4);
                 if (i == 0) {
                     clearValue.put(0, 0.5f).put(1, 0.5f).put(2, 1.0f).put(3, 0.0f);
                 } else {
                     clearValue.put(0, 0).put(1, 0).put(2, 0).put(3, 0);
                 }
-                GL30C.glClearBufferfv(GL11C.GL_COLOR, i + 1, clearValue.asFloatBuffer());
+                GL30C.glClearBufferfv(GL11C.GL_COLOR, i + 1, clearValue);
             }
         }
     }
