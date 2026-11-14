@@ -26,7 +26,9 @@ public final class IrisGlslConditionalPreprocessor {
     public String preprocess(String source, Map<String, String> initialDefines) {
         Objects.requireNonNull(source, "source");
         Map<String, String> macros = new LinkedHashMap<>(initialDefines == null ? Map.of() : initialDefines);
-        String normalized = source.replaceAll("\\\\\\R", " ");
+        String normalized = source.replace("\\" + "\r\n", " ")
+                .replace("\\" + "\n", " ")
+                .replace("\\" + "\r", " ");
         String[] lines = normalized.split("\\R", -1);
         StringBuilder output = new StringBuilder(source.length());
         Deque<Conditional> stack = new ArrayDeque<>();
@@ -177,13 +179,19 @@ public final class IrisGlslConditionalPreprocessor {
 
         private long parseLogicalOr() {
             long value = parseLogicalAnd();
-            while (match("||")) value = truth(value) || truth(parseLogicalAnd()) ? 1 : 0;
+            while (match("||")) {
+                long right = parseLogicalAnd();
+                value = truth(value) || truth(right) ? 1 : 0;
+            }
             return value;
         }
 
         private long parseLogicalAnd() {
             long value = parseBitwiseOr();
-            while (match("&&")) value = truth(value) && truth(parseBitwiseOr()) ? 1 : 0;
+            while (match("&&")) {
+                long right = parseBitwiseOr();
+                value = truth(value) && truth(right) ? 1 : 0;
+            }
             return value;
         }
 
