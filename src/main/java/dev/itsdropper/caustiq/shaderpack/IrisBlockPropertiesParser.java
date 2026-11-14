@@ -32,8 +32,9 @@ public final class IrisBlockPropertiesParser {
             for (String value : values) {
                 if (value.isBlank()) continue;
                 ParsedBlock block = parseBlock(value, lineNumber + 1);
-                putUnique(result, block.identifier(), id, lineNumber + 1);
-                if (!block.properties().isEmpty()) {
+                if (block.properties().isEmpty()) {
+                    putUnique(result, block.identifier(), id, lineNumber + 1);
+                } else {
                     putUnique(result, block.identifier() + formatProperties(block.properties()), id, lineNumber + 1);
                 }
             }
