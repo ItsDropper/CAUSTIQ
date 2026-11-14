@@ -112,6 +112,7 @@ class IrisTerrainCompatibilityAnalyzerTest {
                     () -> IrisNvidiumTerrainTranslator.from(model),
                     "The pinned Photon gbuffers_terrain pair must translate into the Nvidium mesh/fragment ABI");
             assertNotNull(translator);
+            assertEquals(java.util.List.of(1), translator.renderTargetIndices());
         }
     }
 
