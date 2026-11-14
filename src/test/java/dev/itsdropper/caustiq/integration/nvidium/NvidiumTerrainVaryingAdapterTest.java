@@ -30,6 +30,7 @@ class NvidiumTerrainVaryingAdapterTest {
             assertTrue(fragment.contains(varying), "Fragment input missing " + varying);
         }
         assertTrue(mesh.contains("decodeVertexColour(V).rgb"));
+        assertTrue(mesh.contains("float((uint(v.color) >> 24u) & 0xFFu) * COLOR_SCALE"));
         assertTrue(mesh.contains("decodeLightUV(V)"));
         assertTrue(mesh.contains("OUT[id].v_materialFlags = V.nvidiumMaterial;"));
         assertTrue(mesh.contains("uint nvidiumMaterial;"));
