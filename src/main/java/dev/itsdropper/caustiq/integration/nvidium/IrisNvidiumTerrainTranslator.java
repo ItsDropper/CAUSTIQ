@@ -71,11 +71,10 @@ public final class IrisNvidiumTerrainTranslator {
     private final int fragDataCount;
 
     private IrisNvidiumTerrainTranslator(String vertexSource, String fragmentSource) {
-        this.vertexSource = Objects.requireNonNull(vertexSource, "vertexSource");
-        this.fragmentSource = Objects.requireNonNull(fragmentSource, "fragmentSource");
-
-        StageSource vertex = prepareVertex(vertexSource);
-        StageSource fragment = prepareFragment(fragmentSource);
+        StageSource vertex = prepareVertex(Objects.requireNonNull(vertexSource, "vertexSource"));
+        StageSource fragment = prepareFragment(Objects.requireNonNull(fragmentSource, "fragmentSource"));
+        this.vertexSource = vertex.source();
+        this.fragmentSource = fragment.source();
         this.varyings = matchVaryings(vertex.varyings(), fragment.varyings());
         this.outputs = fragment.outputs();
         this.usesFragData = fragment.usesFragData();
@@ -166,38 +165,17 @@ public final class IrisNvidiumTerrainTranslator {
         source.append("Vertex caustiqCurrentVertex;\n")
                 .append("uint caustiqCurrentVertexId;\n")
                 .append("vec4 caustiqIrisClipPosition;\n")
-                .append("vec4 caustiqIrisTexCoord[8];\n")
-                .append("#define gl_Vertex (transformMat * vec4(decodeVertexPosition(caustiqCurrentVertex) + origin, 1.0))\n")
-                .append("#define gl_MultiTexCoord0 vec4(decodeVertexUV(caustiqCurrentVertex), 0.0, 1.0)\n")
-                .append("#define gl_MultiTexCoord1 vec4(decodeLightUV(caustiqCurrentVertex), 0.0, 1.0)\n")
-                .append("#define gl_Color decodeVertexColour(caustiqCurrentVertex)\n")
-                .append("#define gl_Normal caustiqDecodeNormal(caustiqCurrentVertex)\n")
-                .append("#define gl_Position caustiqIrisClipPosition\n")
-                .append("#define gl_TexCoord caustiqIrisTexCoord\n")
-                .append("#define gl_VertexID int(caustiqCurrentVertexId)\n")
-                .append("#define mc_Entity caustiqDecodeBlockEntity(caustiqCurrentVertex.blockId)\n")
-                .append("#define at_midBlock caustiqDecodeMidBlock(caustiqCurrentVertex)\n")
-                .append("#define mc_midTexCoord caustiqDecodeMidUv(caustiqCurrentVertex)\n")
-                .append("#define at_midTexCoord caustiqDecodeMidUv(caustiqCurrentVertex)\n")
-                .append("#define iris_Normal caustiqDecodeNormal(caustiqCurrentVertex)\n")
-                .append("#define at_tangent caustiqDecodeTangent(caustiqCurrentVertex)\n")
-                .append("#define vaPosition decodeVertexPosition(caustiqCurrentVertex)\n")
-                .append("#define vaUV0 decodeVertexUV(caustiqCurrentVertex)\n")
-                .append("#define vaUV2 decodeLightUV(caustiqCurrentVertex)\n")
-                .append("#define vaColor decodeVertexColour(caustiqCurrentVertex)\n")
-                .append("#define Position decodeVertexPosition(caustiqCurrentVertex)\n")
-                .append("#define UV0 decodeVertexUV(caustiqCurrentVertex)\n")
-                .append("#define UV2 decodeLightUV(caustiqCurrentVertex)\n")
-                .append("#define Color decodeVertexColour(caustiqCurrentVertex)\n")
-                .append("#define Normal caustiqDecodeNormal(caustiqCurrentVertex)\n")
-                .append("#define ftransform() (caustiqProjection * caustiqModelView * gl_Vertex)\n");
+                .append("vec4 caustiqIrisTexCoord[8];\n");
         for (Varying varying : varyings) {
-            source.append(varying.type()).append(" caustiqIrisVarying_").append(varying.name()).append(";\n")
-                    .append("#define ").append(varying.name()).append(" caustiqIrisVarying_")
-                    .append(varying.name()).append("\n");
+            source.append(varying.type()).append(" caustiqIrisVarying_")
+                    .append(varying.name()).append(";\n");
         }
-        source.append(stripStageDirectives(removeUniformsAndAttributes(vertexSource, true)));
-        return source.toString();
+        String translated = translateVertexBuiltins(vertexSource);
+        for (Varying varying : varyings) {
+            translated = replaceIdentifier(translated, varying.name(),
+                    "caustiqIrisVarying_" + varying.name());
+        }
+        return source.append(translated).toString();
     }
 
     private String vertexInvocation() {
@@ -226,28 +204,13 @@ public final class IrisNvidiumTerrainTranslator {
     private String fragmentProgramSource() {
         StringBuilder source = new StringBuilder();
         source.append("vec4 caustiqIrisTexCoord[8];\n")
-                .append("vec4 caustiqIrisFragData[8];\n")
-                .append("#define gl_TexCoord caustiqIrisTexCoord\n")
-                .append("#define gl_FragColor colour\n")
-                .append("#define gl_FragData caustiqIrisFragData\n")
-                .append("#define gtexture tex_diffuse\n")
-                .append("#define lightmap tex_light\n")
-                .append("#define viewSize (screenSize * 2.0)\n")
-                .append("#define pixelSize (1.0 / (screenSize * 2.0))\n")
-                .append("#define viewWidth (screenSize.x * 2.0)\n")
-                .append("#define viewHeight (screenSize.y * 2.0)\n")
-                .append("#define fogColor fogColour\n");
+                .append("vec4 caustiqIrisFragData[8];\n");
+        String translated = translateFragmentBuiltins(fragmentSource);
         for (FragmentOutput output : outputs) {
-            if (output.location() == 0) {
-                source.append("#define ").append(output.name()).append(" colour\n");
-            } else {
-                source.append("#define ").append(output.name()).append(" caustiqIrisOutput")
-                        .append(output.location()).append("\n");
-            }
+            translated = replaceIdentifier(translated, output.name(),
+                    output.location() == 0 ? "colour" : "caustiqIrisOutput" + output.location());
         }
-        source.append(stripStageDirectives(removeUniformsAndAttributes(fragmentSource, false))
-                .replace("void main()", "void caustiqIrisFragmentMain()"));
-        return source.toString();
+        return source.append(translated).toString();
     }
 
     private String fragmentInvocation() {
@@ -292,21 +255,20 @@ public final class IrisNvidiumTerrainTranslator {
     }
 
     private static StageSource prepareVertex(String source) {
-        String working = removeUniformsAndAttributes(source, true);
-        working = stripStageDirectives(working);
-        String renamed = renameMain(working, "caustiqIrisVertexMain");
-        List<Varying> varyings = parseVertexVaryings(source);
-        return new StageSource(renamed, varyings, List.of(), false, 0);
+        String clean = stripComments(source);
+        List<Varying> varyings = parseVertexVaryings(clean);
+        String working = stripStageDirectives(removeUniformsAndAttributes(clean, true));
+        return new StageSource(renameMain(working, "caustiqIrisVertexMain"),
+                varyings, List.of(), false, 0);
     }
 
     private static StageSource prepareFragment(String source) {
-        String working = removeUniformsAndAttributes(source, false);
-        working = stripStageDirectives(working);
-        List<Varying> varyings = parseFragmentInputs(source);
-        List<FragmentOutput> outputs = parseFragmentOutputs(source);
-        boolean fragData = source.contains("gl_FragData");
+        String clean = stripComments(source);
+        List<Varying> varyings = parseFragmentInputs(clean);
+        List<FragmentOutput> outputs = parseFragmentOutputs(clean);
+        boolean fragData = clean.contains("gl_FragData");
         int fragDataCount = 0;
-        Matcher fragIndices = FRAG_DATA_INDEX.matcher(source);
+        Matcher fragIndices = FRAG_DATA_INDEX.matcher(clean);
         while (fragIndices.find()) fragDataCount = Math.max(fragDataCount, Integer.parseInt(fragIndices.group(1)) + 1);
         if (fragData && !outputs.isEmpty()) {
             throw new IllegalArgumentException("gbuffers_terrain mixes gl_FragData with explicit fragment outputs.");
@@ -314,6 +276,7 @@ public final class IrisNvidiumTerrainTranslator {
         if (fragDataCount > 8) {
             throw new IllegalArgumentException("Nvidium MRT supports fragment output locations 0 through 7.");
         }
+        String working = stripStageDirectives(removeUniformsAndAttributes(clean, false));
         return new StageSource(renameMain(working, "caustiqIrisFragmentMain"),
                 List.of(), outputs, fragData, fragDataCount);
     }
@@ -366,15 +329,18 @@ public final class IrisNvidiumTerrainTranslator {
     }
 
     private static String removeUniformsAndAttributes(String source, boolean vertex) {
-        String working = source;
+        String working = stripComments(source);
         Matcher uniforms = UNIFORM.matcher(working);
         StringBuffer uniformOutput = new StringBuffer();
         while (uniforms.find()) {
             String type = uniforms.group(1);
             String name = uniforms.group(2);
-            String alias = UNIFORM_ALIASES.get(name);
-            if (alias == null) {
+            String expected = expectedUniformType(name);
+            if (expected == null) {
                 throw new IllegalArgumentException("Unsupported Iris terrain uniform '" + name + "' (" + type + ").");
+            }
+            if (!expected.equals(type)) {
+                throw new IllegalArgumentException("Iris terrain uniform '" + name + "' must be " + expected + ", not " + type + ".");
             }
             if ((name.equals("gtexture") || name.equals("lightmap") || name.equals("viewSize")
                     || name.equals("pixelSize") || name.equals("viewWidth") || name.equals("viewHeight")
@@ -398,6 +364,12 @@ public final class IrisNvidiumTerrainTranslator {
             }
             attributes.appendTail(attributeOutput);
             working = attributeOutput.toString();
+
+            Matcher vertexOutputs = VERTEX_OUTPUT.matcher(working);
+            StringBuffer vertexOutputBuffer = new StringBuffer();
+            while (vertexOutputs.find()) vertexOutputs.appendReplacement(vertexOutputBuffer, "");
+            vertexOutputs.appendTail(vertexOutputBuffer);
+            working = vertexOutputBuffer.toString();
             if (Pattern.compile("\\b(attribute|varying)\\b").matcher(working).find()) {
                 throw new IllegalArgumentException("Iris terrain vertex source contains an unsupported attribute/varying declaration.");
             }
@@ -425,6 +397,84 @@ public final class IrisNvidiumTerrainTranslator {
             throw new IllegalArgumentException("Iris terrain stage writes a built-in output not represented by Nvidium's mesh/fragment ABI.");
         }
         return translateLegacyTextureFunctions(working);
+    }
+
+    private static String expectedUniformType(String name) {
+        return switch (name) {
+            case "gtexture", "lightmap" -> "sampler2D";
+            case "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse" -> "mat4";
+            case "cameraPosition", "fogColor" -> "vec3";
+            case "frameTimeCounter", "viewWidth", "viewHeight" -> "float";
+            case "frameCounter" -> "int";
+            case "viewSize", "pixelSize" -> "vec2";
+            default -> null;
+        };
+    }
+
+    private static String translateVertexBuiltins(String source) {
+        String translated = source;
+        translated = replaceIdentifier(translated, "gl_VertexID", "int(caustiqCurrentVertexId)");
+        translated = replaceIdentifier(translated, "gl_Vertex",
+                "(transformMat * vec4(decodeVertexPosition(caustiqCurrentVertex) + origin, 1.0))");
+        translated = replaceIdentifier(translated, "gl_MultiTexCoord0",
+                "vec4(decodeVertexUV(caustiqCurrentVertex), 0.0, 1.0)");
+        translated = replaceIdentifier(translated, "gl_MultiTexCoord1",
+                "vec4(decodeLightUV(caustiqCurrentVertex), 0.0, 1.0)");
+        translated = replaceIdentifier(translated, "gl_Color", "decodeVertexColour(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "gl_Normal", "caustiqDecodeNormal(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "gl_Position", "caustiqIrisClipPosition");
+        translated = replaceIdentifier(translated, "gl_TexCoord", "caustiqIrisTexCoord");
+        translated = replaceIdentifier(translated, "mc_Entity", "caustiqDecodeBlockEntity(caustiqCurrentVertex.blockId)");
+        translated = replaceIdentifier(translated, "at_midBlock", "caustiqDecodeMidBlock(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "mc_midTexCoord", "caustiqDecodeMidUv(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "at_midTexCoord", "caustiqDecodeMidUv(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "iris_Normal", "caustiqDecodeNormal(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "at_tangent", "caustiqDecodeTangent(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "vaPosition", "decodeVertexPosition(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "vaUV0", "decodeVertexUV(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "vaUV2", "decodeLightUV(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "vaColor", "decodeVertexColour(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "Position", "decodeVertexPosition(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "UV0", "decodeVertexUV(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "UV2", "decodeLightUV(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "Color", "decodeVertexColour(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "Normal", "caustiqDecodeNormal(caustiqCurrentVertex)");
+        translated = translated.replaceAll("\\bftransform\\s*\\(\\s*\\)",
+                "(caustiqProjection * caustiqModelView * (transformMat * vec4(decodeVertexPosition(caustiqCurrentVertex) + origin, 1.0)))");
+        return translateUniformAliases(translated);
+    }
+
+    private static String translateFragmentBuiltins(String source) {
+        String translated = source;
+        translated = replaceIdentifier(translated, "gl_TexCoord", "caustiqIrisTexCoord");
+        translated = replaceIdentifier(translated, "gl_FragColor", "colour");
+        translated = replaceIdentifier(translated, "gl_FragData", "caustiqIrisFragData");
+        return translateUniformAliases(translateLegacyTextureFunctions(translated));
+    }
+
+    private static String translateUniformAliases(String source) {
+        String translated = source;
+        for (Map.Entry<String, String> alias : UNIFORM_ALIASES.entrySet()) {
+            translated = replaceIdentifier(translated, alias.getKey(), alias.getValue());
+        }
+        translated = replaceIdentifier(translated, "gl_ModelViewProjectionMatrix",
+                "(caustiqProjection * caustiqModelView)");
+        translated = replaceIdentifier(translated, "gl_ModelViewMatrixInverse", "caustiqModelViewInverse");
+        translated = replaceIdentifier(translated, "gl_ModelViewMatrix", "caustiqModelView");
+        translated = replaceIdentifier(translated, "gl_ProjectionMatrixInverse", "caustiqProjectionInverse");
+        translated = replaceIdentifier(translated, "gl_ProjectionMatrix", "caustiqProjection");
+        translated = replaceIdentifier(translated, "gl_NormalMatrix", "caustiqNormalMatrix");
+        return translated;
+    }
+
+    private static String replaceIdentifier(String source, String identifier, String replacement) {
+        return source.replaceAll("(?<![A-Za-z0-9_])" + Pattern.quote(identifier)
+                + "(?![A-Za-z0-9_])", Matcher.quoteReplacement(replacement));
+    }
+
+    private static String stripComments(String source) {
+        return source.replaceAll("(?s)/\\*.*?\\*/", "")
+                .replaceAll("(?m)//[^\\r\\n]*", "");
     }
 
     private static String translateLegacyTextureFunctions(String source) {
