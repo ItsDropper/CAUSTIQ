@@ -49,11 +49,14 @@ public final class IrisTerrainCompatibilityAnalyzer {
     private static final Pattern IDENTIFIER = Pattern.compile("\\b[A-Za-z_][A-Za-z0-9_]*\\b");
 
     private static final Set<String> UNAVAILABLE_VERTEX_INPUTS = Set.of(
-            "mc_Entity", "mc_midTexCoord", "at_midTexCoord", "at_midBlock",
-            "at_tangent", "gl_Normal", "vaNormal");
+            "mc_Entity", "mc_midTexCoord", "mc_midBlock", "at_midTexCoord", "at_midBlock",
+            "at_tangent", "gl_Normal", "vaNormal", "gl_MultiTexCoord2", "gl_MultiTexCoord3",
+            "gl_MultiTexCoord4", "gl_MultiTexCoord5", "gl_MultiTexCoord6", "gl_MultiTexCoord7",
+            "gl_SecondaryColor", "gl_FogCoord", "gl_ClipVertex", "gl_PointSize");
     private static final Set<String> UNAVAILABLE_TRANSFORMS = Set.of(
             "gl_ModelViewMatrix", "gl_ModelViewMatrixInverse", "gl_ModelViewMatrixTranspose",
-            "gl_ModelViewMatrixInverseTranspose", "gl_ProjectionMatrix", "gl_ProjectionMatrixInverse",
+            "gl_ModelViewMatrixInverseTranspose", "gl_NormalMatrix",
+            "gl_ProjectionMatrix", "gl_ProjectionMatrixInverse",
             "gl_ProjectionMatrixTranspose", "gl_ProjectionMatrixInverseTranspose",
             "gl_ModelViewProjectionMatrix", "gl_TextureMatrix", "gbufferModelView",
             "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
