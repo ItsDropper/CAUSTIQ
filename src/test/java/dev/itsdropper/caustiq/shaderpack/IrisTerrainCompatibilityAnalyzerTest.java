@@ -201,4 +201,44 @@ class IrisTerrainCompatibilityAnalyzerTest {
         assertTrue(result.compatible(), result.issues().toString());
     }
 
+    @Test
+    void rejectsCustomUniformsAndUniformBlocksWithoutNvidiumBindings() {
+        String vertex = """
+                #version 400
+                uniform float frameTimeCounter;
+                uniform mat4 customTransform;
+                void main() { gl_Position = customTransform * vec4(frameTimeCounter); }
+                """;
+        String fragment = """
+                #version 400
+                layout(std140) uniform PackLighting { vec4 customLight; };
+                layout(location = 0) out vec4 color;
+                void main() { color = customLight; }
+                """;
+        var result = analyzer.analyze(vertex, fragment);
+        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNBOUND_UNIFORM")
+                && i.symbol().equals("frameTimeCounter")));
+        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNBOUND_UNIFORM")
+                && i.symbol().equals("customTransform")));
+        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNSUPPORTED_UNIFORM_BLOCK")));
+    }
+
+    @Test
+    void acceptsUniformsMappedByTheNvidiumTerrainScene() {
+        String vertex = """
+                #version 400
+                void main() { gl_Position = gl_Vertex; }
+                """;
+        String fragment = """
+                #version 400
+                uniform float viewWidth;
+                uniform float viewHeight;
+                uniform vec4 fogColor;
+                layout(location = 0) out vec4 color;
+                void main() { color = fogColor + vec4(viewWidth + viewHeight); }
+                """;
+        var result = analyzer.analyze(vertex, fragment);
+        assertTrue(result.compatible(), result.issues().toString());
+    }
+
 }
