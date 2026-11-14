@@ -68,7 +68,7 @@ jobs:
           matches = []
           for report in glob.glob("build/test-results/test/TEST-*.xml"):
               root = ET.parse(report).getroot()
-              matches.extend(case for case in root.iter("testcase") if case.attrib.get("name") == test_name)
+              matches.extend(case for case in root.iter("testcase") if case.attrib.get("name", "").split("(")[0] == test_name)
 
           if len(matches) != 1:
               raise SystemExit(f"Expected exactly one executed Photon terrain audit test, found {len(matches)}")
