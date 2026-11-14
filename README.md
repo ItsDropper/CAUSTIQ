@@ -50,13 +50,12 @@ On Linux/macOS:
 ./gradlew build
 ```
 
-The build runs the shader-pack scanner tests. The distributable JAR is written to `build/libs/`.
+The build runs the shader-pack scanner and GLSL preprocessing tests. The distributable JAR is written to `build/libs/`.
 
 ## Next engineering stages
 
-1. Parse shader-pack metadata and options.
-2. Implement GLSL include resolution and preprocessing.
-3. Build shader compilation and diagnostic reporting.
-4. Establish a renderer abstraction independent of Sodium.
-5. Add optional Sodium and Mod Menu integrations.
-6. Develop and test Nvidium coexistence.
+1. Parse shader-pack metadata and user options.
+2. Implement GLSL parsing/validation and compiler diagnostic mapping.
+3. Establish a renderer abstraction independent of Sodium.
+4. Add optional Sodium and Mod Menu integrations.
+5. Develop and test Nvidium coexistence.
