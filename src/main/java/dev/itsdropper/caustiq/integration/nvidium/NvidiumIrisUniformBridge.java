@@ -6,6 +6,7 @@ import org.joml.Matrix3fc;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL20C;
+import net.minecraft.client.Minecraft;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -76,6 +77,8 @@ public final class NvidiumIrisUniformBridge {
             if (timeLocation >= 0) GL20C.glUniform1f(timeLocation, snapshot.frameTimeCounter());
             int frameLocation = GL20C.glGetUniformLocation(program, "caustiqFrameCounter");
             if (frameLocation >= 0) GL20C.glUniform1i(frameLocation, snapshot.frameCounter());
+            uploadPhotonUniforms(program, snapshot);
+            NvidiumIrisTextureBridge.bindForTerrain();
             warnedUploadFailure = false;
         } catch (ReflectiveOperationException | RuntimeException exception) {
             if (!warnedUploadFailure) {
@@ -83,6 +86,97 @@ public final class NvidiumIrisUniformBridge {
                 CaustiqClient.LOGGER.warn("Unable to upload Iris terrain matrices to Nvidium's primary shader.", exception);
             }
         }
+    }
+
+    private static void uploadPhotonUniforms(int program, Snapshot snapshot) {
+        float near = projectionDistance(snapshot.projection(), false);
+        float far = projectionDistance(snapshot.projection(), true);
+        Object level = Minecraft.getInstance().level;
+        float rain = invokeFloat(level, "getRainLevel", 1.0f, 0.0f);
+        float wetness = rain;
+        float worldAge = invokeLong(level, "getGameTime", 0L);
+        float sunAngle = invokeFloat(level, "getSunAngle", 1.0f, 0.0f);
+
+        scalar(program, "caustiqNear", near);
+        scalar(program, "caustiqFar", far);
+        integer2(program, "caustiqAtlasSize", 0, 0);
+        scalar(program, "caustiqRainStrength", rain);
+        scalar(program, "caustiqWetness", wetness);
+        vector2(program, "caustiqTaaOffset", 0.0f, 0.0f);
+        vector3(program, "caustiqLightDirection",
+                (float) Math.sin(sunAngle), (float) Math.cos(sunAngle), 0.0f);
+        scalar(program, "caustiqWorldAge", worldAge);
+        scalar(program, "caustiqTimeSunrise", 0.0f);
+        scalar(program, "caustiqTimeNoon", 0.0f);
+        scalar(program, "caustiqTimeSunset", 0.0f);
+        scalar(program, "caustiqTimeMidnight", 0.0f);
+        scalar(program, "caustiqBiomeTemperature", 0.5f);
+        scalar(program, "caustiqBiomeHumidity", 0.5f);
+        scalar(program, "caustiqAlphaTestRef", 0.1f);
+        integer(program, "caustiqBlockEntityId", 0);
+        integer(program, "caustiqEntityId", 0);
+        integer(program, "caustiqCurrentRenderedItemId", 0);
+        vector4(program, "caustiqEntityColor", 1.0f, 1.0f, 1.0f, 1.0f);
+        integer(program, "caustiqNoiseTexture", 2);
+        integer(program, "caustiqNormalTexture", 3);
+        integer(program, "caustiqSpecularTexture", 4);
+    }
+
+    private static float projectionDistance(float[] projection, boolean farPlane) {
+        float diagonal = projection[10];
+        float translation = projection[14];
+        float denominator = diagonal + (farPlane ? 1.0f : -1.0f);
+        if (!Float.isFinite(denominator) || Math.abs(denominator) < 1.0e-6f) {
+            return farPlane ? 512.0f : 0.05f;
+        }
+        float distance = Math.abs(translation / denominator);
+        return Float.isFinite(distance) && distance > 0.0f
+                ? distance : (farPlane ? 512.0f : 0.05f);
+    }
+
+    private static float invokeFloat(Object target, String name, float argument, float fallback) {
+        if (target == null) return fallback;
+        try {
+            Object value = target.getClass().getMethod(name, float.class).invoke(target, argument);
+            return value instanceof Number number ? number.floatValue() : fallback;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
+    private static long invokeLong(Object target, String name, long fallback) {
+        if (target == null) return fallback;
+        try {
+            Object value = target.getClass().getMethod(name).invoke(target);
+            return value instanceof Number number ? number.longValue() : fallback;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
+    private static void scalar(int program, String name, float value) {
+        int location = GL20C.glGetUniformLocation(program, name);
+        if (location >= 0) GL20C.glUniform1f(location, value);
+    }
+
+    private static void integer(int program, String name, int value) {
+        int location = GL20C.glGetUniformLocation(program, name);
+        if (location >= 0) GL20C.glUniform1i(location, value);
+    }
+
+    private static void integer2(int program, String name, int x, int y) {
+        int location = GL20C.glGetUniformLocation(program, name);
+        if (location >= 0) GL20C.glUniform2i(location, x, y);
+    }
+
+    private static void vector2(int program, String name, float x, float y) {
+        int location = GL20C.glGetUniformLocation(program, name);
+        if (location >= 0) GL20C.glUniform2f(location, x, y);
+    }
+
+    private static void vector4(int program, String name, float x, float y, float z, float w) {
+        int location = GL20C.glGetUniformLocation(program, name);
+        if (location >= 0) GL20C.glUniform4f(location, x, y, z, w);
     }
 
     /** Uploads the captured camera/time state to a CAUSTIQ OpenGL post-process program. */
