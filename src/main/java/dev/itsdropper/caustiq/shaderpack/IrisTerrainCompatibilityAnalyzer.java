@@ -51,6 +51,8 @@ public final class IrisTerrainCompatibilityAnalyzer {
     private static final Pattern UNIFORM_BLOCK = Pattern.compile(
             "\\buniform\\s+[A-Za-z_][A-Za-z0-9_]*\\s*\\{");
     private static final Pattern IDENTIFIER = Pattern.compile("\\b[A-Za-z_][A-Za-z0-9_]*\\b");
+    private static final Pattern CONDITIONAL_DIRECTIVE = Pattern.compile(
+            "(?m)^\\s*#\\s*(?:if|ifdef|ifndef|elif)\\b");
 
     private static final Set<String> UNAVAILABLE_VERTEX_INPUTS = Set.of(
             "mc_Entity", "mc_midTexCoord", "mc_midBlock", "at_midTexCoord", "at_midBlock",
@@ -83,6 +85,11 @@ public final class IrisTerrainCompatibilityAnalyzer {
         Set<String> vertexIdentifiers = identifiers(vertex);
         Set<String> fragmentIdentifiers = identifiers(fragment);
         List<Issue> issues = new ArrayList<>();
+        if (CONDITIONAL_DIRECTIVE.matcher(vertex).find()
+                || CONDITIONAL_DIRECTIVE.matcher(fragment).find()) {
+            issues.add(new Issue("UNRESOLVED_PREPROCESSOR_CONDITION", "GLSL conditional directives",
+                    "The compatibility audit expands includes but does not evaluate Iris/JCPP macro conditions; branch-specific interfaces cannot be proven safe."));
+        }
 
         for (String symbol : UNAVAILABLE_VERTEX_INPUTS) {
             if (vertexIdentifiers.contains(symbol)) {
