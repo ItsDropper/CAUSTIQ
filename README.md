@@ -1,6 +1,14 @@
-# Caustiq
+# Caustiq — Nvidium branch
 
-Caustiq is an independent, client-side Minecraft shader engine. Its primary goal is to load existing OptiFine/Iris-style shader packs while preserving compatibility with accelerated terrain renderers such as Nvidium.
+This branch is the dedicated CAUSTIQ distribution target for Minecraft 1.21.11 with Sodium + Nvidium installed. It keeps the same Fabric mod ID (caustiq) as main; install only one CAUSTIQ build in a game instance. Its JAR is named caustiq-nvidium-*.jar.
+
+## Renderer integration status
+
+Experimental — Nvidium terrain integration is not implemented or verified.
+
+This branch requires Sodium (>=0.8.0) and Nvidium. It retains the same caustiq mod ID as main and produces a separately named caustiq-nvidium artifact. The branch starts with explicit renderer-stack validation and the existing final-colour post-process; it does not hook Nvidium's internal terrain renderer or adapt its mesh-shader output into Iris-style render targets. A successful build or detected Nvidium installation is not proof that Nvidium's accelerated terrain path remains active while shaders run.
+
+Nvidium uses a separate mesh-shader terrain pipeline. Full Iris-level support requires a real bridge for terrain colour/depth, gbuffers, shadow rendering, and pipeline synchronization. Do not bypass Nvidium's own shader compatibility behavior or claim support until those paths are implemented and tested in-game.
 
 ## Project status
 
@@ -66,6 +74,13 @@ This is an architectural compatibility strategy, **not a verified Nvidium compat
 - Releases Caustiq-owned render targets when the game renderer shuts down.
 
 The pack's own final vertex stage is catalogued but not yet executed. The first pass supports a single color input only; texture layouts, shadow maps, deferred buffers, geometry-specific gbuffers injection, and full Iris/OptiFine pipeline semantics remain unfinished. Multi-pass packs such as Complementary Reimagined are detected and deliberately left inactive instead of being incorrectly rendered through the final-pass path.
+
+## Distribution target
+
+- Branch: nvidium
+- Artifact base name: caustiq-nvidium
+- Fabric mod ID: caustiq (same as main; do not install both builds together)
+- Required renderer mods: Sodium and Nvidium
 
 ## Development target
 

@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "id": "caustiq",
   "version": "${version}",
-  "name": "Caustiq",
-  "description": "An independent client-side shader engine for Minecraft.",
+  "name": "Caustiq (Nvidium)",
+  "description": "CAUSTIQ shader engine build for the Sodium + Nvidium renderer stack.",
   "authors": ["ItsDropper"],
   "contact": {
-    "homepage": "https://github.com/ItsDropper/CAUSTIQ",
-    "sources": "https://github.com/ItsDropper/CAUSTIQ"
+    "homepage": "https://github.com/ItsDropper/CAUSTIQ/tree/nvidium",
+    "sources": "https://github.com/ItsDropper/CAUSTIQ/tree/nvidium"
   },
   "environment": "client",
   "entrypoints": {
@@ -18,9 +18,8 @@
   "depends": {
     "fabricloader": ">=0.20.1",
     "minecraft": "~1.21.11",
-    "java": ">=21"
-  },
-  "suggests": {
-    "sodium": ">=0.8.0"
+    "java": ">=21",
+    "sodium": ">=0.8.0",
+    "nvidium": "*"
   }
 }
