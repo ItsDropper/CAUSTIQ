@@ -31,6 +31,16 @@ public final class NvidiumTerrainVaryingAdapter {
     private static final String FRAGMENT_VARYINGS = MESH_VARYINGS;
     private static final String FRAGMENT_UNIFORM_ALIASES =
             NvidiumIrisTerrainAbi.fragmentAliasDeclarations();
+    private static final String FRAGMENT_GBUFFER_OUTPUTS = String.join("\n",
+            "layout(location = 1) out vec4 caustiqGBufferNormal;",
+            "layout(location = 2) out vec4 caustiqGBufferPosition;",
+            "layout(location = 3) out vec4 caustiqGBufferMaterial;",
+            "layout(location = 4) out vec4 caustiqGBufferLightmap;");
+    private static final String FRAGMENT_GBUFFER_WRITES = String.join("\n",
+            "    caustiqGBufferNormal = vec4(normalize(v_normal) * 0.5 + 0.5, 1.0);",
+            "    caustiqGBufferPosition = vec4(v_renderPosition, 1.0);",
+            "    caustiqGBufferMaterial = vec4(v_vertexColour, float(v_materialFlags) / 255.0);",
+            "    caustiqGBufferLightmap = vec4(v_lightmapCoord, 0.0, 1.0);");
     private static final String MESH_ASSIGNMENTS = String.join("\n",
             "    OUT[id].uv = decodeVertexUV(V);",
             "    OUT[id].v_colour = computeMultiplier(V);",
@@ -116,7 +126,9 @@ public final class NvidiumTerrainVaryingAdapter {
             boolean complete = mesh.contains(MARKER) && fragment.contains(MARKER)
                     && mesh.contains(MESH_VARYINGS) && fragment.contains(FRAGMENT_VARYINGS)
                     && mesh.contains(MESH_ASSIGNMENTS) && mesh.contains(NORMAL_HELPER)
-                    && fragment.contains(FRAGMENT_UNIFORM_ALIASES);
+                    && fragment.contains(FRAGMENT_UNIFORM_ALIASES)
+                    && fragment.contains(FRAGMENT_GBUFFER_OUTPUTS)
+                    && fragment.contains(FRAGMENT_GBUFFER_WRITES);
             if (complete) return Map.copyOf(sourceStages);
             throw new IllegalStateException("Nvidium terrain varying profile is only partially applied or has an incompatible ABI.");
         }
@@ -127,6 +139,9 @@ public final class NvidiumTerrainVaryingAdapter {
         fragment = replaceOnce(fragment, "    vec2 uv;\n    vec3 v_colour;", FRAGMENT_VARYINGS, "fragment interpolant declaration");
         fragment = replaceOnce(fragment, MARKER + "\n",
                 MARKER + "\n" + FRAGMENT_UNIFORM_ALIASES, "fragment uniform aliases");
+        fragment = replaceOnce(fragment, "layout(location = 0) out vec4 colour;",
+                "layout(location = 0) out vec4 colour;\n" + FRAGMENT_GBUFFER_OUTPUTS,
+                "G-buffer fragment outputs");
         mesh = replaceOnce(mesh, "void putVertex(uint id, Vertex V) {",
                 "void putVertex(uint id, Vertex V, uint quadId) {", "mesh varying writer signature");
         mesh = replaceOnce(mesh, "putVertex(qId+uint(triangle1), Vc);",
@@ -140,11 +155,20 @@ public final class NvidiumTerrainVaryingAdapter {
                         + "    caustiqComputeTriangleBasis(quadId, triangle1);", "triangle selection");
         mesh = replaceOnce(mesh, "    OUT[id].uv = decodeVertexUV(V);\n    OUT[id].v_colour = computeMultiplier(V);",
                 MESH_ASSIGNMENTS, "mesh varying assignments");
+        fragment = appendBeforeFinalBrace(fragment, FRAGMENT_GBUFFER_WRITES);
 
         Map<String, String> adapted = new LinkedHashMap<>(sourceStages);
         adapted.put("MESH", mesh);
         adapted.put("FRAGMENT", fragment);
         return Map.copyOf(adapted);
+    }
+
+    private static String appendBeforeFinalBrace(String source, String statements) {
+        int closingBrace = source.lastIndexOf('}');
+        if (closingBrace < 0 || !source.substring(closingBrace + 1).isBlank()) {
+            throw new IllegalStateException("Unsupported Nvidium fragment shader layout at main() terminator.");
+        }
+        return source.substring(0, closingBrace) + statements + "\n" + source.substring(closingBrace);
     }
 
     private static String disableBarycentricPath(String source) {
