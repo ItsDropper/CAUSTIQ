@@ -23,8 +23,12 @@ public final class NvidiumIrisChunkVertex implements ChunkVertexType {
     private static final float MODEL_ORIGIN = 8.0f;
     private static final float MODEL_RANGE = 32.0f;
     private static final GlVertexFormat FORMAT = new GlVertexFormat(null, null, STRIDE);
+    private static volatile boolean enabled;
 
     private NvidiumIrisChunkVertex() { }
+
+    public static void enable() { enabled = true; }
+    public static boolean isEnabled() { return enabled; }
 
     @Override public GlVertexFormat getVertexFormat() { return FORMAT; }
 
