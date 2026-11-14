@@ -38,7 +38,7 @@ public final class IrisGlslConditionalPreprocessor {
             String line = lines[lineNumber];
             Matcher directive = DIRECTIVE.matcher(line);
             if (!directive.matches()) {
-                if (active) output.append(line).append('\\n');
+                if (active) output.append(line).append('\n');
                 continue;
             }
 
@@ -77,17 +77,17 @@ public final class IrisGlslConditionalPreprocessor {
                 case "define" -> {
                     if (active) {
                         define(argument, macros);
-                        output.append(line).append('\\n');
+                        output.append(line).append('\n');
                     }
                 }
                 case "undef" -> {
                     if (active) {
                         macros.remove(firstIdentifier(argument));
-                        output.append(line).append('\\n');
+                        output.append(line).append('\n');
                     }
                 }
                 default -> {
-                    if (active) output.append(line).append('\\n');
+                    if (active) output.append(line).append('\n');
                 }
             }
         }
