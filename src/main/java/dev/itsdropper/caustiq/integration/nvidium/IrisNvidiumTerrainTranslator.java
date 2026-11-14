@@ -188,6 +188,11 @@ public final class IrisNvidiumTerrainTranslator {
         for (Varying varying : varyings) {
             invocation.append("    caustiqIrisVarying_").append(varying.name())
                     .append(" = ").append(varying.type()).append("(0);\n");
+            String initialValue = initialVaryingValue(varying.name());
+            if (initialValue != null) {
+                invocation.append("    caustiqIrisVarying_").append(varying.name())
+                        .append(" = ").append(initialValue).append(";\n");
+            }
         }
         invocation.append("    caustiqIrisVertexMain();\n")
                 .append("    gl_MeshVerticesNV[id].gl_Position = caustiqIrisClipPosition;\n")
@@ -199,6 +204,21 @@ public final class IrisNvidiumTerrainTranslator {
                     .append(varying.name()).append(";\n");
         }
         return invocation.toString();
+    }
+
+    private static String initialVaryingValue(String name) {
+        return switch (name) {
+            case "mc_Entity" -> "caustiqDecodeBlockEntity(V.blockId)";
+            case "at_midBlock" -> "caustiqDecodeMidBlock(V)";
+            case "mc_midTexCoord", "at_midTexCoord" -> "caustiqDecodeMidUv(V)";
+            case "iris_Normal", "Normal" -> "caustiqDecodeNormal(V)";
+            case "at_tangent" -> "caustiqDecodeTangent(V)";
+            case "vaPosition", "Position" -> "decodeVertexPosition(V)";
+            case "vaUV0", "UV0" -> "decodeVertexUV(V)";
+            case "vaUV2", "UV2" -> "decodeLightUV(V)";
+            case "vaColor", "Color" -> "decodeVertexColour(V)";
+            default -> null;
+        };
     }
 
     private String fragmentProgramSource() {
