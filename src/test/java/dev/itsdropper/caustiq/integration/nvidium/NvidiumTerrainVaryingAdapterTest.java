@@ -142,6 +142,7 @@ class NvidiumTerrainVaryingAdapterTest {
     private static Map<String, String> sourceStages() {
         String mesh = """
                 #version 460
+                layout(triangles, max_vertices=64, max_primitives=32) out;
                 layout(location=1) out Interpolants {
                     vec2 uv;
                     vec3 v_colour;
