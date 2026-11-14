@@ -45,9 +45,13 @@ public final class CaustiqClient implements ClientModInitializer {
         NvidiumCompatibility.Status nvidiumStatus = NvidiumCompatibility.inspect(FabricLoader.getInstance()::isModLoaded);
         LOGGER.info("Nvidium distribution dependency check: {}.", nvidiumStatus);
         if (renderer.nvidiumLoaded()) {
-            NvidiumShaderProgramBridge.registerNativeSourceAdapter(NvidiumTerrainVaryingAdapter::adapt);
-            LOGGER.info("Installed Nvidium terrain varying profile {} (UV, raw tint, lightmap UV, world position, geometric face normal). Iris shader-pack translation remains disabled until a pack translator is registered.",
-                    NvidiumTerrainVaryingAdapter.PROFILE_ID);
+            if (NvidiumCompatibility.enableExtendedVertexFormat()) {
+                NvidiumShaderProgramBridge.registerNativeSourceAdapter(NvidiumTerrainVaryingAdapter::adapt);
+                LOGGER.info("Installed Nvidium terrain vertex ABI {} (40-byte packed vertices with block ID, normal/tangent, quad midpoint UV, midpoint block offset, and Nvidium material flags).",
+                        NvidiumTerrainVaryingAdapter.PROFILE_ID);
+            } else {
+                LOGGER.warn("Nvidium's Sodium-compatible extended vertex format could not be enabled. CAUSTIQ will leave Nvidium's native terrain shader and vertex format untouched.");
+            }
         }
         LOGGER.info("Caustiq initialized for Minecraft 1.21.11. Shader-pack directory: {}",
                 shaderPackDirectory.toAbsolutePath());
