@@ -108,6 +108,7 @@ public final class NvidiumIrisUniformBridge {
                 (float) Math.sin(sunAngle), (float) Math.cos(sunAngle), 0.0f);
         scalar(program, "caustiqWorldAge", worldAge);
         scalar(program, "caustiqWorldTime", worldTime);
+        scalar(program, "caustiqDayFactor", 0.5f - 0.5f * (float) Math.cos(worldTime * Math.PI * 2.0));
         scalar(program, "caustiqTimeSunrise", 0.0f);
         scalar(program, "caustiqTimeNoon", 0.0f);
         scalar(program, "caustiqTimeSunset", 0.0f);
