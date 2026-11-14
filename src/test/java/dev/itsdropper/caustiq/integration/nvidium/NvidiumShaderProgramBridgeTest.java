@@ -7,7 +7,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NvidiumShaderProgramBridgeTest {
-    @AfterEach void reset() { NvidiumShaderProgramBridge.unregisterTerrainAdapter(); }
+    @AfterEach void reset() { NvidiumShaderProgramBridge.resetForTests(); }
 
     @Test void capturesTerrainStagesAtCompileBoundary() {
         Map<Object, String> sources = terrainSources();
