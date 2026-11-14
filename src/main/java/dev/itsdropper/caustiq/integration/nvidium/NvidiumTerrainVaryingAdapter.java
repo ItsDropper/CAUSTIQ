@@ -33,6 +33,8 @@ public final class NvidiumTerrainVaryingAdapter {
             "    flat mat3 v_tbn;",
             "    flat uint v_materialFlags;");
     private static final String FRAGMENT_VARYINGS = MESH_VARYINGS;
+    private static final String MESH_UNIFORM_ALIASES =
+            NvidiumIrisTerrainAbi.vertexAliasDeclarations();
     private static final String FRAGMENT_UNIFORM_ALIASES =
             NvidiumIrisTerrainAbi.fragmentAliasDeclarations();
     private static final String FRAGMENT_GBUFFER_OUTPUTS = String.join("\n",
@@ -137,6 +139,7 @@ public final class NvidiumTerrainVaryingAdapter {
             boolean complete = meshMarked && fragmentMarked
                     && mesh.contains(MESH_VARYINGS) && fragment.contains(FRAGMENT_VARYINGS)
                     && mesh.contains(MESH_ASSIGNMENTS) && mesh.contains(NORMAL_HELPER)
+                    && mesh.contains(MESH_UNIFORM_ALIASES)
                     && mesh.contains(VERTEX_FORMAT_EXTENSION)
                     && fragment.contains(VERTEX_FORMAT_EXTENSION)
                     && fragment.contains(FRAGMENT_UNIFORM_ALIASES)
@@ -168,6 +171,8 @@ public final class NvidiumTerrainVaryingAdapter {
                 "return (int(v.nvidiumMaterial) >> 1) & 3;", "fragment Nvidium alpha cutoff source");
         mesh = replaceOnce(mesh, "#version 460", "#version 460\n" + MARKER, "mesh version");
         fragment = replaceOnce(fragment, "#version 460", "#version 460\n" + MARKER, "fragment version");
+        mesh = replaceOnce(mesh, MARKER + "\n", MARKER + "\n" + MESH_UNIFORM_ALIASES,
+                "mesh Iris uniform aliases");
         mesh = replaceOnce(mesh, "    vec2 uv;\n    vec3 v_colour;", MESH_VARYINGS, "mesh interpolant declaration");
         fragment = replaceOnce(fragment, "    vec2 uv;\n    vec3 v_colour;", FRAGMENT_VARYINGS, "fragment interpolant declaration");
         fragment = replaceOnce(fragment, MARKER + "\n",
