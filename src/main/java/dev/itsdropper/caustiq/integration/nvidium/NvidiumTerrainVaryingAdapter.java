@@ -16,6 +16,8 @@ public final class NvidiumTerrainVaryingAdapter {
     private static final String MARKER = "#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 2";
     private static final Pattern BARYCENTRIC_DEFINE = Pattern.compile(
             "(?m)^\\s*#\\s*define\\s+USE_NV_FRAGMENT_SHADER_BARYCENTRIC\\b[^\\r\\n]*");
+    private static final Pattern PRIMARY_FRAGMENT_INTERFACE = Pattern.compile(
+            "layout\\s*\\(\\s*location\\s*=\\s*1\\s*\\)\\s*in\\s+Interpolants\\s*\\{");
     private static final String MESH_VARYINGS = String.join("\n",
             "    vec2 uv;",
             "    vec3 v_colour;",
@@ -139,7 +141,7 @@ public final class NvidiumTerrainVaryingAdapter {
         boolean hasPrimaryMeshAnchors = mesh.contains("void putVertex(uint id, Vertex V) {")
                 && mesh.contains("    OUT[id].uv = decodeVertexUV(V);");
         boolean hasPrimaryFragmentAnchor = fragment.contains("layout(location = 0) out vec4 colour;")
-                && fragment.contains("in Interpolants {"); 
+                && PRIMARY_FRAGMENT_INTERFACE.matcher(fragment).find(); 
         if (!hasPrimaryMeshAnchors || !hasPrimaryFragmentAnchor) {
             throw new IllegalStateException("Nvidium primary terrain shader has a partial or incompatible source layout.");
         }
