@@ -1,5 +1,8 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
+import com.mojang.blaze3d.opengl.GlTexture;
+import com.mojang.blaze3d.pipeline.TextureTarget;
+import com.mojang.blaze3d.textures.GpuTextureView;
 import dev.itsdropper.caustiq.CaustiqClient;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL20C;
@@ -28,6 +31,7 @@ public final class NvidiumGBufferTargets {
     private static final int REQUIRED_DRAW_BUFFERS = ATTACHMENT_COUNT + 1;
 
     private static final int[] TEXTURES = new int[ATTACHMENT_COUNT];
+    private static final TextureTarget[] TARGETS = new TextureTarget[ATTACHMENT_COUNT];
     private static int width;
     private static int height;
     private static FramebufferState activeState;
@@ -58,7 +62,8 @@ public final class NvidiumGBufferTargets {
         }
         if (viewportWidth <= 0 || viewportHeight <= 0) return false;
 
-        ensureTextures(viewportWidth, viewportHeight);
+        ensureTargets(viewportWidth, viewportHeight);
+        GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, framebuffer);
         int[] previousDrawBuffers = new int[drawBufferCount];
         for (int i = 0; i < drawBufferCount; i++) {
             previousDrawBuffers[i] = GL11C.glGetInteger(GL20C.GL_DRAW_BUFFER0 + i);
@@ -106,9 +111,11 @@ public final class NvidiumGBufferTargets {
         FramebufferState state = activeState;
         if (state == null) return;
         activeState = null;
-        if (GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING) != state.framebuffer()) {
-            warnUnavailable("The active draw framebuffer changed before Nvidium's terrain draw completed; "
-                    + "CAUSTIQ left the original framebuffer untouched.");
+        int currentFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
+        if (currentFramebuffer != state.framebuffer()) {
+            GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, state.framebuffer());
+            restore(state);
+            GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, currentFramebuffer);
             return;
         }
         restore(state);
@@ -122,6 +129,15 @@ public final class NvidiumGBufferTargets {
         return TEXTURES[attachment - 1];
     }
 
+    /** Minecraft GPU view for sampling this attachment in a RenderPass. */
+    public static GpuTextureView view(int attachment) {
+        if (attachment < NORMAL || attachment > LIGHTMAP) {
+            throw new IllegalArgumentException("G-buffer attachment must be between 1 and 4.");
+        }
+        TextureTarget target = TARGETS[attachment - 1];
+        return target == null ? null : target.getColorTextureView();
+    }
+
     public static int width() { return width; }
     public static int height() { return height; }
     public static boolean isAttachedForCurrentDraw() { return activeState != null; }
@@ -129,25 +145,30 @@ public final class NvidiumGBufferTargets {
     /** Releases persistent G-buffer textures; call on the render thread. */
     public static void destroy() {
         end();
-        for (int i = 0; i < TEXTURES.length; i++) {
-            if (TEXTURES[i] != 0) GL11C.glDeleteTextures(TEXTURES[i]);
+        for (int i = 0; i < TARGETS.length; i++) {
+            if (TARGETS[i] != null) TARGETS[i].destroyBuffers();
+            TARGETS[i] = null;
             TEXTURES[i] = 0;
         }
         width = 0;
         height = 0;
     }
 
-    private static void ensureTextures(int newWidth, int newHeight) {
+    private static void ensureTargets(int newWidth, int newHeight) {
+        if (TARGETS[0] == null) {
+            for (int i = 0; i < TARGETS.length; i++) {
+                TARGETS[i] = new TextureTarget("Caustiq Nvidium G-buffer " + (i + 1),
+                        newWidth, newHeight, false);
+            }
+        } else if (width != newWidth || height != newHeight) {
+            for (TextureTarget target : TARGETS) target.resize(newWidth, newHeight);
+        }
         int previousActiveTexture = GL11C.glGetInteger(GL13_ACTIVE_TEXTURE);
         int previousTextureBinding = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
         try {
-            if (TEXTURES[0] == 0) {
-                for (int i = 0; i < TEXTURES.length; i++) TEXTURES[i] = GL11C.glGenTextures();
-            }
-            if (width == newWidth && height == newHeight) return;
-
-            for (int texture : TEXTURES) {
-                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
+            for (int i = 0; i < TARGETS.length; i++) {
+                TEXTURES[i] = ((GlTexture) TARGETS[i].getColorTexture()).glId();
+                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, TEXTURES[i]);
                 GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_NEAREST);
                 GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_NEAREST);
                 GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, GL12_CLAMP_TO_EDGE);
