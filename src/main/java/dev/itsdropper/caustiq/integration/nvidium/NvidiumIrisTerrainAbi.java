@@ -93,13 +93,13 @@ public final class NvidiumIrisTerrainAbi {
      * absent and must be rejected by the translator.
      */
     public static String fragmentAliasDeclarations() {
-        return String.join("\\n",
+        return String.join("\n",
                 "// CAUSTIQ mappings to values Nvidium actually binds for this terrain pass.",
                 "#define CAUSTIQ_IRIS_VIEW_WIDTH (screenSize.x * 2.0)",
                 "#define CAUSTIQ_IRIS_VIEW_HEIGHT (screenSize.y * 2.0)",
                 "#define CAUSTIQ_IRIS_FOG_COLOR fogColour",
                 "#define CAUSTIQ_IRIS_GTEXTURE tex_diffuse",
-                "#define CAUSTIQ_IRIS_LIGHTMAP tex_light") + "\\n";
+                "#define CAUSTIQ_IRIS_LIGHTMAP tex_light") + "\n";
     }
 
     public static Map<String, Semantic> vertexSemantics() { return VERTEX_SEMANTICS; }
