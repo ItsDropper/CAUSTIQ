@@ -50,6 +50,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("gbufferProjection", "caustiqProjection"),
             Map.entry("gbufferProjectionInverse", "caustiqProjectionInverse"),
             Map.entry("cameraPosition", "caustiqCameraPosition"),
+            Map.entry("eyePosition", "caustiqCameraPosition"),
             Map.entry("frameTimeCounter", "caustiqFrameTimeCounter"),
             Map.entry("frameCounter", "caustiqFrameCounter"),
             Map.entry("viewSize", "(screenSize * 2.0)"),
@@ -487,6 +488,33 @@ public final class IrisNvidiumTerrainTranslator {
             throw new IllegalArgumentException("Iris terrain stage writes a built-in output not represented by Nvidium's mesh/fragment ABI.");
         }
         return translateLegacyTextureFunctions(working);
+    }
+
+    private static String photonUniformDeclarations() {
+        return """
+                layout(binding = 2) uniform sampler2D caustiqNoiseTexture;
+                layout(binding = 3) uniform sampler2D caustiqNormalTexture;
+                layout(binding = 4) uniform sampler2D caustiqSpecularTexture;
+                uniform float caustiqNear;
+                uniform float caustiqFar;
+                uniform ivec2 caustiqAtlasSize;
+                uniform float caustiqRainStrength;
+                uniform float caustiqWetness;
+                uniform vec2 caustiqTaaOffset;
+                uniform vec3 caustiqLightDirection;
+                uniform float caustiqWorldAge;
+                uniform float caustiqTimeSunrise;
+                uniform float caustiqTimeNoon;
+                uniform float caustiqTimeSunset;
+                uniform float caustiqTimeMidnight;
+                uniform float caustiqBiomeTemperature;
+                uniform float caustiqBiomeHumidity;
+                uniform float caustiqAlphaTestRef;
+                uniform int caustiqBlockEntityId;
+                uniform int caustiqEntityId;
+                uniform int caustiqCurrentRenderedItemId;
+                uniform vec4 caustiqEntityColor;
+                """;
     }
 
     private static String expectedUniformType(String name) {
