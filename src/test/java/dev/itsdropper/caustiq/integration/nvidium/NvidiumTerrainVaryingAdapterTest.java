@@ -166,6 +166,7 @@ class NvidiumTerrainVaryingAdapterTest {
                 """;
         String fragment = """
                 #version 460
+                layout(location = 0) out vec4 colour;
                 layout(location = 1) in Interpolants {
                     vec2 uv;
                     vec3 v_colour;
