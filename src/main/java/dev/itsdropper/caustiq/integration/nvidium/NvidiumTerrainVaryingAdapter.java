@@ -124,7 +124,8 @@ public final class NvidiumTerrainVaryingAdapter {
         String fragment = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("FRAGMENT"), "FRAGMENT source"));
         boolean hasPrimaryMeshAnchors = mesh.contains("void putVertex(uint id, Vertex V) {")
                 && mesh.contains("    OUT[id].uv = decodeVertexUV(V);");
-        boolean hasPrimaryFragmentAnchor = fragment.contains("layout(location = 0) out vec4 colour;");
+        boolean hasPrimaryFragmentAnchor = fragment.contains("layout(location = 0) out vec4 colour;")
+                && fragment.contains("layout(location = 1) in Interpolants");
         if (!hasPrimaryMeshAnchors && !hasPrimaryFragmentAnchor
                 && !mesh.contains(MARKER) && !fragment.contains(MARKER)) {
             return Map.copyOf(sourceStages);
