@@ -75,6 +75,11 @@ assert "flat mat3 v_tbn;" in adapter and "OUT[id].v_tbn = caustiqTriangleTbn;" i
 assert "putVertex(uint id, Vertex V, uint quadId)" in adapter, "Mesh varying writer does not receive quad identity"
 assert "transformMat * vec4(decodeVertexPosition(vertex) + origin, 1.0)" in adapter, "Terrain render position is not transformed"
 assert "flat uint v_materialFlags;" in adapter and "rawVertexAlphaCutoff(V)" in adapter
+assert "layout(location = 4) out vec4 caustiqGBufferLightmap;" in adapter
+assert "caustiqGBufferNormal = vec4(normalize(v_normal)" in adapter
+assert "caustiqGBufferPosition = vec4(v_renderPosition, 1.0)" in adapter
+assert "caustiqGBufferMaterial = vec4(v_vertexColour" in adapter
+assert "caustiqGBufferLightmap = vec4(v_lightmapCoord" in adapter
 abi = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisTerrainAbi.java").read_text(encoding="utf-8")
 assert "CAUSTIQ_IRIS_VIEW_WIDTH (screenSize.x * 2.0)" in abi
 assert "CAUSTIQ_IRIS_VIEW_HEIGHT (screenSize.y * 2.0)" in abi
