@@ -224,7 +224,7 @@ public final class NvidiumGBufferTargets {
             for (int i = 0; i < ATTACHMENT_COUNT; i++) {
                 int index = i + 1;
                 IrisTerrainPassScheduler.RenderTarget spec = targetSpecs.get(index);
-                if (spec != null && !spec.clear() && spec.persistent()) continue;
+                if (spec != null && !spec.clear()) continue;
                 float[] color = parseClearColor(spec == null ? "0.0 0.0 0.0 0.0" : spec.clearColor());
                 FloatBuffer clearValue = stack.mallocFloat(4);
                 clearValue.put(color).flip();
