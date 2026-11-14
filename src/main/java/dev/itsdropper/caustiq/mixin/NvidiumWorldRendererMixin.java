@@ -1,5 +1,6 @@
 package dev.itsdropper.caustiq.mixin;
 
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisChunkVertex;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumRenderBridge;
 import org.spongepowered.asm.mixin.Mixin;
@@ -7,15 +8,28 @@ import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Hooks Nvidium's real renderer entrypoints. Nvidium owns terrain drawing;
- * CAUSTIQ only observes completion so its final pass can run afterward.
+ * Hooks Nvidium's real renderer entrypoints and expands its arena allocation
+ * stride to match the extended Sodium/Iris terrain vertex ABI.
  */
 @Pseudo
-@Mixin(targets = "me.cortex.nvidium.NvidiumWorldRenderer")
+@Mixin(targets = "me.cortex.nvidium.NvidiumWorldRenderer", remap = false)
 public abstract class NvidiumWorldRendererMixin {
+    @ModifyArg(
+            method = "<init>",
+            at = @At(value = "INVOKE",
+                    target = "Lme/cortex/nvidium/managers/SectionManager;<init>(Lme/cortex/nvidium/gl/RenderDevice;JLme/cortex/nvidium/util/UploadingBufferStream;ILme/cortex/nvidium/NvidiumWorldRenderer;)V",
+                    remap = false),
+            index = 3,
+            remap = false,
+            require = 1)
+    private int caustiq$allocateExtendedTerrainStride(int originalStride) {
+        return NvidiumIrisChunkVertex.isEnabled() ? NvidiumIrisChunkVertex.STRIDE : originalStride;
+    }
+
     @Inject(method = "renderFrame", at = @At("HEAD"), remap = false, require = 1)
     private void caustiq$captureIrisTerrainUniforms(
             @Coerce Object pass,
