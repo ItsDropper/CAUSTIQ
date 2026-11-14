@@ -20,6 +20,7 @@ mesh = source("src/main/resources/assets/nvidium/shaders/terrain/mesh.glsl")
 fragment = source("src/main/resources/assets/nvidium/shaders/terrain/frag.frag")
 primary = source("src/main/java/me/cortex/nvidium/renderers/PrimaryTerrainRasterizer.java")
 adapter = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumTerrainVaryingAdapter.java").read_text(encoding="utf-8")
+bridge = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumShaderProgramBridge.java").read_text(encoding="utf-8")
 
 # The mixin shadows this exact private field and injects at this exact method.
 assert "private final Map<ShaderType, String> sources" in shader, "Shader.Builder.sources signature changed"
@@ -40,6 +41,9 @@ iris_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/Nvidium
 assert 'me.cortex.nvidium.sodiumCompat.IrisCheck' in iris_mixin
 assert 'method = "checkIrisShouldDisable"' in iris_mixin
 assert "callbackInfo.setReturnValue(true)" in iris_mixin
+assert "if (NvidiumShaderProgramBridge.hasTerrainAdapter())" in iris_mixin
+assert "nativeSourceAdapter = NvidiumTerrainVaryingAdapter::adapt" in bridge
+assert "hasTerrainAdapter() { return irisTerrainAdapter != null; }" in bridge
 
 # The active Nvidium terrain pipeline is TASK + MESH + FRAGMENT, with mesh
 # outputs consumed by the fragment shader. Keep this check tied to its source.
@@ -63,6 +67,7 @@ assert fragment.count("    vec2 uv;\n    vec3 v_colour;") == 1, "Pinned Nvidium 
 assert "CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS" in adapter
 assert "decodeLightUV(V)" in adapter and "decodeVertexColour(V).rgb" in adapter
 assert "cross(pb - pa, pc - pa)" in adapter, "Geometric face-normal reconstruction is missing"
+assert "transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)" in adapter, "Terrain position is not transformed into world space"
 assert "NvidiumTerrainVaryingAdapter.class" in (caustiq_root / ".github/workflows/build.yml").read_text(encoding="utf-8")
 
 print("Nvidium source contract verified: compile hook, Iris gate, terrain stage set, and unique varying-adapter anchors.")
