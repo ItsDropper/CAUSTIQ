@@ -22,6 +22,7 @@ public final class ShaderRuntime {
     public static void onWorldRender() {
         if (discoveryFinished) return;
         if (!discoveryStarted) {
+            if (SCAN_RESULT.get() == null) return;
             discoveryStarted = true;
             beginDiscovery();
             return;
