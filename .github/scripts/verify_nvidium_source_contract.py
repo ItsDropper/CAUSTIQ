@@ -110,7 +110,6 @@ assert "int formatSize = Nvidium.config.use_sodium_vertex_format" in nvidium_rep
 assert "copyQuad" in nvidium_repackager
 assert "CompactChunkVertex.STRIDE * 4" in nvidium_repackager
 assert "NvidiumCompactChunkVertex.STRIDE * 4" in nvidium_repackager
-assert "@Constant(intValue = 80)" in stride_mixin, "copyQuad inlines the 20-byte Sodium vertex stride as an 80-byte quad copy"
 vertex_encoder = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
 assert "STRIDE = 40" in vertex_encoder
 assert "ColorABGR.pack(red, green, blue, alpha)" in vertex_encoder
@@ -121,6 +120,7 @@ format_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/Nvidi
 stride_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumRepackagedStrideMixin.java").read_text(encoding="utf-8")
 assert "NvidiumIrisChunkVertex.INSTANCE" in format_mixin
 assert "NvidiumIrisChunkVertex.STRIDE" in stride_mixin
+assert "@Constant(intValue = 80)" in stride_mixin, "copyQuad inlines the 20-byte Sodium vertex stride as an 80-byte quad copy"
 for mixin in ("NvidiumExtendedVertexFormatMixin", "NvidiumRepackagedStrideMixin",
               "NvidiumBlockRendererVertexContextMixin", "NvidiumFluidRendererVertexContextMixin"):
     assert mixin in mixins_json["client"]
