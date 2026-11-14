@@ -15,40 +15,33 @@ import java.util.Objects;
 public final class NvidiumTerrainVaryingAdapter {
     public static final String PROFILE_ID = "caustiq-terrain-varyings-v1";
     private static final String MARKER = "#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 1";
-    private static final String MESH_VARYINGS = """
-        vec2 uv;
-        vec3 v_colour;
-        vec3 v_vertexColour;
-        vec2 v_lightmapCoord;
-        vec3 v_worldPosition;
-        vec3 v_normal;""";
-    private static final String FRAGMENT_VARYINGS = """
-        vec2 uv;
-        vec3 v_colour;
-        vec3 v_vertexColour;
-        vec2 v_lightmapCoord;
-        vec3 v_worldPosition;
-        vec3 v_normal;""";
-    private static final String MESH_ASSIGNMENTS = """
-        OUT[id].uv = decodeVertexUV(V);
-        OUT[id].v_colour = computeMultiplier(V);
-        OUT[id].v_vertexColour = decodeVertexColour(V).rgb;
-        OUT[id].v_lightmapCoord = decodeLightUV(V);
-        OUT[id].v_worldPosition = decodeVertexPosition(V) + origin;
-        OUT[id].v_normal = caustiqTriangleNormal;""";
-    private static final String NORMAL_HELPER = """
-            vec3 caustiqTriangleNormal;
-            
-            vec3 caustiqComputeTriangleNormal(uint quadId, bool triangle1) {
-                Vertex a = terrainData[(quadId << 2) + (triangle1 ? 2u : 0u)];
-                Vertex b = terrainData[(quadId << 2) + (triangle1 ? 3u : 1u)];
-                Vertex c = terrainData[(quadId << 2) + (triangle1 ? 0u : 2u)];
-                vec3 pa = decodeVertexPosition(a);
-                vec3 pb = decodeVertexPosition(b);
-                vec3 pc = decodeVertexPosition(c);
-                return normalize(cross(pb - pa, pc - pa));
-            }
-            """;
+    private static final String MESH_VARYINGS = String.join("\n",
+            "    vec2 uv;",
+            "    vec3 v_colour;",
+            "    vec3 v_vertexColour;",
+            "    vec2 v_lightmapCoord;",
+            "    vec3 v_worldPosition;",
+            "    vec3 v_normal;");
+    private static final String FRAGMENT_VARYINGS = MESH_VARYINGS;
+    private static final String MESH_ASSIGNMENTS = String.join("\n",
+            "    OUT[id].uv = decodeVertexUV(V);",
+            "    OUT[id].v_colour = computeMultiplier(V);",
+            "    OUT[id].v_vertexColour = decodeVertexColour(V).rgb;",
+            "    OUT[id].v_lightmapCoord = decodeLightUV(V);",
+            "    OUT[id].v_worldPosition = decodeVertexPosition(V) + origin;",
+            "    OUT[id].v_normal = caustiqTriangleNormal;");
+    private static final String NORMAL_HELPER = String.join("\n",
+            "vec3 caustiqTriangleNormal;",
+            "",
+            "vec3 caustiqComputeTriangleNormal(uint quadId, bool triangle1) {",
+            "    Vertex a = terrainData[(quadId << 2) + (triangle1 ? 2u : 0u)];",
+            "    Vertex b = terrainData[(quadId << 2) + (triangle1 ? 3u : 1u)];",
+            "    Vertex c = terrainData[(quadId << 2) + (triangle1 ? 0u : 2u)];",
+            "    vec3 pa = decodeVertexPosition(a);",
+            "    vec3 pb = decodeVertexPosition(b);",
+            "    vec3 pc = decodeVertexPosition(c);",
+            "    return normalize(cross(pb - pa, pc - pa));",
+            "}") + "\n";
 
     private NvidiumTerrainVaryingAdapter() { }
 
