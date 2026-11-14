@@ -24,7 +24,8 @@ class IrisNvidiumTerrainTranslatorTest {
                 void main() {
                     gl_Position = gbufferProjection * gbufferModelView * gl_Vertex;
                     gl_TexCoord[0] = gl_MultiTexCoord0;
-                    texCoord = gl_MultiTexCoord0.xy + at_midBlock.xy + iris_Normal.xy;
+                    vec2 rawLight = gl_MultiTexCoord1.xy;
+                    texCoord = gl_MultiTexCoord0.xy + at_midBlock.xy + iris_Normal.xy + rawLight * 0.0;
                 }
                 """, """
                 #version 150
@@ -44,6 +45,7 @@ class IrisNvidiumTerrainTranslatorTest {
         assertTrue(mesh.contains("void caustiqIrisVertexMain()"));
         assertTrue(mesh.contains("caustiqDecodeMidBlock(caustiqCurrentVertex)"));
         assertTrue(mesh.contains("caustiqDecodeNormal(caustiqCurrentVertex)"));
+        assertTrue(mesh.contains("vec4(decodeLightUV(caustiqCurrentVertex) * 256.0, 0.0, 1.0)"));
         assertTrue(mesh.contains("caustiqProjection * caustiqModelView"));
         assertTrue(mesh.contains("gl_MeshVerticesNV[id].gl_Position = caustiqIrisClipPosition;"));
         assertTrue(mesh.contains("OUT[id].texCoord = caustiqIrisVarying_texCoord;"));
