@@ -6,17 +6,22 @@ Caustiq is an independent, client-side Minecraft shader engine. Its primary goal
 
 **Early development — pack discovery, source preprocessing, program discovery, Minecraft GPU pipeline compilation, an executable single-input final fragment pass, pack option metadata parsing, and video-settings integration are implemented.** This is not yet broad shader-pack compatibility.
 
-## First in-game shader smoke test
+## Bundled shader-pack example
 
-A known-purpose test pack is included at examples/caustiq-smoke-test.
+The build now produces a real, installable example shader ZIP: **CAUSTIQ Stillwater**.
 
-1. Build Caustiq and install its development JAR in a Minecraft 1.21.11 Fabric instance.
-2. Copy the caustiq-smoke-test folder into that instance's shaderpacks directory.
-3. Open Options → Video Settings → Caustiq Shaders.
-4. Select caustiq-smoke-test and ensure Caustiq is enabled.
-5. Enter a world. The final pass should visibly rotate the scene's color channels.
+- Gradle task: `packageStillwater` (also included in `build`).
+- Local output: `build/distributions/caustiq-stillwater-<version>.zip`.
+- GitHub Actions uploads it separately from the mod JAR as `caustiq-stillwater-<commit-sha>`.
+- CI validates both GLSL stages with `glslangValidator` and checks the ZIP root layout.
 
-The effect is intentionally unmistakable. If the world colors do not change, collect the Caustiq log lines around shader discovery, compilation, and final-pass execution. This smoke test validates only the current final color pass, not compatibility with arbitrary shader packs.
+Stillwater is a deliberately restrained cinematic grade: compact highlight bloom, a soft filmic shoulder, subtle cool shadows/warm highlights, mild contrast, restrained vignette and low-level dithering. It is authored for Caustiq's current final-colour pass, not presented as a full Iris/OptiFine shader pack.
+
+To install, copy the generated ZIP directly into `.minecraft/shaderpacks/`, launch Minecraft with Caustiq, then select **caustiq-stillwater** in Options → Video Settings → Caustiq Shaders.
+
+## First in-game pipeline smoke test
+
+A deliberately obvious channel-rotation test pack remains included at `examples/caustiq-smoke-test`. It is useful for diagnosing whether the final pass executes, while Stillwater is the visual example. The smoke test validates only the current final color pass, not compatibility with arbitrary shader packs.
 
 ## Video settings integration
 
@@ -68,11 +73,11 @@ The pack's own final vertex stage is catalogued but not yet executed. The first 
 
 Use JDK 25 to run Gradle.
 
-Windows: gradlew.bat build
+Windows: `gradlew.bat build`
 
-Linux/macOS: ./gradlew build
+Linux/macOS: `./gradlew build`
 
-The build runs scanner, preprocessing, metadata, program-catalog, diagnostic, and bundled smoke-pack discovery tests. The distributable JAR is written to build/libs/.
+The build runs scanner, preprocessing, metadata, program-catalog, diagnostic, and bundled smoke-pack discovery tests, and generates both the distributable mod JAR and the Stillwater shader ZIP.
 
 ## Next stages
 
