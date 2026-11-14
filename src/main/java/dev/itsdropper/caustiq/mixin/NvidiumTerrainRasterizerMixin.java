@@ -20,14 +20,6 @@ public abstract class NvidiumTerrainRasterizerMixin {
     }
 
     @Inject(method = "raster",
-            at = @At(value = "INVOKE", target = "Lme/cortex/nvidium/gl/shader/Shader;bind()V",
-                    shift = org.spongepowered.asm.mixin.injection.At.Shift.AFTER),
-            remap = false, require = 1)
-    private void caustiq$uploadIrisTerrainUniforms(CallbackInfo callbackInfo) {
-        NvidiumIrisUniformBridge.upload(this);
-    }
-
-    @Inject(method = "raster",
             at = @At(value = "INVOKE",
                     target = "Lme/cortex/nvidium/gl/shader/Shader;bind()V",
                     shift = At.Shift.AFTER),
