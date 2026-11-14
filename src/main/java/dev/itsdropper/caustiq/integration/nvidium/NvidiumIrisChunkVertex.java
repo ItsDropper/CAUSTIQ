@@ -1,6 +1,7 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
-import net.caffeinemc.mods.sodium.api.util.ColorARGB;
+import net.caffeinemc.mods.sodium.api.util.ColorABGR;
+import net.caffeinemc.mods.sodium.api.util.ColorU8;
 import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexFormat;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
@@ -69,7 +70,7 @@ public final class NvidiumIrisChunkVertex implements ChunkVertexType {
 
                 MemoryUtil.memPutInt(ptr, packPositionHi(x, y, z));
                 MemoryUtil.memPutInt(ptr + 4L, packPositionLo(x, y, z));
-                MemoryUtil.memPutInt(ptr + 8L, ColorARGB.mulRGB(vertex.color, vertex.ao));
+                MemoryUtil.memPutInt(ptr + 8L, encodeColor(vertex.color, vertex.ao));
                 MemoryUtil.memPutInt(ptr + 12L, (u & 0xFFFF) | ((v & 0xFFFF) << 16));
                 MemoryUtil.memPutInt(ptr + 16L, (light & 0xFFFF)
                         | ((basis.tangentHandedness > 0.0f ? 1 : 0) << 16)
@@ -96,6 +97,16 @@ public final class NvidiumIrisChunkVertex implements ChunkVertexType {
 
     private static int packPositionLo(int x, int y, int z) {
         return (x & 0x3FF) | ((y & 0x3FF) << 10) | ((z & 0x3FF) << 20);
+    }
+
+    private static int encodeColor(int color, float brightness) {
+        int red = ColorU8.normalizedFloatToByte(
+                ColorU8.byteToNormalizedFloat(ColorABGR.unpackRed(color)) * brightness);
+        int green = ColorU8.normalizedFloatToByte(
+                ColorU8.byteToNormalizedFloat(ColorABGR.unpackGreen(color)) * brightness);
+        int blue = ColorU8.normalizedFloatToByte(
+                ColorU8.byteToNormalizedFloat(ColorABGR.unpackBlue(color)) * brightness);
+        return ColorABGR.pack(red, green, blue, 0);
     }
 
     private static int compactLight(int light) {
