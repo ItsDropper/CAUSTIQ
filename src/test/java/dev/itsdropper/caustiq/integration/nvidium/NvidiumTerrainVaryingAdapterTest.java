@@ -23,16 +23,20 @@ class NvidiumTerrainVaryingAdapterTest {
         for (String varying : new String[]{
                 "vec2 uv;", "vec3 v_colour;", "vec3 v_vertexColour;",
                 "vec2 v_lightmapCoord;", "vec3 v_renderPosition;", "vec2 v_quadMidUv;",
-                "vec3 v_quadMidPosition;", "vec3 v_normal;", "vec4 v_tangent;",
-                "flat mat3 v_tbn;", "flat uint v_materialFlags;"
+                "vec3 v_quadMidPosition;", "vec3 v_midBlock;", "vec3 v_blockEntity;",
+                "vec3 v_normal;", "vec4 v_tangent;", "flat mat3 v_tbn;", "flat uint v_materialFlags;"
         }) {
             assertTrue(mesh.contains(varying), "Mesh output missing " + varying);
             assertTrue(fragment.contains(varying), "Fragment input missing " + varying);
         }
         assertTrue(mesh.contains("decodeVertexColour(V).rgb"));
         assertTrue(mesh.contains("decodeLightUV(V)"));
-        assertTrue(mesh.contains("rawVertexAlphaCutoff(V) << 1u"));
-        assertTrue(mesh.contains("hasMipping(V) ? 1u : 0u"));
+        assertTrue(mesh.contains("OUT[id].v_materialFlags = V.nvidiumMaterial;"));
+        assertTrue(mesh.contains("uint nvidiumMaterial;"));
+        assertTrue(mesh.contains("caustiqDecodeBlockEntity(V.blockId)"));
+        assertTrue(mesh.contains("caustiqDecodeMidUv(V)"));
+        assertTrue(mesh.contains("caustiqDecodeMidBlock(V)"));
+        assertTrue(mesh.contains("caustiqDecodeTangent(V)"));
         assertTrue(fragment.contains("#define CAUSTIQ_IRIS_VIEW_WIDTH (screenSize.x * 2.0)"));
         assertTrue(fragment.contains("#define CAUSTIQ_IRIS_VIEW_HEIGHT (screenSize.y * 2.0)"));
         assertTrue(fragment.contains("#define CAUSTIQ_IRIS_GTEXTURE tex_diffuse"));
@@ -49,15 +53,11 @@ class NvidiumTerrainVaryingAdapterTest {
             assertTrue(fragment.contains(output), "Fragment G-buffer ABI missing " + output);
         }
         assertTrue(mesh.contains("transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)"));
-        assertTrue(mesh.contains("cross(edge1, edge2)"));
-        assertTrue(mesh.contains("caustiqQuadMidUv(uint quadId)"));
-        assertTrue(mesh.contains("caustiqQuadMidPosition(uint quadId)"));
-        assertTrue(mesh.contains("caustiqComputeTriangleBasis(uint quadId, bool triangle1)"));
-        assertTrue(mesh.contains("caustiqTriangleTbn = mat3(tangent, bitangent, caustiqTriangleNormal)"));
-        assertTrue(mesh.contains("putVertex(uint id, Vertex V, uint quadId)"));
-        assertTrue(mesh.contains("putVertex(qId+uint(triangle1), Vc, quadId)"));
-        assertTrue(mesh.contains("putVertex(uId, V, quadId)"));
-        assertTrue(mesh.contains("caustiqComputeTriangleBasis(quadId, triangle1)"));
+        assertTrue(mesh.contains("vec3 caustiqDecodeNormal(Vertex vertex)"));
+        assertTrue(mesh.contains("vec4 caustiqDecodeTangent(Vertex vertex)"));
+        assertTrue(mesh.contains("vec2 caustiqDecodeMidUv(Vertex vertex)"));
+        assertTrue(mesh.contains("vec3 caustiqDecodeMidBlock(Vertex vertex)"));
+        assertTrue(mesh.contains("OUT[id].v_tbn = caustiqDecodeTbn(V);"));
         assertEquals("task source", adapted.get("TASK"));
     }
 
@@ -94,10 +94,12 @@ class NvidiumTerrainVaryingAdapterTest {
                 "FRAGMENT", Files.readString(shaderRoot.resolve("frag.frag")));
 
         Map<String, String> adapted = NvidiumTerrainVaryingAdapter.adapt(sources);
-        assertTrue(adapted.get("MESH").contains("caustiqComputeTriangleBasis(quadId, triangle1)"));
+        assertTrue(adapted.get("MESH").contains("caustiqDecodeTangent(V)"));
+        assertTrue(adapted.get("MESH").contains("uint nvidiumMaterial;"));
+        assertTrue(adapted.get("MESH").contains("OUT[id].v_midBlock = caustiqDecodeMidBlock(V);"));
         assertTrue(adapted.get("MESH").contains("OUT[id].v_lightmapCoord = decodeLightUV(V);"));
-        assertTrue(adapted.get("MESH").contains("OUT[id].v_quadMidUv = caustiqQuadMidUv(quadId);"));
-        assertTrue(adapted.get("MESH").contains("OUT[id].v_tbn = caustiqTriangleTbn;"));
+        assertTrue(adapted.get("MESH").contains("OUT[id].v_quadMidUv = caustiqDecodeMidUv(V);"));
+        assertTrue(adapted.get("MESH").contains("OUT[id].v_tbn = caustiqDecodeTbn(V);"));
         assertTrue(adapted.get("FRAGMENT").contains("vec3 v_renderPosition;"));
         assertTrue(adapted.get("FRAGMENT").contains("flat mat3 v_tbn;"));
         assertTrue(adapted.get("FRAGMENT").contains("layout(location = 4) out vec4 caustiqGBufferLightmap;"));
@@ -143,6 +145,10 @@ class NvidiumTerrainVaryingAdapterTest {
         String mesh = """
                 #version 460
                 layout(triangles, max_vertices=64, max_primitives=32) out;
+                struct Vertex {
+                    uint hi; uint lo; uint color; uint16_t u; uint16_t v;
+                    uint8_t blockLight; uint8_t skyLight; uint8_t material; uint8_t section;
+                };
                 layout(location=1) out Interpolants {
                     vec2 uv;
                     vec3 v_colour;
@@ -167,6 +173,10 @@ class NvidiumTerrainVaryingAdapterTest {
                 """;
         String fragment = """
                 #version 460
+                struct Vertex {
+                    uint hi; uint lo; uint color; uint16_t u; uint16_t v;
+                    uint8_t blockLight; uint8_t skyLight; uint8_t material; uint8_t section;
+                };
                 layout(location = 0) out vec4 colour;
                 layout(location = 1) in Interpolants {
                     vec2 uv;
