@@ -55,21 +55,17 @@ public final class IrisTerrainCompatibilityAnalyzer {
             "(?m)^\\s*#\\s*(?:if|ifdef|ifndef|elif)\\b");
 
     private static final Set<String> UNAVAILABLE_VERTEX_INPUTS = Set.of(
-            "mc_Entity", "mc_midTexCoord", "mc_midBlock", "at_midTexCoord", "at_midBlock",
-            "at_tangent", "gl_Normal", "vaNormal", "gl_MultiTexCoord2", "gl_MultiTexCoord3",
+            "mc_midBlock", "vaNormal", "gl_MultiTexCoord2", "gl_MultiTexCoord3",
             "gl_MultiTexCoord4", "gl_MultiTexCoord5", "gl_MultiTexCoord6", "gl_MultiTexCoord7",
             "gl_SecondaryColor", "gl_FogCoord", "gl_ClipVertex", "gl_PointSize");
     private static final Set<String> UNAVAILABLE_TRANSFORMS = Set.of(
-            "gl_ModelViewMatrix", "gl_ModelViewMatrixInverse", "gl_ModelViewMatrixTranspose",
-            "gl_ModelViewMatrixInverseTranspose", "gl_NormalMatrix",
-            "gl_ProjectionMatrix", "gl_ProjectionMatrixInverse",
-            "gl_ProjectionMatrixTranspose", "gl_ProjectionMatrixInverseTranspose",
-            "gl_ModelViewProjectionMatrix", "gl_TextureMatrix", "gbufferModelView",
-            "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
             "gbufferPreviousModelView", "gbufferPreviousModelViewInverse",
             "gbufferPreviousProjection", "gbufferPreviousProjectionInverse",
             "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse",
-            "cameraPosition", "previousCameraPosition");
+            "previousCameraPosition");
+    private static final Set<String> AVAILABLE_VERTEX_UNIFORMS = Set.of(
+            "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection",
+            "gbufferProjectionInverse", "cameraPosition", "frameTimeCounter", "frameCounter");
     private static final Set<String> AVAILABLE_SAMPLERS = Set.of(
             "gtexture", "lightmap", "tex_diffuse", "tex_light");
 
@@ -199,6 +195,7 @@ public final class IrisTerrainCompatibilityAnalyzer {
                 continue;
             }
             if (UNAVAILABLE_TRANSFORMS.contains(name)
+                    || (stage.equals("vertex") && AVAILABLE_VERTEX_UNIFORMS.contains(name))
                     || (stage.equals("fragment") && NvidiumIrisTerrainAbi.fragmentSemantic(name).isPresent())) {
                 continue;
             }
