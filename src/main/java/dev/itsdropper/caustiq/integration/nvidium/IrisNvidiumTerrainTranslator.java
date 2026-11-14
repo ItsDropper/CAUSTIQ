@@ -461,7 +461,7 @@ public final class IrisNvidiumTerrainTranslator {
         translated = replaceIdentifier(translated, "gl_MultiTexCoord0",
                 "vec4(decodeVertexUV(caustiqCurrentVertex), 0.0, 1.0)");
         translated = replaceIdentifier(translated, "gl_MultiTexCoord1",
-                "vec4(decodeLightUV(caustiqCurrentVertex), 0.0, 1.0)");
+                "vec4(decodeLightUV(caustiqCurrentVertex) * 256.0, 0.0, 1.0)");
         translated = replaceIdentifier(translated, "gl_Color", "decodeVertexColour(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "gl_Normal", "caustiqDecodeNormal(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "gl_Position", "caustiqIrisClipPosition");
@@ -474,11 +474,11 @@ public final class IrisNvidiumTerrainTranslator {
         translated = replaceIdentifier(translated, "at_tangent", "caustiqDecodeTangent(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "vaPosition", "decodeVertexPosition(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "vaUV0", "decodeVertexUV(caustiqCurrentVertex)");
-        translated = replaceIdentifier(translated, "vaUV2", "decodeLightUV(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "vaUV2", "decodeLightUV(caustiqCurrentVertex) * 256.0");
         translated = replaceIdentifier(translated, "vaColor", "decodeVertexColour(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "Position", "decodeVertexPosition(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "UV0", "decodeVertexUV(caustiqCurrentVertex)");
-        translated = replaceIdentifier(translated, "UV2", "decodeLightUV(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "UV2", "decodeLightUV(caustiqCurrentVertex) * 256.0");
         translated = replaceIdentifier(translated, "Color", "decodeVertexColour(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "Normal", "caustiqDecodeNormal(caustiqCurrentVertex)");
         translated = translated.replaceAll("\\bftransform\\s*\\(\\s*\\)",
