@@ -4,7 +4,9 @@ Caustiq is an independent, client-side Minecraft shader engine. Its primary goal
 
 ## Project status
 
-**Early development — shader-pack discovery is implemented.** Caustiq now scans the standard `.minecraft/shaderpacks` directory for directory packs and ZIP archives, validates their layout, and reports recognized pipeline entry points. It does not compile or render shaders yet.
+**Early development — discovery, source preprocessing, program discovery, and OpenGL compilation are implemented.** Caustiq scans directory and ZIP packs, safely reads shader sources, expands includes, discovers conventional vertex/fragment pairs, and compiles/links those pairs on the Minecraft render thread.
+
+This milestone establishes the first real GPU-facing shader stage. It does **not** yet draw the linked programs, replace Minecraft's world-render pipeline, or claim general Iris/OptiFine pack compatibility.
 
 ## Development target
 
@@ -17,22 +19,38 @@ Caustiq is an independent, client-side Minecraft shader engine. Its primary goal
 - Gradle Kotlin DSL
 - No third-party runtime mod dependencies
 
-The current Loom release requires JDK 25 to run Gradle. The mod itself is compiled with `--release 21`. Fabric Loader is the only required mod-platform dependency. Sodium and Mod Menu integrations are intended to remain optional. JUnit is used only by the test source set and is not included in the mod JAR.
+The current Loom release requires JDK 25 to run Gradle. The mod itself is compiled with `--release 21`. Fabric Loader is the only required mod-platform dependency. Sodium and Mod Menu integrations are intended to remain optional. JUnit is used only by the test source set and is not included in the mod JAR. LWJGL is supplied by Minecraft and is not bundled separately.
 
-## Shader-pack discovery
-
-The scanner:
+## Shader-pack discovery and source access
 
 - Discovers directory packs and `.zip` archives.
-- Accepts a `shaders/` directory at the pack root or one wrapper directory below it, and preserves that internal root in each descriptor.
-- Identifies common OptiFine-style pipeline entry points such as `gbuffers_*`, `composite*`, `deferred*`, `shadow*`, and `final`.
-- Inspects ZIP central-directory metadata without extracting or decompressing entries.
-- Rejects absolute paths, traversal segments, backslash paths, duplicate/case-colliding entries, ambiguous shader roots, and malformed archives.
-- Applies candidate, entry-count, nesting-depth, compressed-size, per-entry-size, total-size, and compression-ratio limits.
-- Skips symbolic links and hidden top-level entries.
-- Produces immutable descriptors and per-candidate diagnostics.
+- Accepts `shaders/` at the pack root or one wrapper directory below it.
+- Identifies common OptiFine-style pipeline entry points.
+- Inspects ZIP central-directory metadata without extracting entries.
+- Rejects traversal, absolute paths, duplicate/case-colliding entries, ambiguous roots, malformed archives, and suspicious archive metadata.
+- Reads bounded UTF-8 shader sources from directories and ZIP archives.
+- Lists shader-relative source paths with entry-count and path-safety limits.
+- Expands nested quoted/angle-bracket includes and emits source IDs for diagnostics.
 
-This is structural recognition, not a claim that all Iris extensions or shader-pack features are supported. Actual compatibility requires later preprocessing, compilation, and rendering stages.
+## GLSL program compilation
+
+- Discovers matching `.vsh` and `.fsh` stages by their relative program name.
+- Does not guess how to pair unmatched stages; they are reported as ignored.
+- Preprocesses each stage independently before compilation.
+- Compiles and links through Minecraft's existing LWJGL/OpenGL runtime.
+- Includes the original source path and driver compiler/linker log in failures.
+- Compiles at most one program per rendered world frame to avoid compiling an entire pack in one frame.
+- Releases linked GPU programs when the game renderer shuts down.
+
+Automatic compilation is enabled only when exactly one structurally valid shader pack is present. With multiple packs, Caustiq reports that selection is required and does not silently choose one. Pack-selection UI/configuration is a later milestone.
+
+## Current limitations
+
+- Linked programs are not yet executed or connected to a post-processing/frame-graph pass.
+- This is not a complete GLSL C preprocessor; macro expansion and extension-specific transformations remain compiler/compatibility-layer work.
+- Shader-pack options, uniforms, texture targets, shadow maps, deferred buffers, and world render stages are not implemented.
+- Many existing packs require Iris/OptiFine-specific uniforms, macros, and pipeline semantics and will not compile unchanged.
+- Nvidium coexistence has not yet been validated in-game.
 
 ## Build and test
 
@@ -50,12 +68,11 @@ On Linux/macOS:
 ./gradlew build
 ```
 
-The build runs the shader-pack scanner and GLSL preprocessing tests. The distributable JAR is written to `build/libs/`.
+The build runs the shader-pack scanner, GLSL preprocessor, and program-catalog tests. The distributable JAR is written to `build/libs/`.
 
 ## Next engineering stages
 
-1. Parse shader-pack metadata and user options.
-2. Implement GLSL parsing/validation and compiler diagnostic mapping.
-3. Establish a renderer abstraction independent of Sodium.
-4. Add optional Sodium and Mod Menu integrations.
-5. Develop and test Nvidium coexistence.
+1. Add pack selection and configuration UI.
+2. Implement a safe render-target/frame-graph backend and execute a real post-processing pass.
+3. Add shader-pack uniforms, texture targets, options, and common OptiFine/Iris compatibility semantics.
+4. Add optional Sodium integration and validate Nvidium coexistence.
