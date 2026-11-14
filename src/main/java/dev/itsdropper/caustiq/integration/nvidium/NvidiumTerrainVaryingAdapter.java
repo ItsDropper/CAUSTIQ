@@ -125,6 +125,12 @@ public final class NvidiumTerrainVaryingAdapter {
     private NvidiumTerrainVaryingAdapter() { }
 
     /** Adapts the pinned Nvidium terrain shader ABI; unknown layouts fail closed. */
+    public static boolean isPrimary(Map<String, String> sourceStages) {
+        String mesh = sourceStages.get("MESH");
+        return mesh != null
+                && mesh.contains("layout(triangles, max_vertices=64, max_primitives=32) out;");
+    }
+
     public static Map<String, String> adapt(Map<String, String> sourceStages) {
         Objects.requireNonNull(sourceStages, "sourceStages");
         if (!sourceStages.keySet().equals(Set.of("TASK", "MESH", "FRAGMENT"))) {
