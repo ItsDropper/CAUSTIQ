@@ -90,10 +90,11 @@ class NvidiumTerrainVaryingAdapterTest {
         Path shaderRoot = Path.of(sourceDirectory, "src/main/resources/assets/nvidium/shaders/terrain");
         String scene = Files.readString(shaderRoot.getParent().resolve("occlusion/scene.glsl"));
         String vertexFormat = Files.readString(shaderRoot.resolve("vertex_format/vertex_format.glsl"));
+        String sodiumFormat = Files.readString(shaderRoot.resolve("vertex_format/sodium_vertex_format.glsl"));
         Map<String, String> sources = Map.of(
                 "TASK", Files.readString(shaderRoot.resolve("task.glsl")),
-                "MESH", scene + "\\n" + vertexFormat + "\\n" + Files.readString(shaderRoot.resolve("mesh.glsl")),
-                "FRAGMENT", scene + "\\n" + vertexFormat + "\\n" + Files.readString(shaderRoot.resolve("frag.frag")));
+                "MESH", scene + "\\n" + sodiumFormat + "\\n" + vertexFormat + "\\n" + Files.readString(shaderRoot.resolve("mesh.glsl")),
+                "FRAGMENT", scene + "\\n" + sodiumFormat + "\\n" + vertexFormat + "\\n" + Files.readString(shaderRoot.resolve("frag.frag")));
 
         Map<String, String> adapted = NvidiumTerrainVaryingAdapter.adapt(sources);
         assertTrue(adapted.get("MESH").contains("caustiqDecodeTangent(V)"));
