@@ -134,17 +134,47 @@ public final class ShaderRuntime {
         }
         try {
             sources = ShaderPackSources.open(selected);
-            ShaderPackProgramCatalog.Result catalog = new ShaderPackProgramCatalog().discover(sources);
-            if (!catalog.invalidPrograms().isEmpty()) {
+            IrisShaderPackModel packModel = new IrisShaderPackParser().parse(sources);
+            List<ShaderPackProgramCatalog.Program> discoveredPrograms = new ArrayList<>();
+            List<String> invalidPrograms = new ArrayList<>();
+            for (IrisShaderPackModel.Program program : packModel.base().programs().values()) {
+                ShaderPackProgramCatalog.Group group = classifyProgram(program.name());
+                ShaderPackProgramCatalog.Program catalogProgram = new ShaderPackProgramCatalog.Program(
+                        program.name(), group, 0, program.stages());
+                if (!catalogProgram.isExecutableShape()) invalidPrograms.add(program.name());
+                discoveredPrograms.add(catalogProgram);
+            }
+            ShaderPackProgramCatalog.Result catalog = new ShaderPackProgramCatalog.Result(
+                    discoveredPrograms, List.of(), invalidPrograms);
+
+            if (!packModel.dimensionOverrides().isEmpty()) {
+                CaustiqClient.LOGGER.warn(
+                        "Shader pack '{}' defines {} independent Iris dimension program set(s) ({}). CAUSTIQ will not collapse these into the overworld program set.",
+                        selected.displayName(), packModel.dimensionOverrides().size(),
+                        String.join(", ", packModel.dimensionOverrides().keySet()));
+                pending = List.of();
+                discoveryFinished = true;
+                closeSources();
+                return;
+            }
+            if (!packModel.requiredFeatures().isEmpty()) {
+                CaustiqClient.LOGGER.warn(
+                        "Shader pack '{}' requires Iris feature flag(s) {}. CAUSTIQ's Nvidium translation pipeline does not currently implement Iris feature negotiation; refusing partial activation.",
+                        selected.displayName(), packModel.requiredFeatures());
+                pending = List.of();
+                discoveryFinished = true;
+                closeSources();
+                return;
+            }
+            if (!invalidPrograms.isEmpty()) {
                 CaustiqClient.LOGGER.warn("Shader pack '{}' contains program(s) without a vertex+fragment pair or compute stage: {}",
-                        selected.displayName(), catalog.invalidPrograms());
+                        selected.displayName(), invalidPrograms);
             }
             if (!catalog.isFinalOnly()) {
                 CaustiqClient.LOGGER.warn(
-                        "Shader pack '{}' requires the multi-pass world renderer. CAUSTIQ currently supports only a standalone final pass; skipping activation rather than rendering an incorrect partial pipeline. Detected {} program(s), including {} non-final program(s), {} unsupported stage file(s).",
+                        "Shader pack '{}' requires the multi-pass world renderer. CAUSTIQ currently supports only a standalone final pass; skipping activation rather than rendering an incorrect partial pipeline. Detected {} base program(s), {} dimension override(s), {} parser diagnostic(s).",
                         selected.displayName(), catalog.programs().size(),
-                        catalog.programs().stream().filter(program -> program.group() != ShaderPackProgramCatalog.Group.FINAL).count(),
-                        catalog.ignoredStages().size());
+                        packModel.dimensionOverrides().size(), packModel.diagnostics().size());
                 pending = List.of();
                 discoveryFinished = true;
                 closeSources();
@@ -153,26 +183,17 @@ public final class ShaderRuntime {
             pending = catalog.programs();
 
             Map<String, String> defines = new LinkedHashMap<>();
-            try {
-                String properties;
-                try {
-                    properties = sources.read("shaders.properties");
-                } catch (IOException missingProperties) {
-                    properties = "";
-                }
-                ShaderPackMetadata metadata = ShaderPackMetadata.parse(properties, sources);
-                for (ShaderPackMetadata.Option option : metadata.options()) {
-                    defines.put(option.name(), CaustiqConfig.get().option(
-                            selected.id(), option.name(), option.defaultValue()));
-                }
-            } catch (IOException | IllegalArgumentException metadataFailure) {
-                CaustiqClient.LOGGER.warn("Unable to parse shader options for '{}'; compiling with pack defaults: {}",
-                        selected.displayName(), metadataFailure.getMessage());
+            for (ShaderPackMetadata.Option option : packModel.options().options()) {
+                defines.put(option.name(), CaustiqConfig.get().option(
+                        selected.id(), option.name(), option.defaultValue()));
             }
             selectedDefines = Map.copyOf(defines);
 
-            CaustiqClient.LOGGER.info("Preparing '{}': {} conventional program(s), {} unmatched/unsupported stage(s), {} option define(s).",
-                    selected.displayName(), pending.size(), catalog.ignoredStages().size(), selectedDefines.size());
+            CaustiqClient.LOGGER.info(
+                    "Parsed Iris pack '{}': {} base program(s), {} dimension override(s), {} required feature(s), {} preprocessed shader stage(s), {} option define(s).",
+                    selected.displayName(), packModel.base().programs().size(),
+                    packModel.dimensionOverrides().size(), packModel.requiredFeatures().size(),
+                    packModel.preprocessedSources().size(), selectedDefines.size());
             if (pending.isEmpty()) {
                 discoveryFinished = true;
                 closeSources();
@@ -182,6 +203,20 @@ public final class ShaderRuntime {
             discoveryFinished = true;
             closeSources();
         }
+    }
+
+    private static ShaderPackProgramCatalog.Group classifyProgram(String name) {
+        String lower = name.toLowerCase(java.util.Locale.ROOT);
+        if (lower.equals("final")) return ShaderPackProgramCatalog.Group.FINAL;
+        if (lower.startsWith("composite")) return ShaderPackProgramCatalog.Group.COMPOSITE;
+        if (lower.startsWith("deferred")) return ShaderPackProgramCatalog.Group.DEFERRED;
+        if (lower.startsWith("gbuffers_")) return ShaderPackProgramCatalog.Group.GBUFFERS;
+        if (lower.startsWith("shadowcomp")) return ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE;
+        if (lower.startsWith("shadow")) return ShaderPackProgramCatalog.Group.SHADOW;
+        if (lower.startsWith("prepare")) return ShaderPackProgramCatalog.Group.PREPARE;
+        if (lower.startsWith("begin")) return ShaderPackProgramCatalog.Group.BEGIN;
+        if (lower.startsWith("setup")) return ShaderPackProgramCatalog.Group.SETUP;
+        return ShaderPackProgramCatalog.Group.UNKNOWN;
     }
 
     private static void closeSources() {
