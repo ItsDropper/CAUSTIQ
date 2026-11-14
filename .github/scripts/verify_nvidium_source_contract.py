@@ -81,14 +81,16 @@ assert fragment.count("    vec2 uv;\n    vec3 v_colour;") == 1, "Pinned Nvidium 
 assert "CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS" in adapter
 assert "USE_NV_FRAGMENT_SHADER_BARYCENTRIC" in adapter, "Extended varying ABI must disable Nvidium barycentric-only path"
 assert "decodeLightUV(V)" in adapter and "decodeVertexColour(V).rgb" in adapter
-assert "cross(edge1, edge2)" in adapter, "Geometric face-normal reconstruction is missing"
-assert "caustiqQuadMidUv(uint quadId)" in adapter, "Quad midpoint UV reconstruction is missing"
-assert "caustiqQuadMidPosition(uint quadId)" in adapter, "Quad midpoint position reconstruction is missing"
-assert "caustiqComputeTriangleBasis(uint quadId, bool triangle1)" in adapter, "Per-triangle tangent basis reconstruction is missing"
-assert "flat mat3 v_tbn;" in adapter and "OUT[id].v_tbn = caustiqTriangleTbn;" in adapter
+assert "caustiqDecodeNormal(Vertex vertex)" in adapter, "Packed Iris normal decoder is missing"
+assert "caustiqDecodeTangent(Vertex vertex)" in adapter, "Packed Iris tangent decoder is missing"
+assert "caustiqDecodeMidUv(Vertex vertex)" in adapter, "Packed quad midpoint UV decoder is missing"
+assert "caustiqDecodeMidBlock(Vertex vertex)" in adapter, "Packed midpoint block decoder is missing"
+assert "caustiqDecodeBlockEntity(uint packed)" in adapter, "Packed mc_Entity decoder is missing"
+assert "flat mat3 v_tbn;" in adapter and "OUT[id].v_tbn = caustiqDecodeTbn(V);" in adapter
+assert "uint nvidiumMaterial;" in adapter and "V.nvidiumMaterial" in adapter
 assert "putVertex(uint id, Vertex V, uint quadId)" in adapter, "Mesh varying writer does not receive quad identity"
 assert "transformMat * vec4(decodeVertexPosition(vertex) + origin, 1.0)" in adapter, "Terrain render position is not transformed"
-assert "flat uint v_materialFlags;" in adapter and "rawVertexAlphaCutoff(V)" in adapter
+assert "flat uint v_materialFlags;" in adapter and "V.nvidiumMaterial" in adapter
 assert "layout(location = 4) out vec4 caustiqGBufferLightmap;" in adapter
 assert "caustiqGBufferNormal = vec4(normalize(v_normal)" in adapter
 assert "caustiqGBufferPosition = vec4(v_renderPosition, 1.0)" in adapter
@@ -102,6 +104,25 @@ assert "CAUSTIQ_IRIS_LIGHTMAP tex_light" in abi
 assert 'NVIDIUM_VERSION = "0.4.3-beta13-1.21.11"' in abi
 assert 'DIFFUSE_ATLAS_TEXTURE_UNIT = 0' in abi and 'LIGHTMAP_TEXTURE_UNIT = 1' in abi
 assert 'Availability.UNAVAILABLE' in abi
+# Verify the extended vertex encoder and Nvidium's CPU-side repackager use the same 40-byte stride.
+nvidium_repackager = source("src/main/java/me/cortex/nvidium/sodiumCompat/SodiumResultCompatibility.java")
+assert "private static int formatSize" in nvidium_repackager
+assert "copyQuad" in nvidium_repackager
+vertex_encoder = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
+assert "STRIDE = 40" in vertex_encoder
+for field in ("blockId", "normalTangent", "midpointUv", "midBlock", "nvidiumMaterial"):
+    assert field in vertex_encoder
+format_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumExtendedVertexFormatMixin.java").read_text(encoding="utf-8")
+stride_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumRepackagedStrideMixin.java").read_text(encoding="utf-8")
+assert "NvidiumIrisChunkVertex.INSTANCE" in format_mixin
+assert "NvidiumIrisChunkVertex.STRIDE" in stride_mixin
+for mixin in ("NvidiumExtendedVertexFormatMixin", "NvidiumRepackagedStrideMixin",
+              "NvidiumBlockRendererVertexContextMixin", "NvidiumFluidRendererVertexContextMixin"):
+    assert mixin in mixins_json["client"]
+uniform_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumTerrainRasterizerMixin.java").read_text(encoding="utf-8")
+assert "NvidiumIrisUniformBridge.upload(this)" in uniform_mixin
+assert "caustiqDecodeTangent(V)" in adapter and "caustiqDecodeMidBlock(V)" in adapter
+
 vertex_format = source("src/main/resources/assets/nvidium/shaders/terrain/vertex_format/vertex_format.glsl")
 nvidium_vertex_format = source("src/main/resources/assets/nvidium/shaders/terrain/vertex_format/nvidium_vertex_format.glsl")
 sodium_vertex_format = source("src/main/resources/assets/nvidium/shaders/terrain/vertex_format/sodium_vertex_format.glsl")
