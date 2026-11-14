@@ -18,7 +18,7 @@ dependencies {
     minecraft("com.mojang:minecraft:" + property("minecraft_version"))
     mappings(loom.officialMojangMappings())
     modImplementation("net.fabricmc:fabric-loader:" + property("loader_version"))
-    modCompileOnly("net.caffeinemc:sodium-fabric-api:0.8.0+mc1.21.11")
+    modCompileOnly("net.caffeinemc:sodium-fabric-api:0.8.12+mc1.21.11")
     testImplementation(platform("org.junit:junit-bom:5.12.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
