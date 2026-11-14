@@ -4,7 +4,7 @@ Caustiq is an independent, client-side Minecraft shader engine. Its primary goal
 
 ## Project status
 
-**Early development — discovery, source preprocessing, program discovery, source-mapped diagnostics, Minecraft GPU pipeline compilation, and a first executable final fragment pass are implemented.** Caustiq scans directory and ZIP packs, safely reads shader sources, expands includes, discovers conventional vertex/fragment pairs, and compiles a final fragment stage through Minecraft's GPU device.
+**Early development — discovery, source preprocessing, program discovery, Minecraft GPU pipeline compilation, and a first executable final fragment pass are implemented.** Caustiq scans directory and ZIP packs, safely reads shader sources, expands includes, discovers conventional vertex/fragment pairs, and compiles a final fragment stage through Minecraft's GPU device.
 
 The first executable pass draws a full-screen triangle into a Caustiq-owned texture target and copies the result back to Minecraft's main color texture. It uses Minecraft's GPU device, command encoder, render pass, texture views, and texture target APIs; it does not assume OpenGL framebuffer IDs or manually mutate global GL state.
 
@@ -36,7 +36,7 @@ The current Loom release requires JDK 25 to run Gradle. The mod itself is compil
 - Rejects traversal, absolute paths, duplicate/case-colliding entries, ambiguous roots, malformed archives, and suspicious archive metadata.
 - Reads bounded UTF-8 shader sources from directories and ZIP archives.
 - Lists shader-relative source paths with entry-count and path-safety limits.
-- Expands nested quoted/angle-bracket includes and emits source IDs for diagnostics.
+- Expands nested quoted/angle-bracket includes and emits source IDs/source maps for diagnostics.
 
 ## GPU pipeline and final pass
 
@@ -49,6 +49,8 @@ The current Loom release requires JDK 25 to run Gradle. The mod itself is compil
 - Releases Caustiq-owned render targets when the game renderer shuts down.
 
 This is an executable post-processing foundation, not broad shader-pack compatibility. The pack's own final vertex stage is currently catalogued but not executed; the generated vertex stage is used to provide a stable fullscreen contract. Packs requiring custom vertex varyings, non-color samplers, options, texture layouts, macros, or OptiFine/Iris-specific uniforms need the compatibility layer before they can render correctly.
+
+GPU pipeline compilation failures currently include the program name, but the driver's diagnostic log is not yet mapped back through the preprocessor source map. The diagnostic parser and source-map tests remain available for the upcoming integration.
 
 ## Current limitations
 
@@ -76,5 +78,5 @@ The build runs scanner, GLSL preprocessing, program-catalog, and compiler-diagno
 
 1. Add real pack uniform blocks, option parsing, and texture input mapping.
 2. Execute pack-specific vertex stages and add OptiFine/Iris compatibility uniforms and macros.
-3. Add pack selection and configuration UI.
-4. Validate the final-target timing with Nvidium and without Sodium on real hardware.
+3. Integrate GPU pipeline diagnostics with the preprocessor source map.
+4. Add pack selection and configuration UI, then validate final-target timing with Nvidium and without Sodium on real hardware.
