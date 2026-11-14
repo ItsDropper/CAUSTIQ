@@ -119,9 +119,38 @@ public final class NvidiumIrisTerrainAbi {
      * that Nvidium actually binds. Pack-specific uniforms are intentionally
      * absent and must be rejected by the translator.
      */
+    public static String vertexAliasDeclarations() {
+        return String.join("\n",
+                "uniform mat4 caustiqProjection;",
+                "uniform mat4 caustiqModelView;",
+                "uniform mat4 caustiqProjectionInverse;",
+                "uniform mat4 caustiqModelViewInverse;",
+                "uniform mat3 caustiqNormalMatrix;",
+                "uniform vec3 caustiqCameraPosition;",
+                "uniform float caustiqFrameTimeCounter;",
+                "uniform int caustiqFrameCounter;",
+                "#define gl_ModelViewMatrix caustiqModelView",
+                "#define gl_ModelViewMatrixInverse caustiqModelViewInverse",
+                "#define gl_ProjectionMatrix caustiqProjection",
+                "#define gl_ProjectionMatrixInverse caustiqProjectionInverse",
+                "#define gl_ModelViewProjectionMatrix (caustiqProjection * caustiqModelView)",
+                "#define gl_NormalMatrix caustiqNormalMatrix",
+                "#define cameraPosition caustiqCameraPosition",
+                "#define frameTimeCounter caustiqFrameTimeCounter",
+                "#define frameCounter caustiqFrameCounter") + "\n";
+    }
+
     public static String fragmentAliasDeclarations() {
         return String.join("\n",
                 "// CAUSTIQ mappings to values Nvidium actually binds for this terrain pass.",
+                "uniform mat4 caustiqProjection;",
+                "uniform mat4 caustiqModelView;",
+                "uniform mat4 caustiqProjectionInverse;",
+                "uniform mat4 caustiqModelViewInverse;",
+                "uniform mat3 caustiqNormalMatrix;",
+                "uniform vec3 caustiqCameraPosition;",
+                "uniform float caustiqFrameTimeCounter;",
+                "uniform int caustiqFrameCounter;",
                 "#define CAUSTIQ_IRIS_VIEW_WIDTH (screenSize.x * 2.0)",
                 "#define CAUSTIQ_IRIS_VIEW_HEIGHT (screenSize.y * 2.0)",
                 "#define CAUSTIQ_IRIS_FOG_COLOR fogColour",
