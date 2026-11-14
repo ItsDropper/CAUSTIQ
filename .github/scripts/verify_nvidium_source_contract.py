@@ -68,7 +68,20 @@ assert "CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS" in adapter
 assert "USE_NV_FRAGMENT_SHADER_BARYCENTRIC" in adapter, "Extended varying ABI must disable Nvidium barycentric-only path"
 assert "decodeLightUV(V)" in adapter and "decodeVertexColour(V).rgb" in adapter
 assert "cross(pb - pa, pc - pa)" in adapter, "Geometric face-normal reconstruction is missing"
-assert "transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)" in adapter, "Terrain position is not transformed into world space"
+assert "transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)" in adapter, "Terrain render position is not transformed"
+assert "flat uint v_materialFlags;" in adapter and "rawVertexAlphaCutoff(V)" in adapter
+assert "CAUSTIQ_IRIS_VIEW_WIDTH (screenSize.x * 2.0)" in adapter
+assert "CAUSTIQ_IRIS_VIEW_HEIGHT (screenSize.y * 2.0)" in adapter
+assert "CAUSTIQ_IRIS_GTEXTURE tex_diffuse" in adapter
+assert "CAUSTIQ_IRIS_LIGHTMAP tex_light" in adapter
+abi = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisTerrainAbi.java").read_text(encoding="utf-8")
+assert 'NVIDIUM_VERSION = "0.4.3-beta13-1.21.11"' in abi
+assert 'DIFFUSE_ATLAS_TEXTURE_UNIT = 0' in abi and 'LIGHTMAP_TEXTURE_UNIT = 1' in abi
+assert 'Availability.UNAVAILABLE' in abi
+vertex_format = source("src/main/resources/assets/nvidium/shaders/terrain/vertex_format/vertex_format.glsl")
+scene = source("src/main/resources/assets/nvidium/shaders/occlusion/scene.glsl")
+assert "decodeVertexUV" in vertex_format and "decodeLightUV" in vertex_format and "decodeVertexColour" in vertex_format
+assert "mat4 MVP;" in scene and "vec4 fogColour;" in scene and "vec2 screenSize;" in scene
 assert "NvidiumTerrainVaryingAdapter.class" in (caustiq_root / ".github/workflows/build.yml").read_text(encoding="utf-8")
 
-print("Nvidium source contract verified: compile hook, Iris gate, terrain stage set, and unique varying-adapter anchors.")
+print("Nvidium source contract verified: compile hook, Iris gate, packed vertex format, scene uniforms, sampler bindings, and varying ABI.")
