@@ -132,15 +132,29 @@ public final class IrisNvidiumTerrainTranslator {
     private final List<Integer> renderTargetIndices;
 
     private IrisNvidiumTerrainTranslator(String vertexSource, String fragmentSource) {
-        StageSource vertex = prepareVertex(Objects.requireNonNull(vertexSource, "vertexSource"));
-        StageSource fragment = prepareFragment(Objects.requireNonNull(fragmentSource, "fragmentSource"));
+        String activeVertex = preprocessTerrainStage(Objects.requireNonNull(vertexSource, "vertexSource"), true);
+        String activeFragment = preprocessTerrainStage(Objects.requireNonNull(fragmentSource, "fragmentSource"), false);
+        StageSource vertex = prepareVertex(activeVertex);
+        StageSource fragment = prepareFragment(activeFragment);
         this.vertexSource = vertex.source();
         this.fragmentSource = fragment.source();
         this.varyings = matchVaryings(vertex.varyings(), fragment.varyings());
         this.outputs = fragment.outputs();
         this.usesFragData = fragment.usesFragData();
         this.fragDataCount = fragment.fragDataCount();
-        this.renderTargetIndices = parseRenderTargetIndices(fragmentSource);
+        this.renderTargetIndices = parseRenderTargetIndices(activeFragment);
+    }
+
+    private static String preprocessTerrainStage(String source, boolean vertex) {
+        Map<String, String> defines = new LinkedHashMap<>();
+        defines.put("PROGRAM_GBUFFERS_TERRAIN", "1");
+        defines.put("WORLD_OVERWORLD", "1");
+        defines.put("OVERWORLD", "1");
+        defines.put("IS_IRIS", "1");
+        defines.put("MC_VERSION", "12111");
+        defines.put(vertex ? "vsh" : "fsh", "1");
+        return new dev.itsdropper.caustiq.shaderpack.IrisGlslConditionalPreprocessor()
+                .preprocess(source, defines);
     }
 
     public static IrisNvidiumTerrainTranslator from(IrisShaderPackModel model) {
