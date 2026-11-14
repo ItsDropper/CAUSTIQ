@@ -40,7 +40,9 @@ public final class NvidiumTerrainVaryingAdapter {
             "    vec3 pa = (transformMat * vec4(decodeVertexPosition(a) + origin, 1.0)).xyz;",
             "    vec3 pb = (transformMat * vec4(decodeVertexPosition(b) + origin, 1.0)).xyz;",
             "    vec3 pc = (transformMat * vec4(decodeVertexPosition(c) + origin, 1.0)).xyz;",
-            "    return normalize(cross(pb - pa, pc - pa));",
+            "    vec3 faceNormal = cross(pb - pa, pc - pa);",
+            "    float normalLengthSquared = dot(faceNormal, faceNormal);",
+            "    return normalLengthSquared > 1e-12 ? faceNormal * inversesqrt(normalLengthSquared) : vec3(0.0);",
             "}") + "\n";
 
     private NvidiumTerrainVaryingAdapter() { }
