@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "caustiq",
+  "version": "${version}",
+  "name": "Caustiq",
+  "description": "An independent client-side shader engine for Minecraft.",
+  "authors": [
+    "ItsDropper"
+  ],
+  "contact": {
+    "homepage": "https://github.com/ItsDropper/CAUSTIQ",
+    "sources": "https://github.com/ItsDropper/CAUSTIQ"
+  },
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.itsdropper.caustiq.CaustiqClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.20.1",
+    "minecraft": "~1.21.11",
+    "java": ">=21"
+  }
+}
