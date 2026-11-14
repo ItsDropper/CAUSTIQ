@@ -466,6 +466,8 @@ public final class IrisNvidiumTerrainTranslator {
         translated = replaceIdentifier(translated, "gl_Normal", "caustiqDecodeNormal(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "gl_Position", "caustiqIrisClipPosition");
         translated = replaceIdentifier(translated, "gl_TexCoord", "caustiqIrisTexCoord");
+        translated = translated.replaceAll("\\bgl_TextureMatrix\\s*\\[\\s*0\\s*]", "mat4(1.0)");
+        translated = translated.replaceAll("\\bgl_TextureMatrix\\s*\\[\\s*1\\s*]", "mat4(1.0 / 256.0)");
         translated = replaceIdentifier(translated, "mc_Entity", "caustiqDecodeBlockEntity(caustiqCurrentVertex.blockId)");
         translated = replaceIdentifier(translated, "at_midBlock", "caustiqDecodeMidBlock(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "mc_midTexCoord", "caustiqDecodeMidUv(caustiqCurrentVertex)");
