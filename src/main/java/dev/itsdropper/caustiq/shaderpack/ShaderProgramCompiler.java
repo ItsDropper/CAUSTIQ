@@ -4,11 +4,13 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL20C;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Objects;
 
 /** Compiles and links GLSL stages on Minecraft's current OpenGL render context. */
 public final class ShaderProgramCompiler {
     private static final int MAX_SHADER_LOG_LENGTH = 32_768;
+    private static final Map<String, Integer> FULLSCREEN_ATTRIBUTES = Map.of("Position", 0, "UV0", 1);
 
     public CompiledShaderProgram compile(
             ShaderPackProgramCatalog.Program program,
@@ -36,6 +38,9 @@ public final class ShaderProgramCompiler {
             }
             GL20C.glAttachShader(linkedProgram, vertexShader);
             GL20C.glAttachShader(linkedProgram, fragmentShader);
+            for (Map.Entry<String, Integer> attribute : FULLSCREEN_ATTRIBUTES.entrySet()) {
+                GL20C.glBindAttribLocation(linkedProgram, attribute.getValue(), attribute.getKey());
+            }
             GL20C.glLinkProgram(linkedProgram);
             if (GL20C.glGetProgrami(linkedProgram, GL20C.GL_LINK_STATUS) == GL20C.GL_FALSE) {
                 throw new IOException(program.name() + ": program link failed:\n"

@@ -4,9 +4,15 @@ Caustiq is an independent, client-side Minecraft shader engine. Its primary goal
 
 ## Project status
 
-**Early development — discovery, source preprocessing, program discovery, OpenGL compilation, source-mapped diagnostics, and a uniform upload API are implemented.** Caustiq scans directory and ZIP packs, safely reads shader sources, expands includes, discovers conventional vertex/fragment pairs, compiles/links those pairs on the Minecraft render thread, and exposes typed uniform setters on linked programs.
+**Early development — discovery, source preprocessing, program discovery, OpenGL compilation, source-mapped diagnostics, uniform upload, and an initial final-pass executor are implemented.** Caustiq scans directory and ZIP packs, safely reads shader sources, expands includes, discovers conventional vertex/fragment pairs, compiles those pairs on the render thread, and can execute a conventional `final.vsh` / `final.fsh` program over Minecraft's completed world color target.
 
-This milestone establishes real GPU program objects and the first part of the shader-to-renderer interface. It does **not** yet draw the linked programs, replace Minecraft's world-render pipeline, or claim general Iris/OptiFine pack compatibility.
+The final pass renders into a Caustiq-owned color target and then blits the result back to Minecraft's target. It restores framebuffer bindings, viewport, shader program, VAO/buffer bindings, texture bindings, color/depth write masks, and the blend/depth/cull/scissor enables it changes.
+
+## Nvidium and renderer compatibility
+
+Caustiq does not replace Minecraft's chunk renderer, alter terrain vertex formats, intercept chunk submissions, or depend on Sodium APIs. The post-process hook runs after `GameRenderer.renderLevel` and consumes Minecraft's main color target. This is intentionally renderer-agnostic: Nvidium remains responsible for producing the terrain image, and Caustiq only processes the completed color result.
+
+This is an architectural compatibility strategy, **not a verified Nvidium compatibility claim**. In-game validation with Nvidium and without Sodium is still required, especially to confirm the main color target contains the completed accelerated frame at this injection point.
 
 ## Development target
 
@@ -32,29 +38,27 @@ The current Loom release requires JDK 25 to run Gradle. The mod itself is compil
 - Lists shader-relative source paths with entry-count and path-safety limits.
 - Expands nested quoted/angle-bracket includes and emits source IDs for diagnostics.
 
-## GLSL program compilation
+## GLSL program compilation and final pass
 
 - Discovers matching `.vsh` and `.fsh` stages by their relative program name.
 - Does not guess how to pair unmatched stages; they are reported as ignored.
 - Preprocesses each stage independently before compilation.
 - Compiles and links through Minecraft's existing LWJGL/OpenGL runtime.
+- Binds conventional `Position` and `UV0` vertex attributes for full-screen geometry.
 - Parses common NVIDIA and Mesa compiler log formats and maps source IDs/line numbers back to original include files when the driver reports them.
-- Retains the original raw driver log if a vendor-specific format cannot be parsed.
 - Compiles at most one program per rendered world frame to avoid compiling an entire pack in one frame.
-- Releases linked GPU programs when the game renderer shuts down.
+- Executes a discovered `final` program after world rendering using a full-screen triangle.
+- Supplies common sampler and screen-size uniforms when those uniforms exist.
+- Releases linked programs and Caustiq-owned GPU resources when the game renderer shuts down.
 
-## Program uniform interface
-
-A linked program can be bound and supplied with integer/sampler, float, vec2, vec3, vec4, and column-major mat4 uniforms. Uniform locations are cached per program. Missing or optimized-out uniforms are treated as optional and return `false`; callers must bind the program before uploading values. GPU operations and program destruction must run with Minecraft's render context current.
-
-Automatic compilation is enabled only when exactly one structurally valid shader pack is present. With multiple packs, Caustiq reports that selection is required and does not silently choose one. Pack-selection UI/configuration is a later milestone.
+The final pass currently targets conventional GLSL vertex inputs named `Position` and `UV0`. It supplies identity `ProjMat` / `ModelViewMat` matrices and common color sampler aliases. Existing shader packs often need additional Iris/OptiFine uniforms, macros, texture layouts, and stage semantics, so this is an execution foundation rather than broad pack compatibility.
 
 ## Current limitations
 
-- Linked programs are not yet executed or connected to a post-processing/frame-graph pass.
-- This is not a complete GLSL C preprocessor; macro expansion and extension-specific transformations remain compiler/compatibility-layer work.
-- Shader-pack options, texture targets, shadow maps, deferred buffers, and world render stages are not implemented.
-- Many existing packs require Iris/OptiFine-specific uniforms, macros, and pipeline semantics and will not compile unchanged.
+- Shader-pack options, texture targets, shadow maps, deferred buffers, and full world render stages are not implemented.
+- Many existing packs require Iris/OptiFine-specific uniforms, macros, and pipeline semantics and will not compile or render unchanged.
+- A successful compile does not guarantee that a pack's final vertex stage is suitable for the provided full-screen geometry.
+- The pass is injected at the end of world rendering; HUD composition is intentionally outside this pass.
 - Nvidium coexistence has not yet been validated in-game.
 
 ## Build and test
@@ -77,7 +81,7 @@ The build runs scanner, GLSL preprocessing, program-catalog, and compiler-diagno
 
 ## Next engineering stages
 
-1. Implement a safe render-target/frame-graph backend and execute a real post-processing pass.
-2. Add shader-pack uniforms, texture targets, options, and common OptiFine/Iris compatibility semantics.
+1. Implement shader-pack options and a typed uniform/texture binding model.
+2. Add OptiFine/Iris compatibility uniforms, macros, and stage semantics.
 3. Add pack selection and configuration UI.
-4. Add optional Sodium integration and validate Nvidium coexistence.
+4. Add optional Sodium integration and validate Nvidium coexistence on real hardware.
