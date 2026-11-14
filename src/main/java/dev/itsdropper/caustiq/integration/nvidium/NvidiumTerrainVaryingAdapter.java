@@ -16,7 +16,7 @@ public final class NvidiumTerrainVaryingAdapter {
     private static final String MARKER = "#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 2";
     private static final Pattern BARYCENTRIC_DEFINE = Pattern.compile(
             "(?m)^\\s*#\\s*define\\s+USE_NV_FRAGMENT_SHADER_BARYCENTRIC\\b[^\\r\\n]*");
-    private static final String MESH_VARYINGS = String.join("\\n",
+    private static final String MESH_VARYINGS = String.join("\n",
             "    vec2 uv;",
             "    vec3 v_colour;",
             "    vec3 v_vertexColour;",
@@ -31,7 +31,7 @@ public final class NvidiumTerrainVaryingAdapter {
     private static final String FRAGMENT_VARYINGS = MESH_VARYINGS;
     private static final String FRAGMENT_UNIFORM_ALIASES =
             NvidiumIrisTerrainAbi.fragmentAliasDeclarations();
-    private static final String MESH_ASSIGNMENTS = String.join("\\n",
+    private static final String MESH_ASSIGNMENTS = String.join("\n",
             "    OUT[id].uv = decodeVertexUV(V);",
             "    OUT[id].v_colour = computeMultiplier(V);",
             "    OUT[id].v_vertexColour = decodeVertexColour(V).rgb;",
@@ -43,7 +43,7 @@ public final class NvidiumTerrainVaryingAdapter {
             "    OUT[id].v_tangent = caustiqTriangleTangent;",
             "    OUT[id].v_tbn = caustiqTriangleTbn;",
             "    OUT[id].v_materialFlags = (hasMipping(V) ? 1u : 0u) | (rawVertexAlphaCutoff(V) << 1u);");
-    private static final String NORMAL_HELPER = String.join("\\n",
+    private static final String NORMAL_HELPER = String.join("\n",
             "vec3 caustiqTriangleNormal;",
             "vec4 caustiqTriangleTangent;",
             "mat3 caustiqTriangleTbn;",
@@ -121,12 +121,12 @@ public final class NvidiumTerrainVaryingAdapter {
             throw new IllegalStateException("Nvidium terrain varying profile is only partially applied or has an incompatible ABI.");
         }
 
-        mesh = replaceOnce(mesh, "#version 460", "#version 460\\n" + MARKER, "mesh version");
-        fragment = replaceOnce(fragment, "#version 460", "#version 460\\n" + MARKER, "fragment version");
-        mesh = replaceOnce(mesh, "    vec2 uv;\\n    vec3 v_colour;", MESH_VARYINGS, "mesh interpolant declaration");
-        fragment = replaceOnce(fragment, "    vec2 uv;\\n    vec3 v_colour;", FRAGMENT_VARYINGS, "fragment interpolant declaration");
-        fragment = replaceOnce(fragment, MARKER + "\\n",
-                MARKER + "\\n" + FRAGMENT_UNIFORM_ALIASES, "fragment uniform aliases");
+        mesh = replaceOnce(mesh, "#version 460", "#version 460\n" + MARKER, "mesh version");
+        fragment = replaceOnce(fragment, "#version 460", "#version 460\n" + MARKER, "fragment version");
+        mesh = replaceOnce(mesh, "    vec2 uv;\n    vec3 v_colour;", MESH_VARYINGS, "mesh interpolant declaration");
+        fragment = replaceOnce(fragment, "    vec2 uv;\n    vec3 v_colour;", FRAGMENT_VARYINGS, "fragment interpolant declaration");
+        fragment = replaceOnce(fragment, MARKER + "\n",
+                MARKER + "\n" + FRAGMENT_UNIFORM_ALIASES, "fragment uniform aliases");
         mesh = replaceOnce(mesh, "void putVertex(uint id, Vertex V) {",
                 "void putVertex(uint id, Vertex V, uint quadId) {", "mesh varying writer signature");
         mesh = replaceOnce(mesh, "putVertex(qId+uint(triangle1), Vc);",
@@ -134,11 +134,11 @@ public final class NvidiumTerrainVaryingAdapter {
         mesh = replaceOnce(mesh, "putVertex(uId, V);",
                 "putVertex(uId, V, quadId);", "unique vertex varying call");
         mesh = replaceOnce(mesh, "vec4 transformVertex(Vertex V) {",
-                NORMAL_HELPER + "\\n\\nvec4 transformVertex(Vertex V) {", "terrain basis helper insertion point");
+                NORMAL_HELPER + "\n\nvec4 transformVertex(Vertex V) {", "terrain basis helper insertion point");
         mesh = replaceOnce(mesh, "    bool triangle1 = (gl_LocalInvocationIndex & uint(1)) == 1;",
-                "    bool triangle1 = (gl_LocalInvocationIndex & uint(1)) == 1;\\n"
+                "    bool triangle1 = (gl_LocalInvocationIndex & uint(1)) == 1;\n"
                         + "    caustiqComputeTriangleBasis(quadId, triangle1);", "triangle selection");
-        mesh = replaceOnce(mesh, "    OUT[id].uv = decodeVertexUV(V);\\n    OUT[id].v_colour = computeMultiplier(V);",
+        mesh = replaceOnce(mesh, "    OUT[id].uv = decodeVertexUV(V);\n    OUT[id].v_colour = computeMultiplier(V);",
                 MESH_ASSIGNMENTS, "mesh varying assignments");
 
         Map<String, String> adapted = new LinkedHashMap<>(sourceStages);
