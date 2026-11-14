@@ -109,3 +109,9 @@ The build runs scanner, preprocessing, metadata, program-catalog, diagnostic, an
 3. Integrate geometry gbuffers and shadow rendering with Minecraft 1.21.11's render stages and Sodium's vertex conventions without taking ownership of chunk submission.
 4. Replace regex-only GLSL rewriting with AST-based transformations and implement the pack uniform, macro, include, and compatibility surfaces used by real packs.
 5. Validate Complementary Reimagined, BSL, and other representative packs against Iris output, and benchmark vanilla, Sodium, and Nvidium separately.
+
+## Nvidium shader compilation bridge
+
+The Nvidium branch now hooks the actual `Shader.Builder.compile()` boundary and exposes the complete TASK/MESH/FRAGMENT source set to a CAUSTIQ terrain adapter before OpenGL linking. It records stage signatures for diagnostics without retaining shader source strings. A second mixin gates Nvidium's Iris opt-out: the opt-out is overridden only when a real terrain adapter has been registered.
+
+No terrain adapter is registered yet. Therefore Nvidium's normal Iris opt-out remains active when an Iris shader pack is running. This is deliberate: Nvidium uses a custom mesh-shader pipeline that decodes its compact chunk vertex buffer and reconstructs fragment attributes with NV barycentrics. Simply forcing Nvidium on or replacing its fragment shader would render incorrect terrain. Full support still requires translation of Iris terrain vertex/fragment semantics, render-target and depth integration, uniforms, shadow passes, and pass synchronization. The new hooks are the compile-time integration seam, not a claim of Iris shader compatibility.
