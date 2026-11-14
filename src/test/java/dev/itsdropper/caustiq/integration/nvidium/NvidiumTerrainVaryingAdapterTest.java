@@ -55,6 +55,10 @@ class NvidiumTerrainVaryingAdapterTest {
     @Test
     void adaptsThePinnedNvidiumTerrainShaderSourcesWhenAvailable() throws IOException {
         String sourceDirectory = System.getenv("NVIDIUM_SOURCE_DIR");
+        if ("true".equalsIgnoreCase(System.getenv("CI"))) {
+            assertNotNull(sourceDirectory, "CI must supply the pinned Nvidium source checkout");
+            assertFalse(sourceDirectory.isBlank(), "CI supplied an empty Nvidium source path");
+        }
         Assumptions.assumeTrue(sourceDirectory != null && !sourceDirectory.isBlank(),
                 "Pinned Nvidium source checkout is supplied by CI only");
         Path shaderRoot = Path.of(sourceDirectory, "src/main/resources/assets/nvidium/shaders/terrain");
