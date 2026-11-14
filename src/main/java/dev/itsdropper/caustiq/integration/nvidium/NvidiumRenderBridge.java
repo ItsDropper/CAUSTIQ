@@ -11,8 +11,23 @@ public final class NvidiumRenderBridge {
     private static final AtomicLong COMPLETED_SOLID = new AtomicLong();
     private static final AtomicLong STARTED_TRANSLUCENT = new AtomicLong();
     private static final AtomicLong COMPLETED_TRANSLUCENT = new AtomicLong();
+    private static volatile Object worldRenderer;
 
     private NvidiumRenderBridge() { }
+
+    public static void attachWorldRenderer(Object renderer) { worldRenderer = renderer; }
+
+    /** Recompiles Nvidium's task/mesh/fragment programs through the registered CAUSTIQ adapters. */
+    public static boolean reloadShaders() {
+        Object renderer = worldRenderer;
+        if (renderer == null) return false;
+        try {
+            renderer.getClass().getMethod("reloadShaders").invoke(renderer);
+            return true;
+        } catch (ReflectiveOperationException | RuntimeException exception) {
+            return false;
+        }
+    }
 
     public static void solidPassStarted() { STARTED_SOLID.incrementAndGet(); }
     public static void solidPassCompleted() { COMPLETED_SOLID.incrementAndGet(); }
@@ -32,6 +47,7 @@ public final class NvidiumRenderBridge {
         COMPLETED_SOLID.set(0);
         STARTED_TRANSLUCENT.set(0);
         COMPLETED_TRANSLUCENT.set(0);
+        worldRenderer = null;
     }
 
     public record Snapshot(
