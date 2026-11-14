@@ -5,6 +5,7 @@ import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import dev.itsdropper.caustiq.CaustiqClient;
 import org.lwjgl.opengl.GL11C;
+import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL30C;
 import org.lwjgl.system.MemoryStack;
@@ -184,7 +185,7 @@ public final class NvidiumGBufferTargets {
             height = newHeight;
         } finally {
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTextureBinding);
-            GL11C.glActiveTexture(previousActiveTexture);
+            GL13C.glActiveTexture(previousActiveTexture);
             GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
             GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
         }
