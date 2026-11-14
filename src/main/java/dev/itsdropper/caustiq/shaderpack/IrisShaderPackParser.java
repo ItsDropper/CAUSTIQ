@@ -33,8 +33,10 @@ public final class IrisShaderPackParser {
     private static final Set<String> STAGE_EXTENSIONS = Set.of(".vsh", ".fsh", ".gsh", ".csh", ".tcs", ".tes");
 
     public IrisShaderPackModel parse(ShaderPackSources sources) throws IOException {
-        Map<String, String> properties = readProperties(sources, "shaders.properties");
-        Map<String, String> dimensionProperties = readProperties(sources, "dimension.properties");
+        String propertiesSource = readText(sources, "shaders.properties");
+        String dimensionSource = readText(sources, "dimension.properties");
+        Map<String, String> properties = parseProperties(propertiesSource, "shaders.properties");
+        Map<String, String> dimensionProperties = parseProperties(dimensionSource, "dimension.properties");
         Map<String, String> dimensionMappings = parseDimensionMappings(dimensionProperties);
         Set<String> dimensionDirectories = new LinkedHashSet<>(dimensionMappings.values());
 
@@ -94,8 +96,7 @@ public final class IrisShaderPackParser {
 
         Map<String, String> allProperties = new TreeMap<>(properties);
         allProperties.putAll(dimensionProperties);
-        ShaderPackMetadata metadata = ShaderPackMetadata.parse(
-                properties.getOrDefault("shaders.properties", ""), sources);
+        ShaderPackMetadata metadata = ShaderPackMetadata.parse(propertiesSource, sources);
 
         Set<String> required = tokens(properties.get("iris.features.required"));
         Set<String> optional = tokens(properties.get("iris.features.optional"));
@@ -154,14 +155,16 @@ public final class IrisShaderPackParser {
         return result;
     }
 
-    private static Map<String, String> readProperties(ShaderPackSources sources, String path) throws IOException {
-        String source;
+    private static String readText(ShaderPackSources sources, String path) throws IOException {
         try {
-            source = sources.read(path);
+            return sources.read(path);
         } catch (IOException missing) {
-            if (missing.getMessage() != null && missing.getMessage().contains("does not exist")) return Map.of();
+            if (missing.getMessage() != null && missing.getMessage().contains("does not exist")) return "";
             throw missing;
         }
+    }
+
+    private static Map<String, String> parseProperties(String source, String path) throws IOException {
         if (source.getBytes(StandardCharsets.UTF_8).length > MAX_PROPERTIES_BYTES) {
             throw new IOException(path + " exceeds the " + MAX_PROPERTIES_BYTES + " byte parsing limit.");
         }
