@@ -70,11 +70,11 @@ assert "decodeLightUV(V)" in adapter and "decodeVertexColour(V).rgb" in adapter
 assert "cross(pb - pa, pc - pa)" in adapter, "Geometric face-normal reconstruction is missing"
 assert "transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)" in adapter, "Terrain render position is not transformed"
 assert "flat uint v_materialFlags;" in adapter and "rawVertexAlphaCutoff(V)" in adapter
+abi = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisTerrainAbi.java").read_text(encoding="utf-8")
 assert "CAUSTIQ_IRIS_VIEW_WIDTH (screenSize.x * 2.0)" in abi
 assert "CAUSTIQ_IRIS_VIEW_HEIGHT (screenSize.y * 2.0)" in abi
 assert "CAUSTIQ_IRIS_GTEXTURE tex_diffuse" in abi
 assert "CAUSTIQ_IRIS_LIGHTMAP tex_light" in abi
-abi = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisTerrainAbi.java").read_text(encoding="utf-8")
 assert 'NVIDIUM_VERSION = "0.4.3-beta13-1.21.11"' in abi
 assert 'DIFFUSE_ATLAS_TEXTURE_UNIT = 0' in abi and 'LIGHTMAP_TEXTURE_UNIT = 1' in abi
 assert 'Availability.UNAVAILABLE' in abi
