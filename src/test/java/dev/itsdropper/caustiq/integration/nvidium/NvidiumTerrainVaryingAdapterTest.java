@@ -174,4 +174,25 @@ class NvidiumTerrainVaryingAdapterTest {
                 """;
         return Map.of("TASK", "task source", "MESH", mesh, "FRAGMENT", fragment);
     }
+    @Test
+    void leavesNvidiumNonPrimaryTerrainProgramsUntouched() {
+        Map<String, String> sources = Map.of(
+                "TASK", "translucent task",
+                "MESH", "#version 460\nvoid main() { gl_PrimitiveCountNV = 0; }",
+                "FRAGMENT", "#version 460\nlayout(location = 0) out vec4 outputColor;\nvoid main() {}");
+        assertEquals(sources, NvidiumTerrainVaryingAdapter.adapt(sources));
+    }
+
+    @Test
+    void rejectsPartiallyRecognizedPrimaryTerrainShaderLayouts() {
+        Map<String, String> base = sourceStages();
+        Map<String, String> sources = Map.of(
+                "TASK", base.get("TASK"),
+                "MESH", base.get("MESH"),
+                "FRAGMENT", base.get("FRAGMENT").replace(
+                        "layout(location = 1) in Interpolants {",
+                        "layout(location = 2) in Interpolants {"));
+        assertThrows(IllegalStateException.class, () -> NvidiumTerrainVaryingAdapter.adapt(sources));
+    }
+
 }
