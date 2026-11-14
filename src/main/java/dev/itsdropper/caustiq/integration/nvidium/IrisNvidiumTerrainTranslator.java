@@ -62,6 +62,32 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("fogColor", "fogColour"),
             Map.entry("noisetex", "caustiqNoiseTexture"),
             Map.entry("colortex15", "caustiqColortex15"),
+            Map.entry("dhDepthTex", "caustiqDhDepthTexture"),
+            Map.entry("dhDepthTex1", "caustiqDhDepthTexture1"),
+            Map.entry("vxDepthTexOpaque", "caustiqVxDepthTextureOpaque"),
+            Map.entry("vxDepthTexTrans", "caustiqVxDepthTextureTrans"),
+            Map.entry("dhProjection", "caustiqDhProjection"),
+            Map.entry("dhProjectionInverse", "caustiqDhProjectionInverse"),
+            Map.entry("dhPreviousProjection", "caustiqDhPreviousProjection"),
+            Map.entry("dhModelView", "caustiqDhModelView"),
+            Map.entry("dhModelViewInverse", "caustiqDhModelViewInverse"),
+            Map.entry("vxProj", "caustiqVxProjection"),
+            Map.entry("vxProjInv", "caustiqVxProjectionInverse"),
+            Map.entry("vxProjPrev", "caustiqVxPreviousProjection"),
+            Map.entry("dhNearPlane", "caustiqDhNearPlane"),
+            Map.entry("dhFarPlane", "caustiqDhFarPlane"),
+            Map.entry("combined_near", "caustiqCombinedNear"),
+            Map.entry("combined_far", "caustiqCombinedFar"),
+            Map.entry("dhRenderDistance", "caustiqDhRenderDistance"),
+            Map.entry("vxRenderDistance", "caustiqVxRenderDistance"),
+            Map.entry("combined_projection_matrix_0", "caustiqCombinedProjection0"),
+            Map.entry("combined_projection_matrix_1", "caustiqCombinedProjection1"),
+            Map.entry("combined_projection_matrix_2", "caustiqCombinedProjection2"),
+            Map.entry("combined_projection_matrix_3", "caustiqCombinedProjection3"),
+            Map.entry("combined_projection_matrix_inverse_0", "caustiqCombinedProjectionInverse0"),
+            Map.entry("combined_projection_matrix_inverse_1", "caustiqCombinedProjectionInverse1"),
+            Map.entry("combined_projection_matrix_inverse_2", "caustiqCombinedProjectionInverse2"),
+            Map.entry("combined_projection_matrix_inverse_3", "caustiqCombinedProjectionInverse3"),
             Map.entry("normals", "caustiqNormalTexture"),
             Map.entry("specular", "caustiqSpecularTexture"),
             Map.entry("near", "caustiqNear"),
@@ -550,16 +576,24 @@ public final class IrisNvidiumTerrainTranslator {
 
     private static String expectedUniformType(String name) {
         return switch (name) {
-            case "gtexture", "lightmap", "noisetex", "normals", "specular", "colortex15" -> "sampler2D";
-            case "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse" -> "mat4";
+            case "gtexture", "lightmap", "noisetex", "normals", "specular", "colortex15",
+                    "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans" -> "sampler2D";
+            case "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
+                    "dhProjection", "dhProjectionInverse", "dhPreviousProjection", "dhModelView",
+                    "dhModelViewInverse", "vxProj", "vxProjInv", "vxProjPrev" -> "mat4";
             case "cameraPosition", "fogColor", "light_dir", "eyePosition" -> "vec3";
             case "frameTimeCounter", "viewWidth", "viewHeight", "near", "far", "rainStrength",
                     "wetness", "world_age", "time_sunrise", "time_noon", "time_sunset",
-                    "time_midnight", "biome_temperature", "biome_humidity", "alphaTestRef" -> "float";
-            case "frameCounter", "blockEntityId", "entityId", "currentRenderedItemId" -> "int";
+                    "time_midnight", "biome_temperature", "biome_humidity", "alphaTestRef",
+                    "dhNearPlane", "dhFarPlane", "combined_near", "combined_far" -> "float";
+            case "frameCounter", "blockEntityId", "entityId", "currentRenderedItemId",
+                    "dhRenderDistance", "vxRenderDistance" -> "int";
             case "viewSize", "pixelSize", "view_res", "view_pixel_size", "taa_offset" -> "vec2";
             case "atlasSize" -> "ivec2";
-            case "entityColor" -> "vec4";
+            case "entityColor", "combined_projection_matrix_0", "combined_projection_matrix_1",
+                    "combined_projection_matrix_2", "combined_projection_matrix_3",
+                    "combined_projection_matrix_inverse_0", "combined_projection_matrix_inverse_1",
+                    "combined_projection_matrix_inverse_2", "combined_projection_matrix_inverse_3" -> "vec4";
             default -> null;
         };
     }
