@@ -42,8 +42,8 @@ class IrisNvidiumTerrainTranslatorTest {
         String mesh = translated.get("MESH");
         String fragment = translated.get("FRAGMENT");
         assertTrue(mesh.contains("void caustiqIrisVertexMain()"));
-        assertTrue(mesh.contains("caustiqDecodeMidBlock(caustiqCurrentVertex)"));
-        assertTrue(mesh.contains("caustiqDecodeNormal(caustiqCurrentVertex)"));
+        assertTrue(mesh.contains("caustiqDecodeMidBlock(V)"));
+        assertTrue(mesh.contains("caustiqDecodeNormal(V)"));
         assertTrue(mesh.contains("caustiqProjection * caustiqModelView"));
         assertTrue(mesh.contains("gl_MeshVerticesNV[id].gl_Position = caustiqIrisClipPosition;"));
         assertTrue(mesh.contains("OUT[id].texCoord = caustiqIrisVarying_texCoord;"));
