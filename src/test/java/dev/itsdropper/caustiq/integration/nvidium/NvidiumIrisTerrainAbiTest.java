@@ -10,7 +10,9 @@ class NvidiumIrisTerrainAbiTest {
     @Test
     void exposesOnlyAttributesPresentOrDerivableFromPinnedNvidiumFormat() {
         assertTrue(NvidiumIrisTerrainAbi.canRepresentRequiredVertexInputs(List.of(
-                "gl_Vertex", "gl_MultiTexCoord0", "gl_Color", "lmcoord", "gl_Normal")));
+                "gl_Vertex", "gl_MultiTexCoord0", "gl_Color", "lmcoord")));
+        assertFalse(NvidiumIrisTerrainAbi.canRepresentRequiredVertexInputs(List.of("gl_Normal")));
+        assertFalse(NvidiumIrisTerrainAbi.canRepresentRequiredVertexInputs(List.of("viewSpacePosition")));
         assertFalse(NvidiumIrisTerrainAbi.canRepresentRequiredVertexInputs(List.of("mc_Entity")));
         assertFalse(NvidiumIrisTerrainAbi.canRepresentRequiredVertexInputs(List.of("at_midTexCoord")));
         assertFalse(NvidiumIrisTerrainAbi.canRepresentRequiredVertexInputs(List.of("at_midBlock")));
@@ -34,8 +36,10 @@ class NvidiumIrisTerrainAbiTest {
 
     @Test
     void doesNotMisrepresentCameraRelativePositionOrFaceNormals() {
-        assertTrue(NvidiumIrisTerrainAbi.vertexSemantic("viewSpacePosition").orElseThrow()
-                .explanation().contains("not absolute world coordinates"));
+        assertEquals(NvidiumIrisTerrainAbi.Availability.UNAVAILABLE,
+                NvidiumIrisTerrainAbi.vertexSemantic("viewSpacePosition").orElseThrow().availability());
+        assertEquals(NvidiumIrisTerrainAbi.Availability.UNAVAILABLE,
+                NvidiumIrisTerrainAbi.vertexSemantic("gl_Normal").orElseThrow().availability());
         assertTrue(NvidiumIrisTerrainAbi.vertexSemantic("gl_Normal").orElseThrow()
                 .explanation().contains("not a smooth vertex normal"));
     }
