@@ -6,7 +6,7 @@ This branch is the dedicated CAUSTIQ distribution target for Minecraft 1.21.11 w
 
 Experimental — Nvidium terrain integration is not implemented or verified.
 
-This branch requires Sodium 0.8.12 and Nvidium. It retains the same caustiq mod ID as main and produces a separately named caustiq-nvidium artifact. The branch starts with explicit renderer-stack validation and the existing final-colour post-process; it does not hook Nvidium's internal terrain renderer or adapt its mesh-shader output into Iris-style render targets. A successful build or detected Nvidium installation is not proof that Nvidium's accelerated terrain path remains active while shaders run.
+This branch targets the Nvidium 0.4.3-beta13-1.21.11 release and its required Sodium 0.8.12 build. Update both dependency pins together when moving to another Nvidium release. It retains the same caustiq mod ID as main and produces a separately named caustiq-nvidium artifact. The branch starts with explicit renderer-stack validation and the existing final-colour post-process; it does not hook Nvidium's internal terrain renderer or adapt its mesh-shader output into Iris-style render targets. A successful build or detected Nvidium installation is not proof that Nvidium's accelerated terrain path remains active while shaders run.
 
 Nvidium uses a separate mesh-shader terrain pipeline. Full Iris-level support requires a real bridge for terrain colour/depth, gbuffers, shadow rendering, and pipeline synchronization. Do not bypass Nvidium's own shader compatibility behavior or claim support until those paths are implemented and tested in-game.
 
