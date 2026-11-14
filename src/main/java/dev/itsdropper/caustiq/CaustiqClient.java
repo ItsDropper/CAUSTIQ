@@ -3,6 +3,8 @@ package dev.itsdropper.caustiq;
 import dev.itsdropper.caustiq.gui.CaustiqSettingsScreen;
 import dev.itsdropper.caustiq.integration.RendererEnvironment;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumCompatibility;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumShaderProgramBridge;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumTerrainVaryingAdapter;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanner;
@@ -42,7 +44,11 @@ public final class CaustiqClient implements ClientModInitializer {
                 renderer.stack(), renderer.sodiumLoaded(), renderer.nvidiumLoaded());
         NvidiumCompatibility.Status nvidiumStatus = NvidiumCompatibility.inspect(FabricLoader.getInstance()::isModLoaded);
         LOGGER.info("Nvidium distribution dependency check: {}.", nvidiumStatus);
-        LOGGER.warn("Nvidium presence is not renderer integration: this build currently exposes only CAUSTIQ final-colour post-processing. Nvidium mesh-shader terrain, Iris-style gbuffers, shadows, and deferred passes are not yet bridged or verified.");
+        if (renderer.nvidiumLoaded()) {
+            NvidiumShaderProgramBridge.registerNativeSourceAdapter(NvidiumTerrainVaryingAdapter::adapt);
+            LOGGER.info("Installed Nvidium terrain varying profile {} (UV, raw tint, lightmap UV, world position, geometric face normal). Iris shader-pack translation remains disabled until a pack translator is registered.",
+                    NvidiumTerrainVaryingAdapter.PROFILE_ID);
+        }
         LOGGER.info("Caustiq initialized for Minecraft 1.21.11. Shader-pack directory: {}",
                 shaderPackDirectory.toAbsolutePath());
         refreshShaderPacks();
