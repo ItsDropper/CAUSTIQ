@@ -1,37 +1,59 @@
 package dev.itsdropper.caustiq.shaderpack;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Audits an Iris gbuffers_terrain pair against the data and render-target
- * contract currently exposed by Nvidium. This is intentionally a rejection
- * gate, not a GLSL transpiler.
+ * contract currently exposed by Nvidium. This is a rejection gate, not a GLSL
+ * translator: a clean result means the declared interface is representable,
+ * not that arbitrary vertex shader logic has been translated.
  */
 public final class IrisTerrainCompatibilityAnalyzer {
-    private static final Pattern IDENTIFIER = Pattern.compile("\\b[A-Za-z_][A-Za-z0-9_]*\\b");
-    private static final Pattern VERTEX_OUTPUT = Pattern.compile(
-            "(?m)^\\s*(?:flat\\s+|smooth\\s+|noperspective\\s+)?out\\s+\\w+\\s+(\\w+)\\s*(?:\\[[^]]*])?\\s*;");
-    private static final Pattern FRAGMENT_INPUT = Pattern.compile(
-            "(?m)^\\s*(?:flat\\s+|smooth\\s+|noperspective\\s+)?in\\s+\\w+\\s+(\\w+)\\s*(?:\\[[^]]*])?\\s*;");
+    private static final String QUALIFIERS =
+            "(?:(?:flat|smooth|noperspective|centroid|sample|patch|invariant|precise|highp|mediump|lowp)\\s+)*";
+    private static final String LAYOUT = "(?:layout\\s*\\([^)]*\\)\\s*)*";
+    private static final Pattern INTERFACE_DECLARATION = Pattern.compile(
+            "(?m)^\\s*" + LAYOUT + QUALIFIERS
+                    + "(in|out|attribute|varying)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+"
+                    + "([A-Za-z_][A-Za-z0-9_]*)\\s*(?:\\[[^]]*])?\\s*;");
     private static final Pattern FRAGMENT_OUTPUT = Pattern.compile(
-            "(?m)^\\s*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?out\\s+\\w+\\s+(\\w+)\\s*;");
+            "(?m)^\\s*(?:" + LAYOUT + ")"+ QUALIFIERS
+                    + "out\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)"
+                    + "\\s*(?:\\[[^]]*])?\\s*;");
+    private static final Pattern LOCATION = Pattern.compile(
+            "layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)");
     private static final Pattern SAMPLER = Pattern.compile(
-            "\\buniform\\s+(?:[iu]?sampler[A-Za-z0-9_]*|image[A-Za-z0-9_]*)\\s+(\\w+)");
+            "\\buniform\\s+(?:(?:highp|mediump|lowp)\\s+)?"
+                    + "([iu]?sampler[A-Za-z0-9_]*|image[A-Za-z0-9_]*)\\s+"
+                    + "([A-Za-z_][A-Za-z0-9_]*)");
+    private static final Pattern IDENTIFIER = Pattern.compile("\\b[A-Za-z_][A-Za-z0-9_]*\\b");
 
     private static final Set<String> UNAVAILABLE_VERTEX_INPUTS = Set.of(
-            "mc_Entity", "mc_midTexCoord", "at_midTexCoord", "at_midBlock", "at_tangent",
-            "gl_Normal");
+            "mc_Entity", "mc_midTexCoord", "at_midTexCoord", "at_midBlock",
+            "at_tangent", "gl_Normal", "vaNormal");
     private static final Set<String> UNAVAILABLE_TRANSFORMS = Set.of(
-            "gl_ModelViewMatrix", "gl_ProjectionMatrix", "gl_TextureMatrix",
-            "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection",
-            "gbufferProjectionInverse", "cameraPosition");
+            "gl_ModelViewMatrix", "gl_ModelViewMatrixInverse", "gl_ProjectionMatrix",
+            "gl_ProjectionMatrixInverse", "gl_TextureMatrix", "gbufferModelView",
+            "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
+            "cameraPosition", "gbufferPreviousModelView", "gbufferPreviousProjection");
     private static final Set<String> AVAILABLE_SAMPLERS = Set.of(
             "gtexture", "lightmap", "tex_diffuse", "tex_light");
+    private static final Map<String, String> AVAILABLE_VERTEX_ATTRIBUTES = Map.ofEntries(
+            Map.entry("gl_Vertex", "packed position"),
+            Map.entry("gl_MultiTexCoord0", "packed terrain UV"),
+            Map.entry("gl_MultiTexCoord1", "packed lightmap UV"),
+            Map.entry("gl_Color", "packed vertex tint"),
+            Map.entry("vaPosition", "packed position"),
+            Map.entry("vaUV0", "packed terrain UV"),
+            Map.entry("vaUV2", "packed lightmap UV"),
+            Map.entry("vaColor", "packed vertex tint"));
 
     public Result analyze(String vertexSource, String fragmentSource) {
         if (vertexSource == null || vertexSource.isBlank()
@@ -58,54 +80,97 @@ public final class IrisTerrainCompatibilityAnalyzer {
             }
         }
 
-        Set<String> vertexOutputs = declarations(VERTEX_OUTPUT, vertex, 1);
-        Set<String> fragmentInputs = declarations(FRAGMENT_INPUT, fragment, 1);
-        for (String input : fragmentInputs) {
-            if (!vertexOutputs.contains(input) && !Set.of(
-                    "uv", "v_colour", "v_vertexColour", "v_lightmapCoord",
-                    "v_renderPosition", "v_normal", "v_materialFlags").contains(input)) {
-                issues.add(new Issue("UNMAPPED_VARYING", input,
-                        "The fragment input has no matching vertex output or Nvidium varying mapping."));
+        Map<String, Declaration> vertexOutputs = declarations(vertex, Set.of("out", "varying"));
+        Map<String, Declaration> fragmentInputs = declarations(fragment, Set.of("in", "varying"));
+        Map<String, Declaration> vertexAttributes = declarations(vertex, Set.of("attribute", "in"));
+        for (Declaration attribute : vertexAttributes.values()) {
+            if (UNAVAILABLE_VERTEX_INPUTS.contains(attribute.name())) continue;
+            if (!AVAILABLE_VERTEX_ATTRIBUTES.containsKey(attribute.name())) {
+                issues.add(new Issue("UNMAPPED_VERTEX_INPUT", attribute.name(),
+                        "Nvidium's packed terrain vertex has no source for this declared vertex attribute."));
             }
         }
-        for (String output : vertexOutputs) {
-            if (!fragmentInputs.contains(output) && !Set.of("gl_Position").contains(output)) {
-                issues.add(new Issue("UNCONSUMED_VERTEX_OUTPUT", output,
+
+        for (Declaration input : fragmentInputs.values()) {
+            Declaration output = vertexOutputs.get(input.name());
+            if (output == null && !NvidiumVaryings.contains(input.name())) {
+                issues.add(new Issue("UNMAPPED_VARYING", input.name(),
+                        "The fragment input has no matching vertex output or Nvidium varying mapping."));
+            } else if (output != null && !output.type().equals(input.type())) {
+                issues.add(new Issue("VARYING_TYPE_MISMATCH", input.name(),
+                        "Vertex output type " + output.type() + " does not match fragment input type " + input.type() + "."));
+            }
+        }
+        for (Declaration output : vertexOutputs.values()) {
+            if (!fragmentInputs.containsKey(output.name()) && !output.name().equals("gl_Position")) {
+                issues.add(new Issue("UNCONSUMED_VERTEX_OUTPUT", output.name(),
                         "The vertex output is not represented in Nvidium's mesh-to-fragment ABI."));
             }
         }
 
-        Matcher outputs = FRAGMENT_OUTPUT.matcher(fragment);
-        int outputCount = 0;
-        while (outputs.find()) {
-            outputCount++;
-            String location = outputs.group(1);
-            if (location != null && Integer.parseInt(location) != 0) {
-                issues.add(new Issue("MULTIPLE_RENDER_TARGETS", outputs.group(2),
-                        "Nvidium's current terrain fragment pipeline does not provide Iris MRT attachment routing."));
-            }
-        }
-        if (outputCount > 1 && issues.stream().noneMatch(i -> i.code().equals("MULTIPLE_RENDER_TARGETS"))) {
-            issues.add(new Issue("MULTIPLE_RENDER_TARGETS", Integer.toString(outputCount),
-                    "Nvidium's current terrain fragment pipeline does not provide Iris MRT attachment routing."));
-        }
-
+        auditFragmentOutputs(fragment, issues);
         Matcher samplers = SAMPLER.matcher(vertex + "\\n" + fragment);
         while (samplers.find()) {
-            String sampler = samplers.group(1);
+            String sampler = samplers.group(2);
             if (!AVAILABLE_SAMPLERS.contains(sampler)) {
                 issues.add(new Issue("UNBOUND_SAMPLER", sampler,
                         "The sampler has no binding in Nvidium's current terrain shader pipeline."));
             }
         }
 
-        return new Result(issues);
+        if (vertexIdentifiers.contains("gl_TexCoord")) {
+            issues.add(new Issue("UNSUPPORTED_TEXTURE_COORDINATE_SET", "gl_TexCoord",
+                    "Only texture coordinate set 0 (terrain UV) and set 1 (lightmap UV) are represented."));
+        }
+        if (fragmentIdentifiers.contains("gl_FragData")) {
+            issues.add(new Issue("MULTIPLE_RENDER_TARGETS", "gl_FragData",
+                    "Nvidium's current terrain fragment pipeline does not provide Iris MRT attachment routing."));
+        }
+        if (fragmentIdentifiers.contains("gl_FragDepth")) {
+            issues.add(new Issue("CUSTOM_FRAGMENT_DEPTH", "gl_FragDepth",
+                    "The Nvidium terrain pipeline does not currently preserve custom Iris fragment depth writes."));
+        }
+
+        return new Result(deduplicate(issues));
     }
 
-    private static Set<String> declarations(Pattern pattern, String source, int group) {
-        Set<String> result = new LinkedHashSet<>();
-        Matcher matcher = pattern.matcher(source);
-        while (matcher.find()) result.add(matcher.group(group));
+    private static void auditFragmentOutputs(String source, List<Issue> issues) {
+        Matcher matcher = FRAGMENT_OUTPUT.matcher(source);
+        int outputCount = 0;
+        Set<Integer> locations = new LinkedHashSet<>();
+        while (matcher.find()) {
+            outputCount++;
+            int declarationStart = matcher.start();
+            int lineStart = source.lastIndexOf('\\n', declarationStart);
+            String declarationPrefix = source.substring(lineStart + 1, declarationStart);
+            Matcher location = LOCATION.matcher(declarationPrefix);
+            if (location.find()) {
+                int index = Integer.parseInt(location.group(1));
+                locations.add(index);
+                if (index != 0) {
+                    issues.add(new Issue("MULTIPLE_RENDER_TARGETS", matcher.group(2),
+                            "Nvidium's current terrain fragment pipeline only exposes the primary color target (location 0)."));
+                }
+            } else if (outputCount > 1) {
+                issues.add(new Issue("MULTIPLE_RENDER_TARGETS", matcher.group(2),
+                        "Multiple fragment outputs require explicit attachment routing, which Nvidium does not provide."));
+            }
+        }
+        if (outputCount > 1 && locations.size() <= 1
+                && issues.stream().noneMatch(issue -> issue.code().equals("MULTIPLE_RENDER_TARGETS"))) {
+            issues.add(new Issue("MULTIPLE_RENDER_TARGETS", Integer.toString(outputCount),
+                    "Nvidium's current terrain fragment pipeline does not provide Iris MRT attachment routing."));
+        }
+    }
+
+    private static Map<String, Declaration> declarations(String source, Set<String> storage) {
+        Map<String, Declaration> result = new LinkedHashMap<>();
+        Matcher matcher = INTERFACE_DECLARATION.matcher(source);
+        while (matcher.find()) {
+            String qualifier = matcher.group(1);
+            if (!storage.contains(qualifier)) continue;
+            result.put(matcher.group(3), new Declaration(matcher.group(2), matcher.group(3), qualifier));
+        }
         return result;
     }
 
@@ -116,9 +181,24 @@ public final class IrisTerrainCompatibilityAnalyzer {
         return result;
     }
 
+    private static List<Issue> deduplicate(List<Issue> issues) {
+        Map<String, Issue> unique = new LinkedHashMap<>();
+        for (Issue issue : issues) unique.putIfAbsent(issue.code() + "\\0" + issue.symbol(), issue);
+        return List.copyOf(unique.values());
+    }
+
     private static String stripComments(String source) {
         return source.replaceAll("(?s)/\\*.*?\\*/", " ")
                 .replaceAll("(?m)//.*$", " ");
+    }
+
+    private record Declaration(String type, String name, String storage) { }
+
+    private static final class NvidiumVaryings {
+        private static final Set<String> VALUES = Set.of(
+                "uv", "v_colour", "v_vertexColour", "v_lightmapCoord",
+                "v_renderPosition", "v_normal", "v_materialFlags");
+        private static boolean contains(String name) { return VALUES.contains(name); }
     }
 
     public record Issue(String code, String symbol, String explanation) {
