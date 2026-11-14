@@ -12,13 +12,23 @@ base { archivesName.set(property("archives_base_name") as String) }
 repositories {
     mavenCentral()
     maven { name = "CaffeineMC"; url = uri("https://maven.caffeinemc.net/releases") }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Modrinth"
+                url = uri("https://api.modrinth.com/maven")
+            }
+        }
+        filter { includeGroup("maven.modrinth") }
+    }
 }
 
 dependencies {
     minecraft("com.mojang:minecraft:" + property("minecraft_version"))
     mappings(loom.officialMojangMappings())
     modImplementation("net.fabricmc:fabric-loader:" + property("loader_version"))
-    modCompileOnly("net.caffeinemc:sodium-fabric-api:0.8.12+mc1.21.11")
+    // Internal chunk encoder/format types are required for the Nvidium-compatible extended terrain vertex ABI.
+    modCompileOnly("maven.modrinth:AANobbMI:NFkjnzWE")
     testImplementation(platform("org.junit:junit-bom:5.12.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
