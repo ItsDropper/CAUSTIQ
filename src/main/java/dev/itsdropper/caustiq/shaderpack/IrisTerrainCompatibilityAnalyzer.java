@@ -25,7 +25,7 @@ public final class IrisTerrainCompatibilityAnalyzer {
 
     private static final Set<String> UNAVAILABLE_VERTEX_INPUTS = Set.of(
             "mc_Entity", "mc_midTexCoord", "at_midTexCoord", "at_midBlock", "at_tangent",
-            "gl_Normal", "gl_MultiTexCoord1");
+            "gl_Normal");
     private static final Set<String> UNAVAILABLE_TRANSFORMS = Set.of(
             "gl_ModelViewMatrix", "gl_ProjectionMatrix", "gl_TextureMatrix",
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection",
