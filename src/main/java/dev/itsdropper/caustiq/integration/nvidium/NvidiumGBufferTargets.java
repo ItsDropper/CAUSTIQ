@@ -4,6 +4,7 @@ import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import dev.itsdropper.caustiq.CaustiqClient;
+import dev.itsdropper.caustiq.shaderpack.IrisTerrainPassScheduler;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL20C;
@@ -13,6 +14,7 @@ import org.lwjgl.system.MemoryStack;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
+import java.util.Map;
 
 /**
  * Temporarily adds CAUSTIQ's auxiliary terrain G-buffer attachments to the
@@ -39,8 +41,16 @@ public final class NvidiumGBufferTargets {
     private static int height;
     private static FramebufferState activeState;
     private static boolean warnedUnavailable;
+    private static Map<Integer, IrisTerrainPassScheduler.RenderTarget> targetSpecs = Map.of();
+    private static boolean formatsDirty = true;
 
     private NvidiumGBufferTargets() { }
+
+    /** Applies Iris colortex format/filter/clear directives before the next terrain draw. */
+    public static void configureTargets(Map<Integer, IrisTerrainPassScheduler.RenderTarget> specs) {
+        targetSpecs = Map.copyOf(specs);
+        formatsDirty = true;
+    }
 
     /** Called at the Nvidium primary terrain rasterizer boundary, on the render thread. */
     public static boolean begin() {
@@ -135,8 +145,8 @@ public final class NvidiumGBufferTargets {
 
     /** Minecraft GPU view for sampling this attachment in a RenderPass. */
     public static GpuTextureView view(int attachment) {
-        if (attachment < NORMAL || attachment > LIGHTMAP) {
-            throw new IllegalArgumentException("G-buffer attachment must be between 1 and 4.");
+        if (attachment < NORMAL || attachment > MAX_ATTACHMENT) {
+            throw new IllegalArgumentException("G-buffer attachment must be between 1 and " + MAX_ATTACHMENT + ".");
         }
         TextureTarget target = TARGETS[attachment - 1];
         return target == null ? null : target.getColorTextureView();
@@ -156,6 +166,8 @@ public final class NvidiumGBufferTargets {
         }
         width = 0;
         height = 0;
+        targetSpecs = Map.of();
+        formatsDirty = true;
     }
 
     private static void ensureTargets(int newWidth, int newHeight) {
@@ -173,15 +185,32 @@ public final class NvidiumGBufferTargets {
         int previousTextureBinding = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
         try {
             for (int i = 0; i < TARGETS.length; i++) {
+                int index = i + 1;
+                IrisTerrainPassScheduler.RenderTarget spec = targetSpecs.get(index);
+                if (spec != null && (spec.scaleX() != 1.0f || spec.scaleY() != 1.0f)) {
+                    throw new IllegalArgumentException("Scaled colortex" + index
+                            + " cannot be attached to Nvidium's fixed-size terrain framebuffer.");
+                }
+                FormatDescriptor format = format(spec == null ? "RGBA16F" : spec.format());
+                boolean nearest = spec != null && spec.nearest();
+                boolean mipmap = spec != null && spec.mipmap();
                 TEXTURES[i] = ((GlTexture) TARGETS[i].getColorTexture()).glId();
                 GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, TEXTURES[i]);
-                GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_NEAREST);
-                GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_NEAREST);
+                GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER,
+                        mipmap ? GL11C.GL_LINEAR_MIPMAP_LINEAR : (nearest ? GL11C.GL_NEAREST : GL11C.GL_LINEAR));
+                GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER,
+                        nearest ? GL11C.GL_NEAREST : GL11C.GL_LINEAR);
                 GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, GL12_CLAMP_TO_EDGE);
                 GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, GL12_CLAMP_TO_EDGE);
+                if (formatsDirty || width != newWidth || height != newHeight) {
+                    GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, format.internalFormat(),
+                            newWidth, newHeight, 0, format.externalFormat(), format.dataType(),
+                            (java.nio.ByteBuffer) null);
+                }
             }
             width = newWidth;
             height = newHeight;
+            formatsDirty = false;
         } finally {
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTextureBinding);
             GL13C.glActiveTexture(previousActiveTexture);
@@ -193,15 +222,50 @@ public final class NvidiumGBufferTargets {
     private static void clearAuxiliaryAttachments() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             for (int i = 0; i < ATTACHMENT_COUNT; i++) {
+                int index = i + 1;
+                IrisTerrainPassScheduler.RenderTarget spec = targetSpecs.get(index);
+                if (spec != null && !spec.clear() && spec.persistent()) continue;
+                float[] color = parseClearColor(spec == null ? "0.0 0.0 0.0 0.0" : spec.clearColor());
                 FloatBuffer clearValue = stack.mallocFloat(4);
-                if (i == 0) {
-                    clearValue.put(0, 0.5f).put(1, 0.5f).put(2, 1.0f).put(3, 0.0f);
-                } else {
-                    clearValue.put(0, 0).put(1, 0).put(2, 0).put(3, 0);
-                }
-                GL30C.glClearBufferfv(GL11C.GL_COLOR, i + 1, clearValue);
+                clearValue.put(color).flip();
+                GL30C.glClearBufferfv(GL11C.GL_COLOR, index, clearValue);
             }
         }
+    }
+
+    private static float[] parseClearColor(String value) {
+        String[] components = value.trim().split("[\\s,]+");
+        if (components.length == 1) {
+            float gray = Float.parseFloat(components[0]);
+            return new float[]{gray, gray, gray, 1.0f};
+        }
+        if (components.length != 3 && components.length != 4) {
+            throw new IllegalArgumentException("Invalid Iris colortex clear color: " + value);
+        }
+        float[] result = new float[]{0.0f, 0.0f, 0.0f, 1.0f};
+        for (int i = 0; i < components.length; i++) result[i] = Float.parseFloat(components[i]);
+        return result;
+    }
+
+    private static FormatDescriptor format(String name) {
+        return switch (name.toUpperCase(java.util.Locale.ROOT)) {
+            case "RGBA8" -> new FormatDescriptor(GL30C.GL_RGBA8, GL11C.GL_RGBA, GL11C.GL_UNSIGNED_BYTE);
+            case "RGBA16F" -> new FormatDescriptor(GL30C.GL_RGBA16F, GL11C.GL_RGBA, GL30C.GL_HALF_FLOAT);
+            case "RGBA32F" -> new FormatDescriptor(GL30C.GL_RGBA32F, GL11C.GL_RGBA, GL11C.GL_FLOAT);
+            case "RGB8" -> new FormatDescriptor(GL30C.GL_RGB8, GL11C.GL_RGB, GL11C.GL_UNSIGNED_BYTE);
+            case "RGB16F" -> new FormatDescriptor(GL30C.GL_RGB16F, GL11C.GL_RGB, GL30C.GL_HALF_FLOAT);
+            case "RGB32F" -> new FormatDescriptor(GL30C.GL_RGB32F, GL11C.GL_RGB, GL30C.GL_FLOAT);
+            case "RG8" -> new FormatDescriptor(GL30C.GL_RG8, GL30C.GL_RG, GL11C.GL_UNSIGNED_BYTE);
+            case "RG16F" -> new FormatDescriptor(GL30C.GL_RG16F, GL30C.GL_RG, GL30C.GL_HALF_FLOAT);
+            case "RG32F" -> new FormatDescriptor(GL30C.GL_RG32F, GL30C.GL_RG, GL30C.GL_FLOAT);
+            case "R8" -> new FormatDescriptor(GL30C.GL_R8, GL11C.GL_RED, GL11C.GL_UNSIGNED_BYTE);
+            case "R16F" -> new FormatDescriptor(GL30C.GL_R16F, GL11C.GL_RED, GL30C.GL_HALF_FLOAT);
+            case "R32F" -> new FormatDescriptor(GL30C.GL_R32F, GL11C.GL_RED, GL30C.GL_FLOAT);
+            case "RGB10_A2" -> new FormatDescriptor(GL30C.GL_RGB10_A2, GL11C.GL_RGBA, GL30C.GL_UNSIGNED_INT_2_10_10_10_REV);
+            case "R11F_G11F_B10F" -> new FormatDescriptor(GL30C.GL_R11F_G11F_B10F, GL11C.GL_RGB,
+                    GL30C.GL_UNSIGNED_INT_10F_11F_11F_REV);
+            default -> throw new IllegalArgumentException("Unsupported Iris colortex format: " + name);
+        };
     }
 
     private static void restore(FramebufferState state) {
@@ -234,6 +298,7 @@ public final class NvidiumGBufferTargets {
     private static final int GL13_ACTIVE_TEXTURE = 0x84E0;
     private static final int GL12_CLAMP_TO_EDGE = 0x812F;
 
+    private record FormatDescriptor(int internalFormat, int externalFormat, int dataType) { }
     private record AttachmentState(int type, int object, int level, int cubeFace) { }
     private record FramebufferState(int framebuffer, int[] drawBuffers, AttachmentState[] attachments) {
         private FramebufferState {
