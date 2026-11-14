@@ -140,6 +140,16 @@ class IrisShaderPackParserTest {
                 layout(location = 0) out vec4 color;
                 void main() { color = vec4(uv, 0.0, 1.0); }
                 """);
+        Files.writeString(shaders.resolve("gbuffers_terrain_cutout.vsh"), """
+                #version 400
+                uniform float frameTimeCounter;
+                void main() { gl_Position = gl_Vertex + vec4(frameTimeCounter); }
+                """);
+        Files.writeString(shaders.resolve("gbuffers_terrain_cutout.fsh"), """
+                #version 400
+                layout(location = 0) out vec4 color;
+                void main() { color = vec4(1.0); }
+                """);
 
         ShaderPackDescriptor descriptor = new ShaderPackDescriptor("dimension", "DimensionPack",
                 temporaryDirectory.resolve("DimensionPack"), "", ShaderPackSourceType.DIRECTORY,
@@ -149,6 +159,9 @@ class IrisShaderPackParserTest {
             assertTrue(model.diagnostics().stream().anyMatch(issue ->
                     issue.contains("world0 gbuffers_terrain ABI") && issue.contains("at_tangent")),
                     model.diagnostics().toString());
+            assertTrue(model.diagnostics().stream().anyMatch(issue ->
+                    issue.contains("world0 gbuffers_terrain_cutout ABI")
+                            && issue.contains("frameTimeCounter")), model.diagnostics().toString());
         }
     }
 
