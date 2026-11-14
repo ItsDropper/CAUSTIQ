@@ -11,7 +11,7 @@ import java.util.function.UnaryOperator;
 public final class NvidiumShaderProgramBridge {
     private static final Set<String> TERRAIN_STAGES = Set.of("TASK", "MESH", "FRAGMENT");
     private static final AtomicReference<Snapshot> LAST_TERRAIN_PROGRAM = new AtomicReference<>();
-    private static volatile UnaryOperator<Map<String, String>> nativeSourceAdapter;
+    private static volatile UnaryOperator<Map<String, String>> nativeSourceAdapter = NvidiumTerrainVaryingAdapter::adapt;
     private static volatile UnaryOperator<Map<String, String>> irisTerrainAdapter;
 
     private NvidiumShaderProgramBridge() { }
