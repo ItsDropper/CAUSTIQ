@@ -82,6 +82,7 @@ public final class NvidiumIrisTextureBridge {
 
     private static int createTexture(int width, int height, ByteBuffer pixels) {
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
+        int previousBinding = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
         int texture = GL11C.glGenTextures();
         GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
         GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_LINEAR);
@@ -90,6 +91,7 @@ public final class NvidiumIrisTextureBridge {
         GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, GL11C.GL_REPEAT);
         GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_RGBA8,
                 width, height, 0, GL11C.GL_RGBA, GL11C.GL_UNSIGNED_BYTE, pixels);
+        GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousBinding);
         GL13C.glActiveTexture(previousActive);
         return texture;
     }
