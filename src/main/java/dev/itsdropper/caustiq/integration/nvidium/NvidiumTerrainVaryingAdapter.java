@@ -99,7 +99,7 @@ public final class NvidiumTerrainVaryingAdapter {
             "    float handedness = dot(cross(caustiqTriangleNormal, tangent), bitangent) < 0.0 ? -1.0 : 1.0;",
             "    caustiqTriangleTangent = vec4(tangent, handedness);",
             "    caustiqTriangleTbn = mat3(tangent, bitangent, caustiqTriangleNormal);",
-            "}") + "\\n";
+            "}";
 
     private NvidiumTerrainVaryingAdapter() { }
 
