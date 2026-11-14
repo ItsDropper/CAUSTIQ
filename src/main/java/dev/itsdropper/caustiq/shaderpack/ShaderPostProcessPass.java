@@ -42,6 +42,9 @@ public final class ShaderPostProcessPass implements AutoCloseable {
             pass.bindTexture("colortex2", textureOrMain(NvidiumGBufferTargets.POSITION, mainTarget), sampler);
             pass.bindTexture("colortex3", textureOrMain(NvidiumGBufferTargets.MATERIAL, mainTarget), sampler);
             pass.bindTexture("colortex4", textureOrMain(NvidiumGBufferTargets.LIGHTMAP, mainTarget), sampler);
+            pass.bindTexture("colortex5", textureOrMain(5, mainTarget), sampler);
+            pass.bindTexture("colortex6", textureOrMain(6, mainTarget), sampler);
+            pass.bindTexture("colortex7", textureOrMain(7, mainTarget), sampler);
             pass.bindTexture("gcolor", mainTarget.getColorTextureView(), sampler);
             pass.bindTexture("texture", mainTarget.getColorTextureView(), sampler);
             pass.bindTexture("tex", mainTarget.getColorTextureView(), sampler);
