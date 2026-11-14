@@ -14,6 +14,11 @@ import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Objects;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -105,6 +110,43 @@ public final class ShaderPackSources implements GlslPreprocessor.SourceProvider,
             }
         }
         paths.sort(Comparator.naturalOrder());
+        return List.copyOf(paths);
+    }
+
+    /** Lists bounded, normalized shader-relative paths without extracting archives. */
+    public List<String> listShaderFiles() throws IOException {
+        final int maximumEntries = 50_000;
+        List<String> paths = new ArrayList<>();
+        if (archive != null) {
+            Enumeration<? extends ZipEntry> entries = archive.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                if (entry.isDirectory() || !entry.getName().startsWith(archivePrefix)) continue;
+                String relative = entry.getName().substring(archivePrefix.length());
+                if (relative.isEmpty()) continue;
+                paths.add(validateRelativePath(relative));
+                if (paths.size() > maximumEntries) {
+                    throw new IOException("Shader archive contains more than " + maximumEntries + " source entries.");
+                }
+            }
+        } else {
+            try (Stream<Path> walk = Files.walk(directoryRoot, 32)) {
+                List<Path> files = walk.limit(maximumEntries + 1L)
+                        .filter(path -> !path.equals(directoryRoot))
+                        .filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
+                        .toList();
+                if (files.size() > maximumEntries) {
+                    throw new IOException("Shader directory contains more than " + maximumEntries + " entries.");
+                }
+                for (Path file : files) {
+                    if (Files.isSymbolicLink(file)) continue;
+                    String relative = directoryRoot.relativize(file).toString()
+                            .replace(file.getFileSystem().getSeparator(), "/");
+                    paths.add(validateRelativePath(relative));
+                }
+            }
+        }
+        Collections.sort(paths);
         return List.copyOf(paths);
     }
 
