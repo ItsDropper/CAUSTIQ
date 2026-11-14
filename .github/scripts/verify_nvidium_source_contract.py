@@ -88,8 +88,8 @@ assert "caustiqDecodeMidBlock(Vertex vertex)" in adapter, "Packed midpoint block
 assert "caustiqDecodeBlockEntity(uint packed)" in adapter, "Packed mc_Entity decoder is missing"
 assert "flat mat3 v_tbn;" in adapter and "OUT[id].v_tbn = caustiqDecodeTbn(V);" in adapter
 assert "uint nvidiumMaterial;" in adapter and "V.nvidiumMaterial" in adapter
-assert "putVertex(uint id, Vertex V, uint quadId)" in adapter, "Mesh varying writer does not receive quad identity"
-assert "transformMat * vec4(decodeVertexPosition(vertex) + origin, 1.0)" in adapter, "Terrain render position is not transformed"
+assert "OUT[id].v_renderPosition = (transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)).xyz;" in adapter
+assert "OUT[id].v_quadMidPosition = (transformMat * vec4(decodeVertexPosition(V) + origin + OUT[id].v_midBlock, 1.0)).xyz;" in adapter
 assert "flat uint v_materialFlags;" in adapter and "V.nvidiumMaterial" in adapter
 assert "layout(location = 4) out vec4 caustiqGBufferLightmap;" in adapter
 assert "caustiqGBufferNormal = vec4(normalize(v_normal)" in adapter
@@ -106,7 +106,7 @@ assert 'DIFFUSE_ATLAS_TEXTURE_UNIT = 0' in abi and 'LIGHTMAP_TEXTURE_UNIT = 1' i
 assert 'Availability.UNAVAILABLE' in abi
 # Verify the extended vertex encoder and Nvidium's CPU-side repackager use the same 40-byte stride.
 nvidium_repackager = source("src/main/java/me/cortex/nvidium/sodiumCompat/SodiumResultCompatibility.java")
-assert "private static int formatSize" in nvidium_repackager
+assert "int formatSize = Nvidium.config.use_sodium_vertex_format" in nvidium_repackager
 assert "copyQuad" in nvidium_repackager
 vertex_encoder = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
 assert "STRIDE = 40" in vertex_encoder
