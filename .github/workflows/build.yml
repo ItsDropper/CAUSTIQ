@@ -25,6 +25,17 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Verify pinned Nvidium source and mixin contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          nvidium_dir="$RUNNER_TEMP/nvidium-source"
+          mkdir -p "$nvidium_dir"
+          curl --fail --silent --show-error --location \
+            "https://github.com/MCRcortex/nvidium/archive/e600501ab840ba821bbea8bb36616feec8e476ef.tar.gz" \
+            | tar -xz --strip-components=1 -C "$nvidium_dir"
+          python3 .github/scripts/verify_nvidium_source_contract.py "$nvidium_dir" "$GITHUB_WORKSPACE"
+
       - name: Build mod and package example shader pack
         shell: bash
         run: |
