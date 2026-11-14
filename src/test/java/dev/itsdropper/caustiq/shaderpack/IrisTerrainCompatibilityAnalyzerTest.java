@@ -241,4 +241,24 @@ class IrisTerrainCompatibilityAnalyzerTest {
         assertTrue(result.compatible(), result.issues().toString());
     }
 
+    @Test
+    void doesNotTreatFragmentBindingsAsAvailableInTheVertexStage() {
+        String vertex = """
+                #version 400
+                uniform float viewWidth;
+                uniform sampler2D gtexture;
+                void main() { gl_Position = vec4(texture(gtexture, vec2(viewWidth))); }
+                """;
+        String fragment = """
+                #version 400
+                layout(location = 0) out vec4 color;
+                void main() { color = vec4(1.0); }
+                """;
+        var result = analyzer.analyze(vertex, fragment);
+        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNBOUND_UNIFORM")
+                && i.symbol().equals("viewWidth")));
+        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNBOUND_SAMPLER")
+                && i.symbol().equals("gtexture")));
+    }
+
 }
