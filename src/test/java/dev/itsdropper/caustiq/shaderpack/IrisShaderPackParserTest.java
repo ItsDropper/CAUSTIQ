@@ -117,9 +117,9 @@ class IrisShaderPackParserTest {
                 ShaderPackLayout.OPTIFINE_STYLE, 2, 2, 0);
         try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
-            assertTrue(model.diagnostics().stream().anyMatch(issue -> issue.contains("at_tangent")));
-            assertTrue(model.diagnostics().stream().anyMatch(issue -> issue.contains("mc_Entity")));
-            assertTrue(model.diagnostics().stream().anyMatch(issue -> issue.contains("cameraPosition")));
+            assertFalse(model.diagnostics().stream().anyMatch(issue -> issue.contains("at_tangent")));
+            assertFalse(model.diagnostics().stream().anyMatch(issue -> issue.contains("mc_Entity")));
+            assertFalse(model.diagnostics().stream().anyMatch(issue -> issue.contains("cameraPosition")));
             assertTrue(model.diagnostics().stream().anyMatch(issue -> issue.contains("MULTIPLE_RENDER_TARGETS")));
             assertTrue(model.diagnostics().stream().anyMatch(issue -> issue.contains("noisetex")));
         }
@@ -130,7 +130,7 @@ class IrisShaderPackParserTest {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("DimensionPack/shaders/world0"));
         Files.writeString(shaders.resolve("gbuffers_terrain.vsh"), """
                 #version 400
-                attribute vec4 at_tangent;
+                attribute vec4 customTangent;
                 out vec2 uv;
                 void main() { uv = vec2(0.0); gl_Position = vec4(0.0); }
                 """);
@@ -142,8 +142,8 @@ class IrisShaderPackParserTest {
                 """);
         Files.writeString(shaders.resolve("gbuffers_terrain_cutout.vsh"), """
                 #version 400
-                uniform float frameTimeCounter;
-                void main() { gl_Position = gl_Vertex + vec4(frameTimeCounter); }
+                uniform float unsupportedPackClock;
+                void main() { gl_Position = gl_Vertex + vec4(unsupportedPackClock); }
                 """);
         Files.writeString(shaders.resolve("gbuffers_terrain_cutout.fsh"), """
                 #version 400
@@ -157,11 +157,11 @@ class IrisShaderPackParserTest {
         try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
             assertTrue(model.diagnostics().stream().anyMatch(issue ->
-                    issue.contains("world0 gbuffers_terrain ABI") && issue.contains("at_tangent")),
+                    issue.contains("world0 gbuffers_terrain ABI") && issue.contains("customTangent")),
                     model.diagnostics().toString());
             assertTrue(model.diagnostics().stream().anyMatch(issue ->
                     issue.contains("world0 gbuffers_terrain_cutout ABI")
-                            && issue.contains("frameTimeCounter")), model.diagnostics().toString());
+                            && issue.contains("unsupportedPackClock")), model.diagnostics().toString());
         }
     }
 
