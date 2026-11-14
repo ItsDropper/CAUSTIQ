@@ -1,0 +1,84 @@
+package dev.itsdropper.caustiq.shaderpack;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class IrisTerrainPassSchedulerTest {
+    @TempDir Path temporaryDirectory;
+
+    @Test
+    void ordersIrisPassGroupsAndTracksColortexDependencies() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("Pack/shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), """
+                colortex0Format=RGBA16F
+                colortex0Clear=false
+                colortex0Mipmap=true
+                colortex1Format=RGB10_A2
+                colortex1Scale=0.5
+                program.composite2.enabled=true
+                program.composite3.enabled=false
+                """);
+        writeProgram(shaders, "gbuffers_terrain",
+                "out vec4 albedo; void main(){ albedo=vec4(1.0); }");
+        writeProgram(shaders, "composite2",
+                "uniform sampler2D colortex0; out vec4 result; void main(){ result=texture(colortex0, vec2(0.5)); }");
+        writeProgram(shaders, "composite3",
+                "out vec4 result; void main(){ result=vec4(0.0); }");
+        writeProgram(shaders, "final",
+                "uniform sampler2D colortex0; out vec4 result; void main(){ result=texture(colortex0, vec2(0.5)); }");
+
+        ShaderPackDescriptor descriptor = descriptor("Pack", 8);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
+
+            assertEquals(java.util.List.of("gbuffers_terrain", "composite2", "final"),
+                    plan.orderedProgramNames());
+            assertEquals("RGBA16F", plan.targets().get(0).format());
+            assertFalse(plan.targets().get(0).clear());
+            assertTrue(plan.targets().get(0).mipmap());
+            assertEquals(0.5f, plan.targets().get(1).scaleX());
+            assertTrue(plan.passes().get(1).dependencies().contains("gbuffers_terrain"));
+            assertTrue(plan.passes().get(2).dependencies().contains("composite2"));
+        }
+    }
+
+    @Test
+    void dimensionOverrideIsASeparateProgramSetRatherThanMergedWithBase() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("DimensionPack/shaders"));
+        Files.writeString(shaders.resolve("dimension.properties"), "dimension.world0=minecraft:overworld\n");
+        writeProgram(shaders, "gbuffers_terrain",
+                "out vec4 result; void main(){ result=vec4(1.0); }");
+        Path world = Files.createDirectories(shaders.resolve("world0"));
+        writeProgram(world, "final",
+                "out vec4 result; void main(){ result=vec4(0.5); }");
+
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor("DimensionPack", 3))) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler()
+                    .schedule(model, "minecraft:overworld");
+            assertEquals("world0", plan.dimensionDirectory());
+            assertEquals(java.util.List.of("final"), plan.orderedProgramNames());
+        }
+    }
+
+    private void writeProgram(Path directory, String name, String fragment) throws IOException {
+        Files.writeString(directory.resolve(name + ".vsh"), """
+                #version 150
+                void main(){ gl_Position=vec4(0.0); }
+                """);
+        Files.writeString(directory.resolve(name + ".fsh"), "#version 150\n" + fragment);
+    }
+
+    private ShaderPackDescriptor descriptor(String name, int fileCount) {
+        return new ShaderPackDescriptor(name.toLowerCase(), name,
+                temporaryDirectory.resolve(name), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, fileCount, fileCount, 0);
+    }
+}
