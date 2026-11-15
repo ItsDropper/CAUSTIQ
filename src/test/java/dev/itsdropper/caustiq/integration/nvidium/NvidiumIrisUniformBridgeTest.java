@@ -25,6 +25,19 @@ class NvidiumIrisUniformBridgeTest {
     }
 
     @Test
+    void exposesIrisBiomeTemperatureAndRainfallUniforms() {
+        Map<String, Double> values = new HashMap<>();
+        NvidiumIrisUniformBridge.putBiomeUniforms(values, 0.8f, 0.4f);
+        assertEquals(0.8, values.get("temperature"), 1.0e-6);
+        assertEquals(0.4, values.get("rainfall"), 1.0e-6);
+
+        values.clear();
+        NvidiumIrisUniformBridge.putBiomeUniforms(values, Float.NaN, Float.NaN);
+        assertEquals(0.0, values.get("temperature"));
+        assertEquals(0.0, values.get("rainfall"));
+    }
+
+    @Test
     void exposesColumnMajorMatrixComponentsForIrisCustomExpressions() {
         Map<String, Double> values = new HashMap<>();
         float[] matrix = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
