@@ -15,21 +15,47 @@ public final class NvidiumCompatibility {
      * Force its Sodium-compatible base format before Sodium creates the chunk
      * builder; CAUSTIQ then supplies a stride-extended ChunkVertexType.
      */
-    public static boolean enableExtendedVertexFormat() {
+    /**
+     * Requests the extended format before the GL context exists. The request is
+     * safe to record now; Nvidium compatibility is checked later, at the head
+     * of RenderSectionManager construction, after its capability probe.
+     */
+    public static boolean requestExtendedVertexFormat() {
         if (!CaustiqConfig.get().enabled()) return false;
+        try {
+            Class<?> nvidium = Class.forName("me.cortex.nvidium.Nvidium");
+            if (nvidium.getField("FORCE_DISABLE").getBoolean(null)) return false;
+            NvidiumIrisChunkVertex.enable();
+            return true;
+        } catch (ReflectiveOperationException | RuntimeException exception) {
+            NvidiumIrisChunkVertex.disable();
+            return false;
+        }
+    }
+
+    /**
+     * Commits the request once Nvidium has completed its OpenGL capability
+     * check. This must run before Nvidium's own ChunkBuilder ModifyArg hook.
+     */
+    public static boolean enableExtendedVertexFormat() {
+        if (!CaustiqConfig.get().enabled()) {
+            NvidiumIrisChunkVertex.disable();
+            return false;
+        }
         try {
             Class<?> nvidium = Class.forName("me.cortex.nvidium.Nvidium");
             if (!nvidium.getField("IS_COMPATIBLE").getBoolean(null)
                     || nvidium.getField("FORCE_DISABLE").getBoolean(null)) {
+                NvidiumIrisChunkVertex.disable();
                 return false;
             }
-            Field configField = nvidium.getField("config");
-            Object config = configField.get(null);
+            Object config = nvidium.getField("config").get(null);
             Field formatField = config.getClass().getField("use_sodium_vertex_format");
             formatField.setBoolean(config, true);
             NvidiumIrisChunkVertex.enable();
             return true;
         } catch (ReflectiveOperationException | RuntimeException exception) {
+            NvidiumIrisChunkVertex.disable();
             return false;
         }
     }
