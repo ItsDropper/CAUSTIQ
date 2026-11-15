@@ -46,6 +46,12 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             for (IrisTerrainPassScheduler.ScheduledPass scheduled : plan.passes()) {
                 IrisTerrainPassScheduler.Pass pass = scheduled.pass();
                 if (pass.group() == ShaderPackProgramCatalog.Group.GBUFFERS) continue;
+                if (pass.group() != ShaderPackProgramCatalog.Group.DEFERRED
+                        && pass.group() != ShaderPackProgramCatalog.Group.COMPOSITE
+                        && pass.group() != ShaderPackProgramCatalog.Group.FINAL) {
+                    throw new IllegalStateException("Iris pass group '" + pass.group()
+                            + "' is not supported by the full-screen executor.");
+                }
                 if (pass.group() == ShaderPackProgramCatalog.Group.SHADOW) {
                     throw new IllegalStateException("Iris shadow rendering requires a light-space Nvidium terrain pass.");
                 }

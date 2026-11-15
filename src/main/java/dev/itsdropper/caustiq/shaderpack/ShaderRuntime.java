@@ -24,6 +24,8 @@ public final class ShaderRuntime {
     private static final AtomicReference<ShaderPackScanResult> SCAN_RESULT = new AtomicReference<>();
     private static final List<CompiledShaderProgram> COMPILED = new ArrayList<>();
     private static final ShaderPostProcessPass POST_PROCESS = new ShaderPostProcessPass();
+    private static final IrisGlPassExecutor IRIS_PASS_EXECUTOR = new IrisGlPassExecutor();
+    private static final Map<String, IrisGlProgram> IRIS_GL_PROGRAMS = new LinkedHashMap<>();
     private static boolean discoveryStarted, discoveryFinished;
     private static ShaderPackSources sources;
     private static IrisShaderPackModel preparedPackModel;
@@ -57,6 +59,9 @@ public final class ShaderRuntime {
         NvidiumShaderProgramBridge.unregisterTerrainAdapter();
         NvidiumGBufferTargets.resetOutputRouting();
         POST_PROCESS.close();
+        closeIrisPrograms();
+        IRIS_PASS_EXECUTOR.close();
+        NvidiumGBufferTargets.destroy();
         NvidiumGBufferTargets.configureTargets(Map.of());
         COMPILED.forEach(CompiledShaderProgram::close);
         COMPILED.clear();
@@ -67,6 +72,7 @@ public final class ShaderRuntime {
         discoveryStarted = false;
         discoveryFinished = false;
         postProcessFailureLogged = false;
+        irisPassFailureLogged = false;
         preparedPackModel = null;
         preparedPackId = "";
         preparedTerrainTranslators = Map.of();
@@ -277,6 +283,7 @@ public final class ShaderRuntime {
                 compileNextProgram();
             }
         }
+        executeScheduledIrisPasses();
         executeFinalPass();
     }
 
@@ -291,15 +298,54 @@ public final class ShaderRuntime {
         for (int compiledThisFrame = 0; compiledThisFrame < budget && nextProgram < pending.size(); compiledThisFrame++) {
             ShaderPackProgramCatalog.Program program = pending.get(nextProgram++);
             try {
-                COMPILED.add(new ShaderProgramCompiler().compile(program, sources, selectedDefines));
-                CaustiqClient.LOGGER.info("Compiled shader program '{}' ({} linked).", program.name(), COMPILED.size());
+                if (program.group() == ShaderPackProgramCatalog.Group.FINAL) {
+                    COMPILED.add(new ShaderProgramCompiler().compile(program, sources, selectedDefines));
+                }
+                if (program.group() == ShaderPackProgramCatalog.Group.DEFERRED
+                        || program.group() == ShaderPackProgramCatalog.Group.COMPOSITE
+                        || program.group() == ShaderPackProgramCatalog.Group.FINAL) {
+                    Set<String> defines = selectedDefines.entrySet().stream()
+                            .map(entry -> entry.getKey() + "=" + entry.getValue())
+                            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                    IrisGlProgram linked = new IrisGlProgramCompiler().compile(program, sources::read, defines);
+                    IrisGlProgram previous = IRIS_GL_PROGRAMS.put(program.name(), linked);
+                    if (previous != null) previous.close();
+                }
+                CaustiqClient.LOGGER.info("Prepared Iris program '{}' ({} fullscreen programs linked).",
+                        program.name(), IRIS_GL_PROGRAMS.size());
             } catch (IOException | RuntimeException exception) {
                 CaustiqClient.LOGGER.error("Shader program '{}' failed: {}", program.name(), exception.getMessage());
             }
         }
     }
 
+    private static void executeScheduledIrisPasses() {
+        if (!FabricLoader.getInstance().isModLoaded("nvidium") || activePassPlan == null
+                || IRIS_GL_PROGRAMS.isEmpty()) return;
+        boolean hasWorldPasses = activePassPlan.passes().stream().anyMatch(scheduled ->
+                scheduled.pass().group() == ShaderPackProgramCatalog.Group.DEFERRED
+                        || scheduled.pass().group() == ShaderPackProgramCatalog.Group.COMPOSITE);
+        if (!hasWorldPasses || irisPassFailureLogged) return;
+        try {
+            observeNvidiumTerrainBackend();
+            IRIS_PASS_EXECUTOR.render(activePassPlan, IRIS_GL_PROGRAMS,
+                    Minecraft.getInstance().getMainRenderTarget());
+        } catch (RuntimeException exception) {
+            irisPassFailureLogged = true;
+            CaustiqClient.LOGGER.error("CAUSTIQ disabled its Iris multi-pass executor after a render failure.", exception);
+        }
+    }
+
+    private static void closeIrisPrograms() {
+        IRIS_GL_PROGRAMS.values().forEach(IrisGlProgram::close);
+        IRIS_GL_PROGRAMS.clear();
+    }
+
     private static void executeFinalPass() {
+        if (FabricLoader.getInstance().isModLoaded("nvidium") && activePassPlan != null
+                && activePassPlan.passes().stream().anyMatch(scheduled ->
+                        scheduled.pass().group() == ShaderPackProgramCatalog.Group.DEFERRED
+                                || scheduled.pass().group() == ShaderPackProgramCatalog.Group.COMPOSITE)) return;
         if (postProcessFailureLogged) return;
         CompiledShaderProgram finalProgram = COMPILED.stream()
                 .filter(program -> program.name().equalsIgnoreCase("final"))
@@ -428,21 +474,37 @@ public final class ShaderRuntime {
                 return;
             }
             IrisShaderPackModel.Program finalProgram = packModel.base().programs().get("final");
-            if (packModel.base().programs().size() != 1 || finalProgram == null
-                    || !finalProgram.hasVertexAndFragment() || finalProgram.stages().size() != 2) {
-                CaustiqClient.LOGGER.warn(
-                        "Shader pack '{}' does not have the exact standalone final.vsh + final.fsh program shape supported by the current post-process path. Refusing partial activation.",
+            if (finalProgram != null && (!finalProgram.hasVertexAndFragment()
+                    || finalProgram.stages().size() != 2)) {
+                CaustiqClient.LOGGER.warn("Shader pack '{}' has an unsupported final program stage shape.",
                         selected.displayName());
                 pending = List.of();
                 discoveryFinished = true;
                 closeSources();
                 return;
             }
-            if (!catalog.isFinalOnly()) {
-                CaustiqClient.LOGGER.warn(
-                        "Shader pack '{}' requires the multi-pass world renderer. CAUSTIQ currently supports only a standalone final pass; skipping activation rather than rendering an incorrect partial pipeline. Detected {} base program(s), {} dimension override(s), {} parser diagnostic(s).",
-                        selected.displayName(), catalog.programs().size(),
-                        packModel.dimensionOverrides().size(), packModel.diagnostics().size());
+            Set<ShaderPackProgramCatalog.Group> supportedGroups = Set.of(
+                    ShaderPackProgramCatalog.Group.GBUFFERS,
+                    ShaderPackProgramCatalog.Group.DEFERRED,
+                    ShaderPackProgramCatalog.Group.COMPOSITE,
+                    ShaderPackProgramCatalog.Group.FINAL);
+            List<String> unsupportedGroups = catalog.programs().stream()
+                    .filter(program -> !supportedGroups.contains(program.group()))
+                    .map(program -> program.name() + " (" + program.group() + ")").toList();
+            if (!unsupportedGroups.isEmpty()) {
+                CaustiqClient.LOGGER.warn("Shader pack '{}' requires unimplemented Iris pass groups {}; refusing partial execution.",
+                        selected.displayName(), unsupportedGroups);
+                pending = List.of();
+                discoveryFinished = true;
+                closeSources();
+                return;
+            }
+            boolean hasMultiPass = catalog.programs().stream().anyMatch(program ->
+                    program.group() == ShaderPackProgramCatalog.Group.DEFERRED
+                            || program.group() == ShaderPackProgramCatalog.Group.COMPOSITE);
+            if (hasMultiPass && !FabricLoader.getInstance().isModLoaded("nvidium")) {
+                CaustiqClient.LOGGER.warn("Shader pack '{}' requires Nvidium's terrain MRT path for its deferred/composite passes.",
+                        selected.displayName());
                 pending = List.of();
                 discoveryFinished = true;
                 closeSources();
