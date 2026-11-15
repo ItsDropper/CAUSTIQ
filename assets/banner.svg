@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="400" viewBox="0 0 1280 400" role="img" aria-label="CAUSTIQ — a shader engine for Minecraft">
+  <title>CAUSTIQ</title>
+  <defs>
+    <linearGradient id="deep" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#031018"/>
+      <stop offset="0.55" stop-color="#06222f"/>
+      <stop offset="1" stop-color="#0b3a4a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.1" r="0.9">
+      <stop offset="0" stop-color="#7ff6ff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#7ff6ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#031018" stop-opacity="0"/>
+      <stop offset="1" stop-color="#031018" stop-opacity="0.85"/>
+    </linearGradient>
+    <linearGradient id="word" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#9fe9f2"/>
+    </linearGradient>
+
+    <!-- Caustic network: turbulence -> thin bright ridges, two layers drifting against each other -->
+    <filter id="caustic" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="turbulence" baseFrequency="0.011 0.019" numOctaves="2" seed="7" result="n1">
+        <animate attributeName="baseFrequency" dur="18s" repeatCount="indefinite"
+                 values="0.011 0.019;0.014 0.016;0.011 0.019"/>
+      </feTurbulence>
+      <feColorMatrix in="n1" type="matrix" result="ridge1"
+        values="0 0 0 0 0.50
+                0 0 0 0 0.96
+                0 0 0 0 1.00
+                -26 0 0 0 1.9"/>
+      <feTurbulence type="turbulence" baseFrequency="0.017 0.011" numOctaves="2" seed="21" result="n2">
+        <animate attributeName="baseFrequency" dur="23s" repeatCount="indefinite"
+                 values="0.017 0.011;0.013 0.015;0.017 0.011"/>
+      </feTurbulence>
+      <feColorMatrix in="n2" type="matrix" result="ridge2"
+        values="0 0 0 0 0.35
+                0 0 0 0 0.85
+                0 0 0 0 1.00
+                -22 0 0 0 1.55"/>
+      <feBlend in="ridge1" in2="ridge2" mode="screen" result="mix"/>
+      <feGaussianBlur in="mix" stdDeviation="1.1"/>
+    </filter>
+    <filter id="soft" x="-5%" y="-5%" width="110%" height="110%">
+      <feGaussianBlur stdDeviation="0.6"/>
+    </filter>
+    <filter id="bloom" x="-20%" y="-50%" width="140%" height="200%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="frame"><rect width="1280" height="400" rx="20"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <rect width="1280" height="400" fill="url(#deep)"/>
+    <rect width="1280" height="400" filter="url(#caustic)" opacity="1"/>
+    <rect width="1280" height="400" filter="url(#caustic)" opacity="0.45" transform="translate(1280 0) scale(-1 1)"/>
+    <rect width="1280" height="400" fill="url(#glow)"/>
+    <rect width="1280" height="400" fill="url(#fade)"/>
+
+    <!-- floating light motes -->
+    <g fill="#bffaff" opacity="0.7">
+      <circle cx="140" cy="90" r="1.6"><animate attributeName="cy" values="90;70;90" dur="7s" repeatCount="indefinite"/></circle>
+      <circle cx="310" cy="300" r="1.2"><animate attributeName="cy" values="300;280;300" dur="9s" repeatCount="indefinite"/></circle>
+      <circle cx="560" cy="60" r="1.4"><animate attributeName="cy" values="60;82;60" dur="8s" repeatCount="indefinite"/></circle>
+      <circle cx="930" cy="320" r="1.8"><animate attributeName="cy" values="320;298;320" dur="10s" repeatCount="indefinite"/></circle>
+      <circle cx="1120" cy="110" r="1.3"><animate attributeName="cy" values="110;92;110" dur="6s" repeatCount="indefinite"/></circle>
+      <circle cx="1210" cy="260" r="1.1"><animate attributeName="cy" values="260;276;260" dur="11s" repeatCount="indefinite"/></circle>
+    </g>
+
+    <!-- wordmark -->
+    <g filter="url(#bloom)">
+      <text x="640" y="205" text-anchor="middle"
+            font-family="'Segoe UI','SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif"
+            font-size="112" font-weight="800" letter-spacing="26" fill="url(#word)">CAUSTIQ</text>
+    </g>
+    <rect x="470" y="236" width="340" height="3" rx="1.5" fill="#76D13A"/>
+    <rect x="470" y="236" width="340" height="3" rx="1.5" fill="#76D13A" opacity="0.6" filter="url(#bloom)"/>
+
+    <text x="640" y="285" text-anchor="middle"
+          font-family="'Segoe UI','SF Pro Text','Helvetica Neue',Helvetica,Arial,sans-serif"
+          font-size="22" letter-spacing="6" fill="#bfeff5" opacity="0.92">A SHADER ENGINE FOR MINECRAFT</text>
+
+    <g transform="translate(640 336)">
+      <rect x="-305" y="-17" width="610" height="34" rx="17" fill="#ffffff" fill-opacity="0.06" stroke="#76D13A" stroke-opacity="0.7"/>
+      <text x="0" y="6" text-anchor="middle"
+            font-family="'Segoe UI','Helvetica Neue',Helvetica,Arial,sans-serif"
+            font-size="14" letter-spacing="3" fill="#e9fdff">NVIDIUM BRANCH  ·  SODIUM + NVIDIUM  ·  EXPERIMENTAL</text>
+    </g>
+  </g>
+  <rect x="0.5" y="0.5" width="1279" height="399" rx="19.5" fill="none" stroke="#7ff6ff" stroke-opacity="0.18"/>
+</svg>
