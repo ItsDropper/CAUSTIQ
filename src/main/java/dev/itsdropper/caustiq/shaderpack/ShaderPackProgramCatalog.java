@@ -56,7 +56,8 @@ public final class ShaderPackProgramCatalog {
 
         static Group classify(String name) {
             String lower = name.toLowerCase(Locale.ROOT);
-            if (lower.startsWith("clrwl_")) lower = lower.substring("clrwl_".length());
+            // clrwl_* is Colorwheel's external Flywheel program namespace,
+            // not part of Iris' own gbuffers/shadow program inventory.
             if (matches(lower, "shadowcomp")) return SHADOW_COMPOSITE;
             for (Group group : values()) {
                 if (group == UNKNOWN || group == SHADOW_COMPOSITE) continue;
