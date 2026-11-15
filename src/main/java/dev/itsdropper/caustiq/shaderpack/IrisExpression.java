@@ -133,19 +133,19 @@ public final class IrisExpression {
                 case "tan" -> unary(name, a, Math::tan);
                 case "asin" -> unary(name, a, Math::asin);
                 case "acos" -> unary(name, a, Math::acos);
-                case "atan" -> a.size() == 2 ? Math.atan2(a.get(0), a.get(1)) : unary(name, a, Math::atan);
+                case "atan", "atan2" -> a.size() == 2 ? Math.atan2(a.get(0), a.get(1)) : unary(name, a, Math::atan);
                 case "abs" -> unary(name, a, Math::abs);
-                case "sign" -> unary(name, a, Math::signum);
+                case "sign", "signum" -> unary(name, a, Math::signum);
                 case "floor" -> unary(name, a, Math::floor);
                 case "ceil" -> unary(name, a, Math::ceil);
                 case "round" -> unary(name, a, v -> Math.floor(v + 0.5));
-                case "fract" -> unary(name, a, v -> v - Math.floor(v));
+                case "fract", "frac" -> unary(name, a, v -> v - Math.floor(v));
                 case "sqrt" -> unary(name, a, Math::sqrt);
                 case "inversesqrt" -> unary(name, a, v -> 1.0 / Math.sqrt(v));
                 case "exp" -> unary(name, a, Math::exp);
                 case "log" -> unary(name, a, Math::log);
-                case "torad" -> unary(name, a, v -> Math.toRadians(v));
-                case "todeg" -> unary(name, a, v -> Math.toDegrees(v));
+                case "torad", "radians" -> unary(name, a, v -> Math.toRadians(v));
+                case "todeg", "degrees" -> unary(name, a, v -> Math.toDegrees(v));
                 case "saturate" -> unary(name, a, v -> Math.max(0.0, Math.min(1.0, v)));
                 case "pow" -> binary(name, a, Math::pow);
                 case "mod", "fmod" -> binary(name, a, (x, y) -> x - y * Math.floor(x / y));
@@ -158,6 +158,14 @@ public final class IrisExpression {
                     requireCount(name, a, 3);
                     double t = Math.max(0.0, Math.min(1.0, (a.get(2) - a.get(0)) / (a.get(1) - a.get(0))));
                     yield t * t * (3.0 - 2.0 * t);
+                }
+                case "smooth" -> {
+                    if (a.size() < 1 || a.size() > 4) {
+                        throw failure("smooth expects 1 to 4 arguments");
+                    }
+                    // Iris smooth() is stateful; return its target until the per-uniform
+                    // temporal state is available. This preserves valid expression evaluation.
+                    yield a.size() >= 3 && a.size() == 4 ? a.get(1) : a.get(0);
                 }
                 case "if" -> { requireCount(name, a, 3); yield truth(a.get(0)) ? a.get(1) : a.get(2); }
                 default -> throw failure("Unsupported Iris expression function '" + name + "'");
