@@ -9,6 +9,7 @@ import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL20C;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
@@ -152,9 +153,18 @@ public final class NvidiumIrisUniformBridge {
         integer(program, "caustiqIsElytraFlying", isElytraFlying() ? 1 : 0);
         integer(program, "caustiqHeldBlockLightValue", heldBlockLightValue(InteractionHand.MAIN_HAND));
         integer(program, "caustiqHeldBlockLightValue2", heldBlockLightValue(InteractionHand.OFF_HAND));
+        integer(program, "caustiqHeldItemId", heldItemId());
         integer(program, "caustiqColortex1", 5);
         integer(program, "caustiqColortex2", 6);
         integer(program, "caustiqColortex4", 7);
+    }
+
+    /** Returns the registry ID of the local player's main-hand item, matching Iris heldItemId. */
+    private static int heldItemId() {
+        var player = Minecraft.getInstance().player;
+        if (player == null) return 0;
+        ItemStack stack = player.getItemInHand(InteractionHand.MAIN_HAND);
+        return stack.isEmpty() ? 0 : BuiltInRegistries.ITEM.getId(stack.getItem());
     }
 
     /** Mirrors Iris IrisExclusiveUniforms.isElytraFlying(): the local player's fall-flying state. */
