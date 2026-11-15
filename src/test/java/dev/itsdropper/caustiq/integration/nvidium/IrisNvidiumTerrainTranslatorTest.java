@@ -130,6 +130,27 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void rejectsUnavailableSamplersOnlyWhenTheirFunctionsAreReachableFromMain() {
+        assertDoesNotThrow(() -> translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform sampler2D depthtex1;
+                vec4 unusedDepthHelper() { return texture(depthtex1, vec2(0.0)); }
+                void main() { gl_FragColor = vec4(1.0); }
+                """));
+        assertThrows(IllegalArgumentException.class, () -> translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform sampler2D depthtex1;
+                void main() { gl_FragColor = texture(depthtex1, vec2(0.0)); }
+                """));
+    }
+
+    @Test
     void rejectsUnavailableUniformsAndUnmatchedVaryingsBeforeShaderLink() {
         assertThrows(IllegalArgumentException.class, () -> translator("""
                 #version 150
