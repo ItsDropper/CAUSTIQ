@@ -347,14 +347,20 @@ final class IrisImageResources implements AutoCloseable {
         return 4;
     }
 
-    private static Image create(String name, ImageSpec spec) {
+    private static Image create(String name, ImageSpec spec) throws java.io.IOException {
         int target = spec.depth > 1 ? GL12C.GL_TEXTURE_3D : GL11C.GL_TEXTURE_2D;
+        int maximum = GL11C.glGetInteger(target == GL12C.GL_TEXTURE_3D
+                ? GL12C.GL_MAX_3D_TEXTURE_SIZE : GL11C.GL_MAX_TEXTURE_SIZE);
+        if (spec.width > maximum || spec.height > maximum || spec.depth > maximum) {
+            throw new java.io.IOException("Iris image." + name + " exceeds the device texture-size limit of " + maximum + ".");
+        }
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
         int previousBinding = GL11C.glGetInteger(target == GL12C.GL_TEXTURE_3D
                 ? GL12C.GL_TEXTURE_BINDING_3D : GL11C.GL_TEXTURE_BINDING_2D);
         int texture = GL11C.glGenTextures();
         GL11C.glBindTexture(target, texture);
-        int filter = spec.nearest ? GL11C.GL_NEAREST : GL11C.GL_LINEAR;
+        boolean integerFormat = spec.internalFormat == GL30C.GL_R8UI;
+        int filter = spec.nearest || integerFormat ? GL11C.GL_NEAREST : GL11C.GL_LINEAR;
         GL11C.glTexParameteri(target, GL11C.GL_TEXTURE_MIN_FILTER, filter);
         GL11C.glTexParameteri(target, GL11C.GL_TEXTURE_MAG_FILTER, filter);
         GL11C.glTexParameteri(target, GL11C.GL_TEXTURE_WRAP_S, GL12C.GL_CLAMP_TO_EDGE);
