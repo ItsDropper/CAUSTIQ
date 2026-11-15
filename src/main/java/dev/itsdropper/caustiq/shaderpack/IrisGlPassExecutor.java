@@ -415,6 +415,8 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                     shadowComparisonSampler = GL33C.glGenSamplers();
                     GL33C.glSamplerParameteri(shadowComparisonSampler, 0x884C, 0x884E);
                     GL33C.glSamplerParameteri(shadowComparisonSampler, 0x884D, GL11C.GL_LEQUAL);
+                    GL33C.glSamplerParameteri(shadowComparisonSampler, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_LINEAR);
+                    GL33C.glSamplerParameteri(shadowComparisonSampler, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_LINEAR);
                 }
                 GL33C.glBindSampler(unit, shadowComparisonSampler);
             } else {
