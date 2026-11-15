@@ -1,6 +1,7 @@
 package dev.itsdropper.caustiq.shaderpack;
 
 import dev.itsdropper.caustiq.CaustiqClient;
+import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -29,6 +30,10 @@ public final class CaustiqCiShaderValidation {
             if (configuredPath == null || configuredPath.isBlank()) {
                 throw new IOException("CAUSTIQ_CI_SHADERPACK is not set.");
             }
+            if (FabricLoader.getInstance().isModLoaded("nvidium")) {
+                throw new IOException("Nvidium must not be loaded in the shader-only validation job.");
+            }
+            CaustiqClient.LOGGER.info("Photon CI renderer isolation confirmed: Nvidium is absent.");
             int compiled = validate(Path.of(configuredPath));
             String result = "CAUSTIQ_CI_SHADER_VALIDATION_PASS programs=" + compiled;
             CaustiqClient.LOGGER.info(result);
