@@ -146,9 +146,9 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         }
     }
 
-    private static void dispatchCompute(IrisGlProgram program, RenderTarget mainTarget,
-                                         int width, int height, boolean[] alternateCurrent,
-                                         boolean[] hasWritten, IrisShaderResources resources) {
+    private void dispatchCompute(IrisGlProgram program, RenderTarget mainTarget,
+                                  int width, int height, boolean[] alternateCurrent,
+                                  boolean[] hasWritten, IrisShaderResources resources) {
         GL20C.glUseProgram(program.programId());
         bindComputeSamplers(program, mainTarget, alternateCurrent, hasWritten, resources);
         NvidiumIrisUniformBridge.uploadProgram(program.programId());
@@ -174,9 +174,9 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         }
     }
 
-    private static void bindComputeSamplers(IrisGlProgram program, RenderTarget mainTarget,
-                                            boolean[] alternateCurrent, boolean[] hasWritten,
-                                            IrisShaderResources resources) {
+    private void bindComputeSamplers(IrisGlProgram program, RenderTarget mainTarget,
+                                     boolean[] alternateCurrent, boolean[] hasWritten,
+                                     IrisShaderResources resources) {
         int unit = 0;
         int maximum = GL11C.glGetInteger(GL20C.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);
         for (String sampler : program.samplers()) {
@@ -184,14 +184,66 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             if (location < 0) continue;
             if (unit >= maximum) {
                 throw new IllegalStateException("Iris compute program '" + program.name()
-                        + "' exceeds GL_MAX_COMPUTE_TEXTURE_IMAGE_UNITS.");
+                        + "' exceeds GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS.");
             }
             if (resources.bindTexture(sampler, program.name(), unit, location)) {
+                GL33C.glBindSampler(unit, 0);
                 unit++;
                 continue;
             }
-            throw new IllegalStateException("Iris compute sampler '" + sampler
-                    + "' has no declared image/custom texture binding.");
+            int texture;
+            if (sampler.equals("shadowtex0") || sampler.equals("shadow")) {
+                texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowTexture();
+            } else if (sampler.equals("shadowtex1")) {
+                texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowTexture1();
+                if (texture == 0) {
+                    throw new IllegalStateException("Iris compute pass '" + program.name()
+                            + "' samples shadowtex1 before a valid translucent shadow map has been rendered.");
+                }
+            } else if (sampler.matches("shadowcolor[0-6]")) {
+                int index = Integer.parseInt(sampler.substring("shadowcolor".length()));
+                texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowColorTexture(index);
+                if (texture == 0) {
+                    throw new IllegalStateException("Iris compute pass '" + program.name()
+                            + "' samples " + sampler + " before a valid shadow color map has been rendered.");
+                }
+            } else if (sampler.equals("noisetex")) {
+                texture = NvidiumIrisTextureBridge.noiseTexture();
+            } else if (sampler.equals("gcolor") || sampler.equals("DiffuseSampler")
+                    || sampler.equals("texture") || sampler.equals("tex") || sampler.equals("colortex0")) {
+                texture = currentTexture(0, mainTarget, alternateCurrent, hasWritten);
+            } else if (sampler.startsWith("colortex")) {
+                int index;
+                try {
+                    index = Integer.parseInt(sampler.substring("colortex".length()));
+                } catch (NumberFormatException exception) {
+                    throw new IllegalStateException("Unsupported Iris compute sampler name: " + sampler, exception);
+                }
+                if (index < 1 || index > MAX_COLOR_TARGET) {
+                    throw new IllegalStateException("Iris compute sampler '" + sampler
+                            + "' is outside the supported colortex0-colortex31 range.");
+                }
+                texture = currentTexture(index, mainTarget, alternateCurrent, hasWritten);
+            } else {
+                throw new IllegalStateException("Iris compute sampler '" + sampler
+                        + "' has no CAUSTIQ texture binding.");
+            }
+            GL13C.glActiveTexture(GL13C.GL_TEXTURE0 + unit);
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
+            if (program.comparisonSamplers().contains(sampler)) {
+                if (shadowComparisonSampler == 0) {
+                    shadowComparisonSampler = GL33C.glGenSamplers();
+                    GL33C.glSamplerParameteri(shadowComparisonSampler, 0x884C, 0x884E);
+                    GL33C.glSamplerParameteri(shadowComparisonSampler, 0x884D, GL11C.GL_LEQUAL);
+                    GL33C.glSamplerParameteri(shadowComparisonSampler, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_LINEAR);
+                    GL33C.glSamplerParameteri(shadowComparisonSampler, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_LINEAR);
+                }
+                GL33C.glBindSampler(unit, shadowComparisonSampler);
+            } else {
+                GL33C.glBindSampler(unit, 0);
+            }
+            GL20C.glUniform1i(location, unit);
+            unit++;
         }
     }
 
