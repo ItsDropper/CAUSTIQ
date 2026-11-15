@@ -6,15 +6,12 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 /** Per-meshing-thread block metadata consumed by the extended terrain vertex encoder. */
 public final class NvidiumIrisVertexContext {
     private static final ThreadLocal<BlockData> CURRENT = new ThreadLocal<>();
-    private static final ThreadLocal<Deque<BlockData>> PREVIOUS = ThreadLocal.withInitial(ArrayDeque::new);
     private static final AtomicReference<Map<String, Integer>> BLOCK_IDS = new AtomicReference<>(Map.of());
 
     private NvidiumIrisVertexContext() { }
@@ -26,28 +23,6 @@ public final class NvidiumIrisVertexContext {
             if (previous == null) CURRENT.remove();
             else CURRENT.set(previous);
         };
-    }
-
-    /** Pushes block metadata for the duration of a Sodium block/fluid mesh emission. */
-    public static void push(BlockState state, BlockPos position, boolean fluid) {
-        Deque<BlockData> previous = PREVIOUS.get();
-        BlockData current = CURRENT.get();
-        previous.push(current == null ? BlockData.EMPTY : current);
-        CURRENT.set(createData(state, position, fluid));
-    }
-
-    /** Restores the previous block metadata after Sodium finishes emitting the model. */
-    public static void pop() {
-        Deque<BlockData> previous = PREVIOUS.get();
-        if (previous.isEmpty()) {
-            CURRENT.remove();
-            PREVIOUS.remove();
-            return;
-        }
-        BlockData restored = previous.pop();
-        if (restored == BlockData.EMPTY) CURRENT.remove();
-        else CURRENT.set(restored);
-        if (previous.isEmpty()) PREVIOUS.remove();
     }
 
     private static BlockData createData(BlockState state, BlockPos position, boolean fluid) {
