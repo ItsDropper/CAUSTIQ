@@ -1,5 +1,6 @@
 package dev.itsdropper.caustiq.mixin;
 
+import dev.itsdropper.caustiq.CaustiqClient;
 import dev.itsdropper.caustiq.shaderpack.CaustiqCiShaderValidation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -9,22 +10,30 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Waits until Minecraft has reached and rendered its title screen before
- * validating Photon and capturing the completed client frame.
+ * Waits for the title screen where possible, with a bounded startup fallback,
+ * then validates Photon and captures the completed Minecraft frame.
  */
 @Mixin(Minecraft.class)
 public abstract class MinecraftMixin {
     private int caustiq$titleScreenFrames;
+    private int caustiq$elapsedFrames;
 
     @Inject(method = "runTick", at = @At("TAIL"))
     private void caustiq$runCiShaderValidation(CallbackInfo callbackInfo) {
         Minecraft client = Minecraft.getInstance();
+        caustiq$elapsedFrames++;
         if (client.screen instanceof TitleScreen) {
-            if (++caustiq$titleScreenFrames >= 20) {
-                CaustiqCiShaderValidation.runFromEnvironment();
-            }
+            caustiq$titleScreenFrames++;
         } else {
             caustiq$titleScreenFrames = 0;
+        }
+
+        if (caustiq$titleScreenFrames >= 20) {
+            CaustiqCiShaderValidation.runFromEnvironment();
+        } else if (caustiq$elapsedFrames >= 200) {
+            CaustiqClient.LOGGER.warn(
+                    "Photon CI capture reached its 10-second startup fallback before the title screen.");
+            CaustiqCiShaderValidation.runFromEnvironment();
         }
     }
 }
