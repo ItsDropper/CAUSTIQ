@@ -236,7 +236,7 @@ public final class IrisTerrainCompatibilityAnalyzer {
     }
 
     private static boolean isReferenced(String source, String symbol) {
-        return Pattern.compile("\\\\b" + Pattern.quote(symbol) + "\\\\b").matcher(source).find();
+        return Pattern.compile("\\b" + Pattern.quote(symbol) + "\\b").matcher(source).find();
     }
 
     private static Map<String, Declaration> declarations(String source, Set<String> storage) {
