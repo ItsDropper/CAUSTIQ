@@ -31,6 +31,12 @@ public final class IrisShaderPackParser {
                     "deferred[0-9]*|composite[0-9]*|final|dh_[a-z0-9_]+|world)",
             Pattern.CASE_INSENSITIVE);
     private static final Set<String> STAGE_EXTENSIONS = Set.of(".vsh", ".fsh", ".gsh", ".csh", ".tcs", ".tes");
+    private static final Set<String> NVIDIUM_COLOR_FORMATS = Set.of(
+            "RGBA8", "RGBA16F", "RGBA32F", "RGB8", "RGB16F", "RGB32F",
+            "RG8", "RG16F", "RG32F", "R8", "R16F", "R32F",
+            "RGB10_A2", "R11F_G11F_B10F");
+    private static final Pattern COLOR_TARGET_PROPERTY = Pattern.compile(
+            "^([0-9]+)(Format|Scale|ScaleX|ScaleY)$", Pattern.CASE_INSENSITIVE);
 
     public IrisShaderPackModel parse(ShaderPackSources sources) throws IOException {
         String propertiesSource = readText(sources, "shaders.properties");
@@ -142,9 +148,7 @@ public final class IrisShaderPackParser {
         if (properties.keySet().stream().anyMatch(key -> key.startsWith("texture.") || key.equals("texture.noise"))) {
             diagnostics.add("Custom Iris texture declarations were detected; texture loading and sampler binding are not implemented by the Nvidium bridge.");
         }
-        if (!renderTargets.isEmpty()) {
-            diagnostics.add("Iris colortex directives were parsed; Nvidium multi-render-target allocation and pass routing are not implemented.");
-        }
+        validateNvidiumRenderTargets(renderTargets, diagnostics);
         if (paths.stream().anyMatch(path -> path.endsWith(".csh"))) {
             diagnostics.add("Compute shader stages were discovered and preprocessed; Nvidium terrain translation does not execute Iris compute passes.");
         }
@@ -175,6 +179,52 @@ public final class IrisShaderPackParser {
                 preprocessed,
                 diagnostics
         );
+    }
+
+    /**
+     * The Nvidium bridge now allocates and routes colortex1-colortex7. Keep
+     * packs using that implemented subset eligible, while reporting only
+     * target configurations that the current fixed-size attachment path cannot
+     * honor instead of rejecting every pack that declares a colortex setting.
+     */
+    private static void validateNvidiumRenderTargets(
+            Map<String, String> directives, List<String> diagnostics) {
+        directives.forEach((key, value) -> {
+            java.util.regex.Matcher matcher = COLOR_TARGET_PROPERTY.matcher(key);
+            if (!matcher.matches()) return;
+            int index;
+            try {
+                index = Integer.parseInt(matcher.group(1));
+            } catch (NumberFormatException exception) {
+                diagnostics.add("Iris render target index is out of range: " + key);
+                return;
+            }
+            String property = matcher.group(2).toLowerCase(Locale.ROOT);
+            if (index > 7) {
+                diagnostics.add("Nvidium currently exposes colortex0-colortex7; "
+                        + key + "=" + value + " requires an unavailable attachment.");
+                return;
+            }
+            if (property.equals("format")) {
+                String format = value.trim().toUpperCase(Locale.ROOT);
+                if (index == 0 && !format.equals("RGBA8")) {
+                    diagnostics.add("Nvidium's colortex0 output uses the Minecraft RGBA8 main target; "
+                            + key + "=" + value + " cannot be honored.");
+                } else if (index > 0 && !NVIDIUM_COLOR_FORMATS.contains(format)) {
+                    diagnostics.add("Unsupported Nvidium colortex format in " + key + "=" + value + ".");
+                }
+            } else {
+                try {
+                    float scale = Float.parseFloat(value.trim());
+                    if (!Float.isFinite(scale) || scale <= 0.0f || scale != 1.0f) {
+                        diagnostics.add("Nvidium terrain MRT attachments are fixed to screen resolution; "
+                                + key + "=" + value + " is unsupported.");
+                    }
+                } catch (NumberFormatException exception) {
+                    diagnostics.add("Invalid Iris render-target scale in " + key + "=" + value + ".");
+                }
+            }
+        });
     }
 
     private static boolean isTerrainProgram(String name) {
