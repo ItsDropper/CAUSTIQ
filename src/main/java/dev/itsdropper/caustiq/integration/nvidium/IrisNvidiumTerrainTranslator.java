@@ -490,7 +490,9 @@ public final class IrisNvidiumTerrainTranslator {
     private String injectVertexStage(String mesh) {
         String declarations = varyingBlockMembers();
         mesh = insertIntoInterfaceBlock(mesh, "out Interpolants", declarations, "} OUT[];");
-        mesh = insertBefore(mesh, "vec4 transformVertex(Vertex V) {", vertexProgramSource());
+        String vertexProgram = vertexProgramSource();
+        mesh = hoistExtensions(mesh, vertexProgram);
+        mesh = insertBefore(mesh, "vec4 transformVertex(Vertex V) {", vertexProgram);
         String vertexInvocation = vertexInvocation();
         String assignmentAnchor = "    OUT[id].v_materialFlags = V.nvidiumMaterial & 0xFFu;";
         if (!mesh.contains(assignmentAnchor)) {
@@ -509,6 +511,7 @@ public final class IrisNvidiumTerrainTranslator {
         fragment = removeNativeGBufferOutputs(fragment);
         fragment = addPackMrtOutputs(fragment);
         String program = fragmentProgramSource();
+        fragment = hoistExtensions(fragment, program);
         fragment = insertBefore(fragment, "void main() {", program);
 
         String invocation = fragmentInvocation();
@@ -1099,6 +1102,28 @@ public final class IrisNvidiumTerrainTranslator {
         int end = source.indexOf(terminator, blockStart);
         if (end < 0) throw new IllegalStateException("Nvidium interpolant block terminator is missing: " + terminator);
         return source.substring(0, end) + members + source.substring(end);
+    }
+
+    /**
+     * Iris stage extensions are embedded in the injected program body, but GLSL
+     * requires #extension directives before the first non-preprocessor token.
+     * Move them into Nvidium's stage preamble before injecting any declarations.
+     */
+    static String hoistExtensions(String nativeSource, String injectedSource) {
+        Matcher extensions = Pattern.compile("(?m)^[\\t ]*#\\s*extension\\b[^\\r\\n]*(?:\\r?\\n|$)")
+                .matcher(injectedSource);
+        StringBuilder directives = new StringBuilder();
+        String cleaned = extensions.replaceAll("");
+        while (extensions.find()) {
+            String directive = extensions.group();
+            if (!nativeSource.contains(directive.strip())) directives.append(directive);
+        }
+        if (directives.isEmpty()) return nativeSource;
+        Matcher version = VERSION.matcher(nativeSource);
+        if (version.find()) {
+            return nativeSource.substring(0, version.end()) + directives + nativeSource.substring(version.end());
+        }
+        return directives + nativeSource;
     }
 
     private static String insertBefore(String source, String anchor, String insertion) {
