@@ -188,10 +188,10 @@ assert 'case "WATER" -> 1;' in uniform_bridge and 'case "LAVA" -> 2;' in uniform
 assert 'uniform bool caustiqIsElytraFlying;' in translator
 assert 'integer(program, "caustiqIsElytraFlying", isElytraFlying() ? 1 : 0)' in uniform_bridge
 assert 'invokeBoolean(Minecraft.getInstance().player, "isFallFlying", false)' in uniform_bridge
-assert "GL_TEXTURE2" in texture_bridge and "GL_TEXTURE5" in texture_bridge
-assert "NvidiumGBufferTargets.texture(1)" in texture_bridge
-assert "NvidiumGBufferTargets.texture(2)" in texture_bridge
-assert "NvidiumGBufferTargets.texture(4)" in texture_bridge
+assert "GL_TEXTURE2" in texture_bridge and "GL_TEXTURE0 + unit" in texture_bridge
+assert "NvidiumGBufferTargets.texture(attachment)" in texture_bridge
+assert "NvidiumGBufferTargets.MAX_ATTACHMENT" in texture_bridge
+assert "bindTerrainTextures(program, firstTextureUnit, 12)" in texture_bridge
 assert "noiseTexture, noiseTexture" not in texture_bridge, "Unavailable Iris samplers must not receive dummy noise textures"
 vertex_encoder = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
 assert "STRIDE = 40" in vertex_encoder
