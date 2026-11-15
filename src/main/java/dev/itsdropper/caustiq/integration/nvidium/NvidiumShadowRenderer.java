@@ -779,7 +779,7 @@ public final class NvidiumShadowRenderer {
                 GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, translucentFramebuffer);
                 GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
                         GL11C.GL_TEXTURE_2D, translucentDepthTexture, 0);
-                GL20C.glDrawBuffer(GL11C.GL_NONE);
+                GL11C.glDrawBuffer(GL11C.GL_NONE);
                 GL11C.glReadBuffer(GL11C.GL_NONE);
                 int status = GL30C.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER);
                 if (status != GL30C.GL_FRAMEBUFFER_COMPLETE) {
@@ -857,7 +857,7 @@ public final class NvidiumShadowRenderer {
         GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, framebuffer);
         GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
                 GL11C.GL_TEXTURE_2D, texture, 0);
-        GL20C.glDrawBuffer(GL11C.GL_NONE);
+        GL11C.glDrawBuffer(GL11C.GL_NONE);
         GL11C.glReadBuffer(GL11C.GL_NONE);
         int status = GL30C.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER);
         GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
