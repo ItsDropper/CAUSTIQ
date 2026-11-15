@@ -306,6 +306,7 @@ public final class IrisNvidiumTerrainTranslator {
         StringBuilder vertex = new StringBuilder("#version 430 core\n");
         vertex.append(softwareVertexSupport())
                 .append(NvidiumTerrainVaryingAdapter.softwareRenderVertexHelpers())
+                .append("\n\n")
                 .append(vertexProgramSource());
         for (Varying varying : varyings) {
             vertex.append(varying.qualifier() == null || varying.qualifier().isBlank() ? "" : varying.qualifier() + " ")
