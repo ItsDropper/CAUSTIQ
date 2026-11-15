@@ -436,6 +436,10 @@ public final class NvidiumIrisUniformBridge {
         values.put("worldTime", (double) Math.floorMod(dayTime, 24_000L));
         values.put("rainStrength", (double) rain);
         values.put("wetness", (double) rain);
+        float temperature = biomeFloat(level, "getBaseTemperature");
+        float rainfall = biomeFloat(level, "getDownfall");
+        values.put("temperature", (double) (Float.isFinite(temperature) ? temperature : 0.0f));
+        values.put("rainfall", (double) (Float.isFinite(rainfall) ? rainfall : 0.0f));
         values.put("sunAngle", (double) sunAngle);
         values.put("viewWidth", (double) viewWidth);
         values.put("viewHeight", (double) viewHeight);
