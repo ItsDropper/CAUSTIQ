@@ -1,6 +1,6 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
-import net.caffeinemc.mods.sodium.api.util.ColorABGR;
+import net.caffeinemc.mods.sodium.api.util.ColorARGB;
 import net.caffeinemc.mods.sodium.api.util.ColorU8;
 import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexFormat;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
@@ -53,9 +53,9 @@ public final class NvidiumIrisChunkVertex implements ChunkVertexType {
             int normalTangent = encodeNormalTangent(basis.nx, basis.ny, basis.nz,
                     basis.tx, basis.ty, basis.tz);
             int blockEntity = ((context.blockId() + 1) << 1) | (context.renderType() & 1);
-            int nvidiumMaterial = material & 0xFF;
-
             for (ChunkVertexEncoder.Vertex vertex : vertices) {
+                int nvidiumMaterial = (material & 0xFF)
+                        | (ColorU8.normalizedFloatToByte(Mth.clamp(vertex.ao, 0.0f, 1.0f)) << 8);
                 int x = quantizePosition(vertex.x);
                 int y = quantizePosition(vertex.y);
                 int z = quantizePosition(vertex.z);
@@ -100,16 +100,12 @@ public final class NvidiumIrisChunkVertex implements ChunkVertexType {
     }
 
     private static int encodeColor(int color, float brightness) {
-        int red = ColorABGR.unpackRed(color);
-        int green = ColorABGR.unpackGreen(color);
-        int blue = ColorABGR.unpackBlue(color);
-        int alpha = ColorU8.normalizedFloatToByte(Mth.clamp(brightness, 0.0f, 1.0f));
-        return ColorABGR.pack(red, green, blue, alpha);
+        return ColorARGB.mulRGB(color, brightness);
     }
 
     private static int compactLight(int light) {
-        int sky = Mth.clamp((light >>> 16) & 0xFF, 8, 248);
-        int block = Mth.clamp(light & 0xFF, 8, 248);
+        int sky = Mth.clamp(((light >>> 16) & 0xFF) + 8, 8, 248);
+        int block = Mth.clamp((light & 0xFF) + 8, 8, 248);
         return block | (sky << 8);
     }
 
@@ -162,9 +158,9 @@ public final class NvidiumIrisChunkVertex implements ChunkVertexType {
         }
         float[] bitangent = tangent(v[0], v[1], v[2], true);
         if (bitangent == null) bitangent = new float[]{0.0f, 0.0f, 0.0f};
-        float cx = tangent[1] * nz - tangent[2] * ny;
-        float cy = tangent[2] * nx - tangent[0] * nz;
-        float cz = tangent[0] * ny - tangent[1] * nx;
+        float cx = ny * tangent[2] - nz * tangent[1];
+        float cy = nz * tangent[0] - nx * tangent[2];
+        float cz = nx * tangent[1] - ny * tangent[0];
         float handedness = cx * bitangent[0] + cy * bitangent[1] + cz * bitangent[2] < 0.0f ? -1.0f : 1.0f;
         return new Basis(nx, ny, nz, tangent[0], tangent[1], tangent[2], handedness);
     }
