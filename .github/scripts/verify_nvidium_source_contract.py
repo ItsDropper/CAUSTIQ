@@ -61,7 +61,9 @@ assert "public static boolean hasTerrainAdapter()" in bridge
 assert "primaryTerrainAdapter != null || translucentTerrainAdapter != null" in bridge
 runtime = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/ShaderRuntime.java").read_text(encoding="utf-8")
 assert "prepareSelectedNvidiumTerrainAdapter();" in runtime
-assert "selectSupportedTerrainDimension(model)" in runtime
+assert "preparedTerrainTranslators" in runtime
+assert "preparedUnsupportedTerrainDimensions" in runtime
+assert "activateTerrainAdapterForCurrentWorld()" in runtime
 assert "activateTerrainAdapterForCurrentWorld()" in runtime
 assert "IrisNvidiumTerrainTranslator.from(" in runtime
 assert "NvidiumGBufferTargets.configureTargets(" in runtime
