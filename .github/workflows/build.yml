@@ -354,8 +354,10 @@ jobs:
               }
 
               assert metadata["id"] == "caustiq", metadata["id"]
-              assert metadata["depends"]["sodium"] == "=0.8.12", metadata["depends"]
-              assert metadata["depends"]["nvidium"] == "=0.4.3-beta13-1.21.11", metadata["depends"]
+              assert "sodium" not in metadata["depends"], metadata["depends"]
+              assert "nvidium" not in metadata["depends"], metadata["depends"]
+              assert metadata["suggests"]["nvidium"] == "*", metadata.get("suggests")
+              assert mixins["plugin"] == "dev.itsdropper.caustiq.mixin.CaustiqMixinPlugin", mixins
               assert set(mixins["client"]).issuperset({
                   "NvidiumWorldRendererMixin",
                   "NvidiumShaderBuilderMixin",
