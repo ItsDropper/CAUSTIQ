@@ -52,8 +52,9 @@ public final class NvidiumIrisTextureBridge {
         ensureTextures();
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
         int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE9, GL13C.GL_TEXTURE10};
-        int depth = NvidiumShadowRenderer.shadowTexture();
-        int[] textures = {noiseTexture, depth, depth};
+        int depth0 = NvidiumShadowRenderer.shadowTexture();
+        int depth1 = NvidiumShadowRenderer.shadowTexture1();
+        int[] textures = {noiseTexture, depth0, depth1};
         int[] previousBindings = new int[units.length];
         for (int i = 0; i < units.length; i++) {
             GL13C.glActiveTexture(units[i]);

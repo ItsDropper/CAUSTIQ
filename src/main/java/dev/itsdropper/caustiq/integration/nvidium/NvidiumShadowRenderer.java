@@ -92,6 +92,7 @@ public final class NvidiumShadowRenderer {
             if (regionCount == 0) {
                 if (NvidiumTerrainPassBridge.shouldClearAttachments(terrainPass)) {
                     state.clearDepth();
+                    state.clearTranslucentDepth();
                     state.depthValid = true;
                     activeState = state;
                 }
@@ -133,6 +134,12 @@ public final class NvidiumShadowRenderer {
     public static int shadowColorTexture() {
         State state = activeState;
         return state == null || !state.depthValid ? 0 : state.shadowColorTexture;
+    }
+
+    /** Separate translucent shadow depth map (Iris shadowtex1). */
+    public static int shadowTexture1() {
+        State state = activeState;
+        return state == null || !state.depthValid ? 0 : state.translucentDepthTexture;
     }
 
     public static int shadowResolution() {
@@ -246,6 +253,26 @@ public final class NvidiumShadowRenderer {
                         terrainPass, regionCount, address(state.terrainCommands), terrainSampler);
             } finally {
                 SHADOW_RASTERIZATION.remove();
+            }
+            GL42C.glMemoryBarrier(GL42C.GL_FRAMEBUFFER_BARRIER_BIT | GL42C.GL_TEXTURE_FETCH_BARRIER_BIT);
+
+            // Iris shadowtex1 is a distinct translucent depth map. Nvidium's
+            // command builder emits translucent commands into its own buffer;
+            // render those commands against an independent depth attachment.
+            state.clearTranslucentDepth();
+            GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, state.translucentFramebuffer);
+            GL11C.glViewport(0, 0, state.resolution, state.resolution);
+            GL11C.glEnable(GL11C.GL_DEPTH_TEST);
+            GL11C.glDepthFunc(GL11C.GL_LEQUAL);
+            GL11C.glDepthMask(true);
+            GL11C.glColorMask(false, false, false, false);
+            SHADOW_RASTERIZATION.set(Boolean.TRUE);
+            try {
+                invoke(state.translucentShadowRasterizer, "raster",
+                        terrainPass, regionCount, address(state.translucencyCommands), terrainSampler);
+            } finally {
+                SHADOW_RASTERIZATION.remove();
+                GL11C.glColorMask(true, true, true, true);
             }
             GL42C.glMemoryBarrier(GL42C.GL_FRAMEBUFFER_BARRIER_BIT | GL42C.GL_TEXTURE_FETCH_BARRIER_BIT);
         } finally {
@@ -407,7 +434,10 @@ public final class NvidiumShadowRenderer {
         private final int depthTexture;
         private final int shadowColorTexture;
         private final int framebuffer;
+        private final int translucentDepthTexture;
+        private final int translucentFramebuffer;
         private Object shadowRasterizer;
+        private Object translucentShadowRasterizer;
         private int resolution;
         private int frameId;
         private boolean depthValid;
@@ -441,6 +471,9 @@ public final class NvidiumShadowRenderer {
             this.depthTexture = targets[0];
             this.shadowColorTexture = targets[1];
             this.framebuffer = targets[2];
+            int[] translucentTargets = createDepthOnlyTarget(DEFAULT_RESOLUTION);
+            this.translucentDepthTexture = translucentTargets[0];
+            this.translucentFramebuffer = translucentTargets[1];
             this.resolution = DEFAULT_RESOLUTION;
             createShadowRasterizer();
         }
@@ -457,6 +490,8 @@ public final class NvidiumShadowRenderer {
                 try {
                     Class<?> type = Class.forName("me.cortex.nvidium.renderers.PrimaryTerrainRasterizer");
                     shadowRasterizer = type.getConstructor().newInstance();
+                    Class<?> translucentType = Class.forName("me.cortex.nvidium.renderers.TranslucentTerrainRasterizer");
+                    translucentShadowRasterizer = translucentType.getConstructor().newInstance();
                 } finally {
                     NvidiumShaderProgramBridge.endPipelineCompile();
                 }
@@ -466,12 +501,20 @@ public final class NvidiumShadowRenderer {
         }
 
         private void deleteShadowRasterizer() {
-            if (shadowRasterizer == null) return;
-            try { invoke(shadowRasterizer, "delete"); }
-            catch (ReflectiveOperationException | RuntimeException exception) {
-                CaustiqClient.LOGGER.warn("Unable to release Nvidium shadow rasterizer cleanly.", exception);
+            if (shadowRasterizer != null) {
+                try { invoke(shadowRasterizer, "delete"); }
+                catch (ReflectiveOperationException | RuntimeException exception) {
+                    CaustiqClient.LOGGER.warn("Unable to release Nvidium shadow rasterizer cleanly.", exception);
+                }
+                shadowRasterizer = null;
             }
-            shadowRasterizer = null;
+            if (translucentShadowRasterizer != null) {
+                try { invoke(translucentShadowRasterizer, "delete"); }
+                catch (ReflectiveOperationException | RuntimeException exception) {
+                    CaustiqClient.LOGGER.warn("Unable to release Nvidium translucent shadow rasterizer cleanly.", exception);
+                }
+                translucentShadowRasterizer = null;
+            }
         }
 
         private void ensureResolution(int requested) {
@@ -486,16 +529,35 @@ public final class NvidiumShadowRenderer {
             GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_RGBA16F,
                     requested, requested, 0, GL11C.GL_RGBA, GL11C.GL_FLOAT,
                     (ByteBuffer) null);
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, translucentDepthTexture);
+            GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_DEPTH_COMPONENT32F,
+                    requested, requested, 0, GL11C.GL_DEPTH_COMPONENT, GL11C.GL_FLOAT,
+                    (ByteBuffer) null);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
             GL13C.glActiveTexture(activeTexture);
             resolution = requested;
             depthValid = false;
             checkFramebuffer();
+            checkTranslucentFramebuffer();
         }
 
         private void bindDepthTarget() {
             GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, framebuffer);
             GL20C.glDrawBuffers(new int[]{GL11C.GL_NONE, GL30C.GL_COLOR_ATTACHMENT1});
+        }
+
+        private void clearTranslucentDepth() {
+            GlState previous = GlState.capture();
+            try {
+                GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, translucentFramebuffer);
+                GL11C.glViewport(0, 0, resolution, resolution);
+                GL11C.glDisable(GL11C.GL_SCISSOR_TEST);
+                GL11C.glDepthMask(true);
+                GL11C.glClearDepth(1.0);
+                GL11C.glClear(GL11C.GL_DEPTH_BUFFER_BIT);
+            } finally {
+                previous.restore();
+            }
         }
 
         private void clearDepth() {
@@ -710,6 +772,26 @@ public final class NvidiumShadowRenderer {
             }
         }
 
+        private void checkTranslucentFramebuffer() {
+            int previousDraw = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
+            int previousRead = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
+            try {
+                GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, translucentFramebuffer);
+                GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
+                        GL11C.GL_TEXTURE_2D, translucentDepthTexture, 0);
+                GL20C.glDrawBuffer(GL11C.GL_NONE);
+                GL11C.glReadBuffer(GL11C.GL_NONE);
+                int status = GL30C.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER);
+                if (status != GL30C.GL_FRAMEBUFFER_COMPLETE) {
+                    throw new IllegalStateException("Nvidium translucent shadow framebuffer is incomplete: 0x"
+                            + Integer.toHexString(status));
+                }
+            } finally {
+                GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousDraw);
+                GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, previousRead);
+            }
+        }
+
         private void checkFramebuffer() {
             int previousDraw = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
             int previousRead = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
@@ -744,8 +826,10 @@ public final class NvidiumShadowRenderer {
             delete(temporalCommands);
             delete(statisticsBuffer);
             GL30C.glDeleteFramebuffers(framebuffer);
+            GL30C.glDeleteFramebuffers(translucentFramebuffer);
             GL11C.glDeleteTextures(depthTexture);
             GL11C.glDeleteTextures(shadowColorTexture);
+            GL11C.glDeleteTextures(translucentDepthTexture);
             depthValid = false;
         }
 
@@ -754,6 +838,39 @@ public final class NvidiumShadowRenderer {
             try { invoke(resource, "delete"); }
             catch (ReflectiveOperationException | RuntimeException ignored) { }
         }
+    }
+
+    private static int[] createDepthOnlyTarget(int resolution) {
+        int previousActiveTexture = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
+        int previousTexture = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
+        int previousDrawFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
+        int previousReadFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
+        int texture = GL11C.glGenTextures();
+        GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_LINEAR);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_LINEAR);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, 0x812D);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, 0x812D);
+        GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_DEPTH_COMPONENT32F,
+                resolution, resolution, 0, GL11C.GL_DEPTH_COMPONENT, GL11C.GL_FLOAT, (ByteBuffer) null);
+        int framebuffer = GL30C.glGenFramebuffers();
+        GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, framebuffer);
+        GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
+                GL11C.GL_TEXTURE_2D, texture, 0);
+        GL20C.glDrawBuffer(GL11C.GL_NONE);
+        GL11C.glReadBuffer(GL11C.GL_NONE);
+        int status = GL30C.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER);
+        GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
+        GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+        GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
+        GL13C.glActiveTexture(previousActiveTexture);
+        if (status != GL30C.GL_FRAMEBUFFER_COMPLETE) {
+            GL30C.glDeleteFramebuffers(framebuffer);
+            GL11C.glDeleteTextures(texture);
+            throw new IllegalStateException("Could not create Nvidium translucent shadow target: 0x"
+                    + Integer.toHexString(status));
+        }
+        return new int[]{texture, framebuffer};
     }
 
     private static int[] createDepthTarget(int resolution) {

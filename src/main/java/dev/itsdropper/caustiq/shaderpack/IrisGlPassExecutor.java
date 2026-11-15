@@ -307,8 +307,10 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 continue;
             }
             int texture;
-            if (sampler.equals("shadowtex0") || sampler.equals("shadowtex1") || sampler.equals("shadow")) {
+            if (sampler.equals("shadowtex0") || sampler.equals("shadow")) {
                 texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowTexture();
+            } else if (sampler.equals("shadowtex1")) {
+                texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowTexture1();
                 if (texture == 0) {
                     throw new IllegalStateException("Iris pass '" + program.name()
                             + "' samples " + sampler + " before a valid shadow depth map has been rendered.");
