@@ -143,11 +143,11 @@ jobs:
               "photon-nvidium-shadow.frag",
           )
           bindless_extension = re.compile(
-              r"(?m)^[ \\t]*#[ \\t]*extension[ \\t]+GL_NV_bindless_texture\\b"
+              r"(?m)^[ \t]*#[ \t]*extension[ \t]+GL_NV_bindless_texture\b"
           )
           bindless_constructor = re.compile(
-              r"\\bsampler(?:1D|2D|3D|Cube|1DArray|2DArray|CubeArray)\\s*"
-              r"\\(\\s*(?:u?int64_t|uint64_t)\\b"
+              r"\bsampler(?:1D|2D|3D|Cube|1DArray|2DArray|CubeArray)\s*"
+              r"\(\s*(?:u?int64_t|uint64_t)\b"
           )
           generated = {}
           for name in shaders:
@@ -182,7 +182,7 @@ jobs:
           };
           const float COLOR_SCALE = 1.0 / 255.0;
           vec4 decodeVertexColour(Vertex vertex) { return vec4(1.0); }
-          """ + helpers + "\\nvoid main() {\\n    Vertex vertex = Vertex(0u, 0u, 0u, 0u, 0u, 0u, 0u);\\n    gl_Position = vec4(caustiqDecodeNormal(vertex), 1.0);\\n}\\n"
+          """ + helpers + "\nvoid main() {\n    Vertex vertex = Vertex(0u, 0u, 0u, 0u, 0u, 0u, 0u);\n    gl_Position = vec4(caustiqDecodeNormal(vertex), 1.0);\n}\n"
           (output_dir / "nvidium-adapter-helpers.vert").write_text(harness)
           print("Validated four generated Nvidium terrain/shadow stages are present and bindless usage is not silently stripped.")
           print("Extracted the exact injected adapter helper block for standalone GLSL compilation.")
