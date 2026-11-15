@@ -19,7 +19,7 @@ class NvidiumTerrainVaryingAdapterTest {
         String fragment = adapted.get("FRAGMENT");
 
         assertTrue(mesh.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 5"));
-        assertTrue(fragment.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4"));
+        assertTrue(fragment.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 5"));
         assertTrue(mesh.indexOf("#extension GL_ARB_gpu_shader5 : require")
                 < mesh.indexOf("uniform mat4 caustiqProjection;"),
                 "Mesh uniform declarations must follow GLSL extension directives");
@@ -115,9 +115,7 @@ class NvidiumTerrainVaryingAdapterTest {
         assertTrue(adapted.get("MESH").contains("OUT[id].v_midBlock = caustiqDecodeMidBlock(V);"));
         assertTrue(adapted.get("MESH").contains("OUT[id].v_lightmapCoord = decodeLightUV(V);"));
         assertTrue(adapted.get("MESH").contains("OUT[id].v_quadMidUv = caustiqDecodeMidUv(V);"));
-        assertTrue(adapted.get("MESH").contains("OUT[id].v_tbn = caustiqDecodeTbn(V);"));
         assertTrue(adapted.get("FRAGMENT").contains("vec3 v_renderPosition;"));
-        assertTrue(adapted.get("FRAGMENT").contains("flat mat3 v_tbn;"));
         assertTrue(adapted.get("FRAGMENT").contains("layout(location = 4) out vec4 caustiqGBufferLightmap;"));
         assertTrue(adapted.get("FRAGMENT").contains("flat uint v_materialFlags;"));
         assertEquals(sources.get("TASK"), adapted.get("TASK"));
@@ -164,7 +162,7 @@ class NvidiumTerrainVaryingAdapterTest {
         Map<String, String> sources = sourceStages();
         Map<String, String> partiallyAdapted = Map.of(
                 "TASK", sources.get("TASK"),
-                "MESH", sources.get("MESH") + "\n#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4",
+                "MESH", sources.get("MESH") + "\n#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 5",
                 "FRAGMENT", sources.get("FRAGMENT"));
         assertThrows(IllegalStateException.class,
                 () -> NvidiumTerrainVaryingAdapter.adapt(partiallyAdapted));
