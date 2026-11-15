@@ -153,6 +153,19 @@ public final class CaustiqCiShaderValidation {
             List<String> failures = new ArrayList<>();
             int compiled = 0;
             for (IrisShaderPackModel.ProgramSet set : programSets) {
+                Set<String> dimensionDefines = new LinkedHashSet<>(defines);
+                dimensionDefines.remove("WORLD_OVERWORLD=1");
+                dimensionDefines.remove("OVERWORLD=1");
+                if (set.directory().equals("world-1")) {
+                    dimensionDefines.add("WORLD_NETHER=1");
+                    dimensionDefines.add("NETHER=1");
+                } else if (set.directory().equals("world1")) {
+                    dimensionDefines.add("WORLD_END=1");
+                    dimensionDefines.add("END=1");
+                } else {
+                    dimensionDefines.add("WORLD_OVERWORLD=1");
+                    dimensionDefines.add("OVERWORLD=1");
+                }
                 for (IrisShaderPackModel.Program sourceProgram : set.programs().values()) {
                     ShaderPackProgramCatalog.Group group =
                             ShaderPackProgramCatalog.Group.classify(sourceProgram.name());
@@ -169,7 +182,7 @@ public final class CaustiqCiShaderValidation {
                                 + ": incomplete or unsupported shader-stage set " + program.stages().keySet());
                         continue;
                     }
-                    try (IrisGlProgram ignored = compiler.compile(program, sources::read, defines)) {
+                    try (IrisGlProgram ignored = compiler.compile(program, sources::read, dimensionDefines)) {
                         compiled++;
                         CaustiqClient.LOGGER.info("Photon CI linked {}/{} program '{}'.",
                                 set.directory().isBlank() ? "base" : set.directory(), compiled, program.name());
