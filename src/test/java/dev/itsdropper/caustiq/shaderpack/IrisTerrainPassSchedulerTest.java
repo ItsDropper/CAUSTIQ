@@ -68,6 +68,37 @@ class IrisTerrainPassSchedulerTest {
         }
     }
 
+    @Test
+    void mapsFragmentOutputSlotsThroughRendertargetsAndDrawbuffersDirectives() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("OutputMappingPack/shaders"));
+        writeProgram(shaders, "composite", """
+                /* RENDERTARGETS: 0,3,7 */
+                layout(location = 0) out vec4 scene;
+                layout(location = 1) out vec4 normal;
+                layout(location = 2) out vec4 material;
+                void main() {
+                    scene = vec4(1.0);
+                    normal = vec4(0.0, 1.0, 0.0, 1.0);
+                    material = vec4(0.5);
+                }
+                """);
+        writeProgram(shaders, "composite1", """
+                /* DRAWBUFFERS: 35 */
+                void main() {
+                    gl_FragData[0] = vec4(1.0);
+                    gl_FragData[1] = vec4(0.5);
+                }
+                """);
+
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor("OutputMappingPack", 4))) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
+
+            assertEquals(java.util.Set.of(0, 3, 7), plan.passes().get(0).pass().writes());
+            assertEquals(java.util.Set.of(3, 5), plan.passes().get(1).pass().writes());
+        }
+    }
+
     private void writeProgram(Path directory, String name, String fragment) throws IOException {
         Files.writeString(directory.resolve(name + ".vsh"), """
                 #version 150
