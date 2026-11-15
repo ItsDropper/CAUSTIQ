@@ -155,7 +155,7 @@ class NvidiumShaderProgramBridgeTest {
 
     @Test void translucentConstructorPreservesShadowTranslucentCompileScope() {
         NvidiumShaderProgramBridge.registerTranslucentTerrainAdapter(
-                sources -> append(sources, "// regular translucent"));
+                sources -> append(sources, "// regular translucent"), java.util.List.of(0, 1, 2, 3, 4, 5, 6, 7));
         NvidiumShaderProgramBridge.registerShadowTranslucentTerrainAdapter(
                 sources -> append(sources, "// translucent shadow"));
         NvidiumShaderProgramBridge.beginPipelineCompile(
