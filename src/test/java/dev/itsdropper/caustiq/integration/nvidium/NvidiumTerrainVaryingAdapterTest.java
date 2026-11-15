@@ -18,7 +18,7 @@ class NvidiumTerrainVaryingAdapterTest {
         String mesh = adapted.get("MESH");
         String fragment = adapted.get("FRAGMENT");
 
-        assertTrue(mesh.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 3"));
+        assertTrue(mesh.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4"));
         assertTrue(fragment.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 3"));
         for (String varying : new String[]{
                 "vec2 uv;", "vec3 v_colour;", "vec3 v_vertexColour;",
@@ -30,9 +30,9 @@ class NvidiumTerrainVaryingAdapterTest {
             assertTrue(fragment.contains(varying), "Fragment input missing " + varying);
         }
         assertTrue(mesh.contains("decodeVertexColour(V).rgb"));
-        assertTrue(mesh.contains("float((uint(v.color) >> 24u) & 0xFFu) * COLOR_SCALE"));
+        assertTrue(mesh.contains("color.a = float((vertex.nvidiumMaterial >> 8u) & 0xFFu) * COLOR_SCALE;"));
         assertTrue(mesh.contains("decodeLightUV(V)"));
-        assertTrue(mesh.contains("OUT[id].v_materialFlags = V.nvidiumMaterial;"));
+        assertTrue(mesh.contains("OUT[id].v_materialFlags = V.nvidiumMaterial & 0xFFu;"));
         assertTrue(mesh.contains("uint nvidiumMaterial;"));
         assertTrue(mesh.contains("caustiqDecodeBlockEntity(V.blockId)"));
         assertTrue(mesh.contains("caustiqDecodeMidUv(V)"));
@@ -139,7 +139,7 @@ class NvidiumTerrainVaryingAdapterTest {
         Map<String, String> sources = sourceStages();
         Map<String, String> partiallyAdapted = Map.of(
                 "TASK", sources.get("TASK"),
-                "MESH", sources.get("MESH") + "\n#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 3",
+                "MESH", sources.get("MESH") + "\n#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4",
                 "FRAGMENT", sources.get("FRAGMENT"));
         assertThrows(IllegalStateException.class,
                 () -> NvidiumTerrainVaryingAdapter.adapt(partiallyAdapted));
