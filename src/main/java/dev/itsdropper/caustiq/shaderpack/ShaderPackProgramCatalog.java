@@ -56,6 +56,7 @@ public final class ShaderPackProgramCatalog {
 
         static Group classify(String name) {
             String lower = name.toLowerCase(Locale.ROOT);
+            if (lower.startsWith("clrwl_")) lower = lower.substring("clrwl_".length());
             if (matches(lower, "shadowcomp")) return SHADOW_COMPOSITE;
             for (Group group : values()) {
                 if (group == UNKNOWN || group == SHADOW_COMPOSITE) continue;
@@ -72,7 +73,7 @@ public final class ShaderPackProgramCatalog {
                     || prefix.equals("setup") || prefix.equals("begin")
                     || prefix.equals("prepare") || prefix.equals("shadowcomp")) {
                 String suffix = name.startsWith(prefix) ? name.substring(prefix.length()) : "";
-                return !suffix.isEmpty() && suffix.chars().allMatch(Character::isDigit);
+                return !suffix.isEmpty() && suffix.matches("[0-9]+(?:_[a-z0-9_]+)?");
             }
             return false;
         }
@@ -163,7 +164,9 @@ public final class ShaderPackProgramCatalog {
         if (group == Group.GBUFFERS || group == Group.SHADOW || group == Group.FINAL) return 0;
         String suffix = name.substring(group.prefix.length());
         if (suffix.isEmpty()) return 0;
-        try { return Integer.parseInt(suffix); }
+        java.util.regex.Matcher numbered = java.util.regex.Pattern.compile("^(\\d+)").matcher(suffix);
+        if (!numbered.find()) return Integer.MAX_VALUE;
+        try { return Integer.parseInt(numbered.group(1)); }
         catch (NumberFormatException ignored) { return Integer.MAX_VALUE; }
     }
 }
