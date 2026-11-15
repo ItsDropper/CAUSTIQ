@@ -54,6 +54,18 @@ jobs:
           test -s "$photon_dir/shaders/world0/gbuffers_terrain.fsh"
           echo "PHOTON_SOURCE_DIR=$photon_dir" >> "$GITHUB_ENV"
 
+      - name: Download pinned Complementary Reimagined r5.9.3 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/ComplementaryReimagined_r5.9.3.zip"
+          curl --fail --silent --show-error --location \
+            "https://cdn.modrinth.com/data/HVnmMxH1/versions/Bqen1mJX/ComplementaryReimagined_r5.9.3.zip" \
+            --output "$archive"
+          test -s "$archive"
+          unzip -Z1 "$archive" | grep -qx 'shaders/shaders.properties'
+          echo "COMPLEMENTARY_SOURCE_ARCHIVE=$archive" >> "$GITHUB_ENV"
+
       - name: Install GLSL compiler
         shell: bash
         run: |
@@ -138,6 +150,34 @@ jobs:
           if render_case.find("failure") is not None or render_case.find("error") is not None:
               raise SystemExit("Translated Photon terrain render smoke test failed.")
           print("Verified pinned-source terrain/shadow audits, Photon LPV compute execution, and Mesa terrain framebuffer rendering.")
+          PY
+
+      - name: Verify every pinned Complementary Reimagined r5.9.3 expression executed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import xml.etree.ElementTree as ET
+
+          test_name = "evaluatesEveryCustomUniformAndVariableFromPinnedR593Archive"
+          matches = []
+          for report in glob.glob("build/test-results/test/TEST-*.xml"):
+              root = ET.parse(report).getroot()
+              matches.extend(
+                  case for case in root.iter("testcase")
+                  if case.attrib.get("name", "").split("(")[0] == test_name
+              )
+          if len(matches) != 1:
+              raise SystemExit(
+                  f"Expected exactly one Complementary r5.9.3 expression audit, found {len(matches)}"
+              )
+          case = matches[0]
+          if case.find("skipped") is not None:
+              raise SystemExit("Complementary r5.9.3 expression audit was skipped.")
+          if case.find("failure") is not None or case.find("error") is not None:
+              raise SystemExit("Complementary r5.9.3 expression audit failed.")
+          print("Verified every custom uniform and variable expression from the pinned Complementary r5.9.3 archive.")
           PY
 
       - name: Compile generated Nvidium adapter GLSL helpers
