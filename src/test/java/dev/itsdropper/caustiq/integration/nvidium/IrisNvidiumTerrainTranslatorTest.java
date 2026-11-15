@@ -108,6 +108,9 @@ class IrisNvidiumTerrainTranslatorTest {
                         dimension + " fragment program was not translated");
                 assertFalse(translator.renderTargetIndices().isEmpty(),
                         dimension + " has no routed fragment outputs");
+                if (dimension.equals("world0")) {
+                    assertEquals(List.of(1, 2), translator.renderTargetIndices());
+                }
             }
 
             IrisNvidiumTerrainTranslator defaults = IrisNvidiumTerrainTranslator.from(

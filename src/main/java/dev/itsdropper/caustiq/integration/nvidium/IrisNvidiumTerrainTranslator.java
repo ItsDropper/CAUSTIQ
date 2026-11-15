@@ -249,9 +249,11 @@ public final class IrisNvidiumTerrainTranslator {
 
     private static List<Integer> parseRenderTargetIndices(String source) {
         Matcher matcher = RENDERTARGETS.matcher(source);
-        if (!matcher.find()) return List.of(0, 1, 2, 3, 4, 5, 6, 7);
+        String activeDirective = null;
+        while (matcher.find()) activeDirective = matcher.group(1);
+        if (activeDirective == null) return List.of(0, 1, 2, 3, 4, 5, 6, 7);
         List<Integer> targets = new ArrayList<>();
-        for (String token : matcher.group(1).split("[,\\s]+")) {
+        for (String token : activeDirective.split("[,\\s]+")) {
             if (token.isBlank()) continue;
             int target = Integer.parseInt(token);
             if (target < 0 || target > 7) {
