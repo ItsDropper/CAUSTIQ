@@ -191,6 +191,25 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesMoonPhaseToTheRuntimeWorldMoonPhaseUniform() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform int moonPhase;
+                void main() {
+                    gl_FragColor = vec4(float(moonPhase));
+                }
+                """);
+
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform int caustiqMoonPhase;"));
+        assertTrue(fragment.contains("float(caustiqMoonPhase)"));
+        assertFalse(fragment.contains("uniform int moonPhase;"));
+    }
+
+    @Test
     void translatesHeldBlockLightValueToTheIrisItemLightRuntimeUniform() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150
