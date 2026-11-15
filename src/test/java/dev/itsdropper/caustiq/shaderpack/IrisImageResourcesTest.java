@@ -83,6 +83,10 @@ class IrisImageResourcesTest {
             assertEquals(48, images.get("light_data_img").width());
             assertEquals(2, images.get("light_data_img").height());
             assertEquals(128, images.get("voxel_img").depth());
+            assertEquals("voxel_sampler", images.get("voxel_img").sampler());
+            assertEquals("light_sampler_a", images.get("light_img_a").sampler());
+            assertEquals("light_sampler_b", images.get("light_img_b").sampler());
+            assertEquals("light_data_sampler", images.get("light_data_img").sampler());
             assertEquals(128, images.get("light_img_a").depth());
             assertEquals(128, images.get("light_img_b").depth());
 
@@ -98,7 +102,7 @@ class IrisImageResourcesTest {
                             48, 1, 1, false, false));
             assertArrayEquals(new int[]{4, 128, 128},
                     IrisImageResources.calculateDispatchGroups(images,
-                            Set.of("voxel_img", "light_img_a", "light_img_b"),
+                            Set.of("light_img_a", "light_img_b"),
                             32, 1, 1, true, true));
 
             String shadowVertex = preprocessor.preprocess(

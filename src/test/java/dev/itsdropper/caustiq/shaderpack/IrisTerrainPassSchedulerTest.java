@@ -125,6 +125,34 @@ class IrisTerrainPassSchedulerTest {
     }
 
     @Test
+    void usesLastActiveRendertargetsDirectiveAndOnlyAssignedOutputs() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("ConditionalMrt/shaders"));
+        writeProgram(shaders, "composite", """
+                /* RENDERTARGETS: 1 */
+                layout(location = 0) out vec4 first;
+                layout(location = 1) out vec4 second;
+                #ifdef EXTRA_OUTPUT
+                /* RENDERTARGETS: 1,2 */
+                #endif
+                void main() {
+                    first = vec4(1.0);
+                    #ifdef EXTRA_OUTPUT
+                    second = vec4(0.5);
+                    #endif
+                }
+                """);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor("ConditionalMrt", 3))) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisTerrainPassScheduler scheduler = new IrisTerrainPassScheduler();
+            var basic = scheduler.schedule(model, null, java.util.Map.of());
+            assertEquals(java.util.Map.of(0, 1), basic.passes().getFirst().pass().outputTargets());
+            var extended = scheduler.schedule(model, null, java.util.Map.of("EXTRA_OUTPUT", "1"));
+            assertEquals(java.util.Map.of(0, 1, 1, 2),
+                    extended.passes().getFirst().pass().outputTargets());
+        }
+    }
+
+    @Test
     void distinguishesScaledFullscreenTargetsFromScaledTerrainAttachments() throws IOException {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("ScaledPack/shaders"));
         Files.writeString(shaders.resolve("shaders.properties"), "colortex1Scale=0.5\n");

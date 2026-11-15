@@ -388,7 +388,7 @@ final class IrisImageResources implements AutoCloseable {
         }
         GL11C.glBindTexture(target, previousBinding);
         GL13C.glActiveTexture(previousActive);
-        if (spec.clear) clearTexture(texture, spec.internalFormat, spec.externalFormat);
+        clearTexture(texture, spec.internalFormat, spec.externalFormat);
         return new Image(name, spec.sampler, texture, target, spec.internalFormat, spec.externalFormat,
                 spec.width, spec.height, spec.depth);
     }

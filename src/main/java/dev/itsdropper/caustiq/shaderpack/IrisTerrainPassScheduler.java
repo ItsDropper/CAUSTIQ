@@ -22,9 +22,11 @@ public final class IrisTerrainPassScheduler {
     private static final Pattern TARGET_REFERENCE = Pattern.compile("\\bcolortex(\\d+)\\b");
     private static final Pattern OUTPUT_LOCATION = Pattern.compile(
             "(?m)layout\\s*\\([^)]*location\\s*=\\s*(\\d+)[^)]*\\)\\s*" +
-                    "(?:(?:flat|smooth|noperspective|centroid|sample|invariant|precise|highp|mediump|lowp)\\s+)*out\\s+");
-    private static final Pattern OUTPUT_NAME = Pattern.compile("\\boutColor(\\d+)\\b");
-    private static final Pattern FRAG_DATA = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]");
+                    "(?:(?:flat|smooth|noperspective|centroid|sample|invariant|precise|highp|mediump|lowp)\\s+)*out\\s+\\w+\\s+(\\w+)\\s*;");
+    private static final Pattern OUTPUT_NAME = Pattern.compile(
+            "\\boutColor(\\d+)\\s*(?:\\[[^]]+])?\\s*(?:[+*/-]?=)");
+    private static final Pattern FRAG_DATA = Pattern.compile(
+            "\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]\\s*(?:[+*/-]?=)");
     private static final Pattern RENDERTARGETS = Pattern.compile(
             "/\\*\\s*RENDERTARGETS\\s*:\\s*([^*]*?)\\*/", Pattern.CASE_INSENSITIVE);
     private static final Pattern DRAWBUFFERS = Pattern.compile(
@@ -157,7 +159,11 @@ public final class IrisTerrainPassScheduler {
     private static Map<Integer, Integer> collectOutputs(String source) {
         Set<Integer> outputSlots = new LinkedHashSet<>();
         Matcher locations = OUTPUT_LOCATION.matcher(source);
-        while (locations.find()) outputSlots.add(Integer.parseInt(locations.group(1)));
+        while (locations.find()) {
+            if (isAssigned(source, locations.group(2))) {
+                outputSlots.add(Integer.parseInt(locations.group(1)));
+            }
+        }
         Matcher named = OUTPUT_NAME.matcher(source);
         while (named.find()) outputSlots.add(Integer.parseInt(named.group(1)));
         Matcher legacy = FRAG_DATA.matcher(source);
@@ -184,17 +190,25 @@ public final class IrisTerrainPassScheduler {
         return Map.copyOf(result);
     }
 
+    private static boolean isAssigned(String source, String variable) {
+        Pattern assignment = Pattern.compile("\\b" + Pattern.quote(variable)
+                + "\\s*(?:\\[[^]]+])?\\s*(?:[+*/-]?=|\\+\\+|--)");
+        return assignment.matcher(source).find();
+    }
+
     private static List<Integer> parseOutputTargetMapping(String source) {
         Matcher renderTargets = RENDERTARGETS.matcher(source);
         Matcher drawBuffers = DRAWBUFFERS.matcher(source);
-        boolean hasRenderTargets = renderTargets.find();
-        boolean hasDrawBuffers = drawBuffers.find();
-        if (hasRenderTargets && hasDrawBuffers) {
+        String renderTargetDirective = null;
+        String drawBufferDirective = null;
+        while (renderTargets.find()) renderTargetDirective = renderTargets.group(1);
+        while (drawBuffers.find()) drawBufferDirective = drawBuffers.group(1);
+        if (renderTargetDirective != null && drawBufferDirective != null) {
             throw new IllegalArgumentException("A fragment shader cannot declare both RENDERTARGETS and DRAWBUFFERS.");
         }
-        if (hasRenderTargets) {
+        if (renderTargetDirective != null) {
             List<Integer> result = new ArrayList<>();
-            for (String token : renderTargets.group(1).trim().split("\\s*,\\s*")) {
+            for (String token : renderTargetDirective.trim().split("\\s*,\\s*")) {
                 if (!token.matches("\\d+")) {
                     throw new IllegalArgumentException("Invalid Iris RENDERTARGETS entry: " + token);
                 }
@@ -203,10 +217,10 @@ public final class IrisTerrainPassScheduler {
             if (result.isEmpty()) throw new IllegalArgumentException("Iris RENDERTARGETS directive is empty.");
             return List.copyOf(result);
         }
-        if (hasDrawBuffers) {
-            String digits = drawBuffers.group(1).replaceAll("\\s+", "");
+        if (drawBufferDirective != null) {
+            String digits = drawBufferDirective.replaceAll("\\s+", "");
             if (digits.isEmpty() || !digits.matches("[0-7]+")) {
-                throw new IllegalArgumentException("Invalid Iris DRAWBUFFERS directive: " + drawBuffers.group(1));
+                throw new IllegalArgumentException("Invalid Iris DRAWBUFFERS directive: " + drawBufferDirective);
             }
             List<Integer> result = new ArrayList<>(digits.length());
             for (int i = 0; i < digits.length(); i++) result.add(digits.charAt(i) - '0');
