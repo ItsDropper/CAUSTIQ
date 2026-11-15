@@ -206,12 +206,24 @@ public final class CaustiqCiShaderValidation {
                     ShaderPackProgramCatalog.Group.FINAL);
             for (IrisShaderPackModel.ProgramSet set : programSets) {
                 Map<String, String> dimensionValues = new java.util.LinkedHashMap<>(optionValues);
-                dimensionValues.put("WORLD_OVERWORLD", set.directory().equals("world-1") || set.directory().equals("world1") ? "0" : "1");
-                dimensionValues.put("OVERWORLD", dimensionValues.get("WORLD_OVERWORLD"));
-                dimensionValues.put("WORLD_NETHER", set.directory().equals("world-1") ? "1" : "0");
-                dimensionValues.put("NETHER", dimensionValues.get("WORLD_NETHER"));
-                dimensionValues.put("WORLD_END", set.directory().equals("world1") ? "1" : "0");
-                dimensionValues.put("END", dimensionValues.get("WORLD_END"));
+                // Dimension macros are tested with defined(), so inactive dimensions
+                // must be absent rather than defined as zero.
+                dimensionValues.remove("WORLD_OVERWORLD");
+                dimensionValues.remove("OVERWORLD");
+                dimensionValues.remove("WORLD_NETHER");
+                dimensionValues.remove("NETHER");
+                dimensionValues.remove("WORLD_END");
+                dimensionValues.remove("END");
+                if (set.directory().equals("world-1")) {
+                    dimensionValues.put("WORLD_NETHER", "1");
+                    dimensionValues.put("NETHER", "1");
+                } else if (set.directory().equals("world1")) {
+                    dimensionValues.put("WORLD_END", "1");
+                    dimensionValues.put("END", "1");
+                } else {
+                    dimensionValues.put("WORLD_OVERWORLD", "1");
+                    dimensionValues.put("OVERWORLD", "1");
+                }
                 if (set.directory().equals("world-1")) {
                     // Photon deliberately omits shadow samplers in the Nether.
                     dimensionValues.put("SHADOW", "false");
