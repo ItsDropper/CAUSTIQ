@@ -6,6 +6,11 @@ import java.util.function.Function;
 
 /** Bounded scalar Iris expression evaluator used by custom uniforms and variables. */
 public final class IrisExpression {
+    private static final java.util.concurrent.ConcurrentMap<String, SmoothState> SMOOTH_VALUES =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private record SmoothState(double value, long timestampNanos) { }
+
     private IrisExpression() { }
 
     public static double evaluate(String source, Function<String, Double> variables) {
@@ -114,19 +119,20 @@ public final class IrisExpression {
             if (normalized.equals("pi")) return Math.PI;
             if (normalized.equals("tau")) return Math.PI * 2.0;
             if (take("(")) {
+                int functionOffset = cursor;
                 java.util.ArrayList<Double> args = new java.util.ArrayList<>();
                 if (!take(")")) {
                     do { args.add(conditional()); } while (take(","));
                     require(")");
                 }
-                return function(normalized, args);
+                return function(normalized, args, functionOffset);
             }
             Double value = variables.apply(identifier);
             if (value == null) throw failure("Unknown Iris expression variable '" + identifier + "'");
             return value;
         }
 
-        private double function(String name, java.util.List<Double> a) {
+        private double function(String name, java.util.List<Double> a, int functionOffset) {
             return switch (name) {
                 case "sin" -> unary(name, a, Math::sin);
                 case "cos" -> unary(name, a, Math::cos);
@@ -159,17 +165,75 @@ public final class IrisExpression {
                     double t = Math.max(0.0, Math.min(1.0, (a.get(2) - a.get(0)) / (a.get(1) - a.get(0))));
                     yield t * t * (3.0 - 2.0 * t);
                 }
-                case "smooth" -> {
-                    if (a.size() < 1 || a.size() > 4) {
-                        throw failure("smooth expects 1 to 4 arguments");
-                    }
-                    // Iris smooth() is stateful; return its target until the per-uniform
-                    // temporal state is available. This preserves valid expression evaluation.
-                    yield a.size() >= 3 && a.size() == 4 ? a.get(1) : a.get(0);
+                case "smooth" -> smooth(a, functionOffset);
+                case "if" -> conditionalFunction(a);
+                case "equals" -> {
+                    if (a.size() < 2 || a.size() > 3) throw failure("equals expects 2 or 3 arguments");
+                    double tolerance = a.size() == 3 ? Math.abs(a.get(2)) : 0.0;
+                    yield Math.abs(a.get(0) - a.get(1)) <= tolerance ? 1.0 : 0.0;
                 }
-                case "if" -> { requireCount(name, a, 3); yield truth(a.get(0)) ? a.get(1) : a.get(2); }
+                case "between" -> {
+                    requireCount(name, a, 3);
+                    double low = Math.min(a.get(1), a.get(2));
+                    double high = Math.max(a.get(1), a.get(2));
+                    yield a.get(0) >= low && a.get(0) <= high ? 1.0 : 0.0;
+                }
+                case "in" -> {
+                    if (a.size() < 2) throw failure("in expects at least 2 arguments");
+                    boolean found = false;
+                    for (int i = 1; i < a.size(); i++) found |= a.get(0).doubleValue() == a.get(i).doubleValue();
+                    yield found ? 1.0 : 0.0;
+                }
+                case "not" -> { requireCount(name, a, 1); yield truth(a.get(0)) ? 0.0 : 1.0; }
+                case "and" -> {
+                    if (a.isEmpty()) throw failure("and expects at least 1 argument");
+                    yield a.stream().allMatch(Parser::truth) ? 1.0 : 0.0;
+                }
+                case "or" -> {
+                    if (a.isEmpty()) throw failure("or expects at least 1 argument");
+                    yield a.stream().anyMatch(Parser::truth) ? 1.0 : 0.0;
+                }
                 default -> throw failure("Unsupported Iris expression function '" + name + "'");
             };
+        }
+
+        private double conditionalFunction(java.util.List<Double> args) {
+            if (args.size() == 3) return truth(args.get(0)) ? args.get(1) : args.get(2);
+            if (args.size() < 3 || args.size() % 2 == 0) {
+                throw failure("if expects condition/value pairs followed by a default value");
+            }
+            for (int i = 0; i < args.size() - 1; i += 2) {
+                if (truth(args.get(i))) return args.get(i + 1);
+            }
+            return args.getLast();
+        }
+
+        private double smooth(java.util.List<Double> args, int functionOffset) {
+            if (args.isEmpty() || args.size() > 3) {
+                throw failure("smooth expects 1 to 3 arguments");
+            }
+            double target = args.get(0);
+            if (args.size() == 1) return target;
+            double riseHalfLife = Math.max(0.0, args.get(1));
+            double fallHalfLife = args.size() == 3 ? Math.max(0.0, args.get(2)) : riseHalfLife;
+            String key = source + "#" + functionOffset;
+            long now = System.nanoTime();
+            SmoothState previous = SMOOTH_VALUES.get(key);
+            if (previous == null || !Double.isFinite(previous.value())) {
+                SMOOTH_VALUES.put(key, new SmoothState(target, now));
+                return target;
+            }
+            double elapsedTicks = Math.max(0.0, (now - previous.timestampNanos()) / 50_000_000.0);
+            double halfLife = target >= previous.value() ? riseHalfLife : fallHalfLife;
+            double result;
+            if (halfLife <= 0.0) {
+                result = target;
+            } else {
+                double alpha = 1.0 - Math.exp(-Math.log(2.0) * elapsedTicks / halfLife);
+                result = previous.value() + (target - previous.value()) * alpha;
+            }
+            SMOOTH_VALUES.put(key, new SmoothState(result, now));
+            return result;
         }
 
         private double unary(String name, java.util.List<Double> args, java.util.function.DoubleUnaryOperator op) {
