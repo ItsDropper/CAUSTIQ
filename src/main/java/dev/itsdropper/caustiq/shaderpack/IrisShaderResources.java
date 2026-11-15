@@ -23,11 +23,12 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Owns shader-pack custom 2D textures and Iris custom uniform/variable expressions. */
+/** Owns shader-pack custom 2D/3D textures and Iris custom uniform/variable expressions. */
 public final class IrisShaderResources implements AutoCloseable {
     private static final Pattern TEXTURE = Pattern.compile("^texture\\.([A-Za-z_][A-Za-z0-9_]*)(?:\\.([A-Za-z_][A-Za-z0-9_]*))?(?:\\.\\d+)?$");
     private static final Pattern EXPRESSION = Pattern.compile("^(uniform|variable)\\.(float|int|bool|vec[234]|ivec[234]|bvec[234])\\.([A-Za-z_][A-Za-z0-9_]*)$");
     private static final Pattern ANY_EXPRESSION = Pattern.compile("^(uniform|variable)\\..+");
+    private static final Pattern DEFINE = Pattern.compile("(?m)^\\s*#\\s*define\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+([^\\r\\n]+))?");
     private static final int MAX_TEXTURES = 64;
     private static final long MAX_DECODED_BYTES = 128L * 1024L * 1024L;
 
@@ -127,7 +128,7 @@ public final class IrisShaderResources implements AutoCloseable {
         String propertiesSource;
         try { propertiesSource = sources.read("shaders.properties"); }
         catch (IOException missing) { propertiesSource = ""; }
-        IrisImageResources images = IrisImageResources.load(propertiesSource, defines);
+        IrisImageResources images = IrisImageResources.load(propertiesSource, resolveShaderPackDefines(sources, defines));
         return new IrisShaderResources(textures, uniforms, variables, images);
     }
 
@@ -450,6 +451,32 @@ public final class IrisShaderResources implements AutoCloseable {
 
     private static int textureBindingEnum(int target) {
         return target == GL12C.GL_TEXTURE_3D ? GL12C.GL_TEXTURE_BINDING_3D : GL11C.GL_TEXTURE_BINDING_2D;
+    }
+
+    private static Map<String, String> resolveShaderPackDefines(ShaderPackSources sources,
+                                                                      Map<String, String> selectedDefines) {
+        Map<String, String> resolved = new LinkedHashMap<>(selectedDefines);
+        resolved.putIfAbsent("MC_VERSION", "12111");
+        resolved.putIfAbsent("IS_IRIS", "1");
+        try {
+            String settings = sources.read("settings.glsl");
+            String expanded = new GlslPreprocessor().preprocess(settings, sources::read).source();
+            String active = new IrisGlslConditionalPreprocessor().preprocess(expanded, resolved);
+            Matcher definitions = DEFINE.matcher(active);
+            while (definitions.find()) {
+                String value = definitions.group(2);
+                if (value == null || value.isBlank()) value = "1";
+                else {
+                    value = value.replaceFirst("//.*$", "").strip();
+                    int whitespace = value.indexOf(' ');
+                    if (whitespace >= 0) value = value.substring(0, whitespace);
+                }
+                resolved.put(definitions.group(1), value);
+            }
+        } catch (IOException | RuntimeException ignored) {
+            // Packs without settings.glsl still use their explicit selected option values.
+        }
+        return Map.copyOf(resolved);
     }
 
     private static byte[] readTextureBytes(ShaderPackSources sources, String path) throws IOException {
