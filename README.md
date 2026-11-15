@@ -31,6 +31,7 @@ The `nvidium` branch builds the missing bridge, **without taking over terrain su
 
 - Nvidium still owns chunk submission and rasterisation.
 - CAUSTIQ extends Nvidium's vertex and interpolant formats with the data packs expect, translates a pack's terrain program into Nvidium's stages, routes the output into MRT colour targets, and then runs the pack's fullscreen passes over them.
+- A pack's `shadow` program is translated too and drives an **isolated light-space Nvidium pass**, so shadow maps exist without touching Nvidium's camera-culled command buffers.
 - Anything it *can't* represent is **rejected before shader link** — never guessed.
 
 ## ⚡ Install
@@ -61,10 +62,13 @@ flowchart TB
         P2["deferred · composite · final"]
     end
 
+    PS["shadow<br/>.vsh / .fsh"] --> SH["Isolated shadow pass<br/>light-space Nvidium raster"]
+    SH --> SM[("shadowtex0/1<br/>shadowcolor")]
     P1 --> AN["Compatibility analyzer<br/>rejects what Nvidium can't represent"]
     AN --> TR["IrisNvidiumTerrainTranslator<br/>→ task / mesh / fragment"]
     TR --> HK["Shader.Builder.compile() hook<br/>+ native varying ABI adapter"]
     HK --> NV["Nvidium terrain raster<br/>(Nvidium owns submission)"]
+    SM --> NV
     NV --> GB[("Terrain G-buffers 0–7<br/>Fullscreen colortex 0–31")]
     P2 --> SC["Pass scheduler<br/>dependency-ordered plan"]
     SC --> EX["Fullscreen pass executor"]
@@ -100,7 +104,7 @@ Nvidium's existing UV and pre-lit colour varyings are preserved. The adapter dis
 
 `IrisNvidiumTerrainTranslator` rewrites a `gbuffers_terrain` vertex/fragment pair into Nvidium's pipeline: the vertex `main` runs once per emitted Nvidium mesh vertex, Iris varyings are appended to Nvidium's interpolant block, and fragment outputs (`gl_FragData`, `layout(location)`, `RENDERTARGETS`/`DRAWBUFFERS`) are mapped to MRT locations.
 
-Common Iris uniforms are aliased onto what Nvidium really binds (`gtexture`, `lightmap`, `gbufferModelView`, `gbufferProjection`, `cameraPosition`, `frameCounter`, `fogColor`, `viewSize`, …). Unsupported inputs are **rejected before compilation** — the translator never substitutes a guessed value for a missing resource.
+Common Iris uniforms are aliased onto what Nvidium really binds (`gtexture`, `lightmap`, `gbufferModelView`, `gbufferProjection`, `cameraPosition`, `frameCounter`, `fogColor`, `viewSize`, the shadow matrices and `shadowtex0/1`, `shadowcolor0/1`, …). Pack-wide uniforms the terrain stage never references are ignored rather than rejected. Unsupported inputs are **rejected before compilation** — the translator never substitutes a guessed value for a missing resource.
 
 Nvidium's Iris opt-out is overridden only when CAUSTIQ has a prepared terrain adapter for the current world.
 
@@ -125,9 +129,19 @@ Nvidium's Iris opt-out is overridden only when CAUSTIQ has a prepared terrain ad
 
 The `IrisTerrainPassScheduler` turns a pack's program set and `colortex` declarations into a deterministic, dependency-ordered plan (dimension overrides are never silently merged with the base set). `IrisGlPassExecutor` then runs the **deferred → composite → final** fullscreen passes in that order, with per-target ping-pong, scaled storage, persistent state and compact MRT routing.
 
-Custom `texture.<name>` image assets are decoded and uploaded as managed `sampler2D` textures for both terrain and fullscreen programs. Custom `uniform.*` and `variable.*` declarations support float/int/bool and vec2/vec3/vec4 values, arithmetic, conditionals and common scalar math functions. Non-2D sampler types and vector-valued expression operations remain unsupported.
+Custom `texture.<name>` image assets are decoded and uploaded as managed textures for both terrain and fullscreen programs, and `image.*` resources are bound for compute passes. Custom `uniform.*` and `variable.*` declarations support float/int/bool and vec2/vec3/vec4 values (with component access), arithmetic, conditionals and common math functions. Expressions can read the clock and weather, camera and matrix components, the sun position in view space, and the camera biome's `temperature` and `rainfall`. Iris's stateful `smooth()` currently returns its target value instead of smoothing over time.
 
-Shadow passes and compute/geometry/tessellation passes are **not** executed; they raise a clear error instead of rendering something wrong.
+Fullscreen **compute** programs are dispatched with work-group limits checked, including shadow comparison samplers. Geometry and tessellation stages are **not** translated; they raise a clear error instead of rendering something wrong.
+
+<details>
+<summary><b>Shadow pass</b></summary>
+<br>
+
+When a pack ships a `shadow` program, `NvidiumShadowRenderer` renders Nvidium's terrain from the light into its own depth targets, with its own scene buffer, visibility and indirect command buffers. It shares only Nvidium's immutable region and arena data. Opaque depth is exposed as `shadowtex0`, translucent depth as `shadowtex1`, and the shadow program's colour outputs as `shadowcolor0–6`. Resolution and range come from the pack's `shadowMapResolution`, `shadowDistance` and `shadowDistanceRenderMul`.
+
+The light matrices are orthographic and centred on the camera, without texel snapping. If this pipeline throws, it disables itself and leaves normal Nvidium rendering intact.
+
+</details>
 
 </details>
 
@@ -143,12 +157,14 @@ Shadow passes and compute/geometry/tessellation passes are **not** executed; the
 | `gbuffers_terrain` → Nvidium translator | ✅ | Fails closed on unsupported inputs |
 | MRT terrain G-buffers | ✅ | Nvidium terrain attachments 1–7 |
 | Fullscreen colortex allocator | ✅ | colortex0–31, compact MRT slots, scaling, ping-pong and persistence |
-| Custom textures + uniforms | 🟡 | Managed custom sampler2D images; scalar expressions and typed scalar/vector uniforms |
+| Custom textures + uniforms | 🟡 | Managed custom images; typed scalar/vector uniforms; sun, biome and matrix expression variables |
 | Pass scheduler + fullscreen executor | ✅ | `deferred`, `composite`, `final`; GL output limits checked |
+| Shadow rendering | 🟡 | Isolated light-space pass with `shadowtex0/1` and `shadowcolor`; unverified in-game |
+| Compute passes | 🟡 | Dispatched by the fullscreen executor; exercised by a Mesa smoke test |
+| Bundled packs | ✅ | **Lumina** (terrain lighting + shadows) and **Stillwater** (final-pass grade) |
 | **In-game verification** | ⬜ | **Not done** — build success ≠ working renderer |
-| Shadow rendering | ⬜ | Needs a light-space Nvidium terrain pass |
-| Depth, compute, geometry/tessellation passes | ⬜ | |
-| Full Iris expression VM and non-2D sampler types | ⬜ | |
+| Depth textures (`depthtex1`), geometry/tessellation passes | ⬜ | |
+| Full Iris expression VM, temporal `smooth()` | ⬜ | |
 | Validation against real packs & benchmarks | ⬜ | |
 
 ## 🔬 What Nvidium can actually provide
@@ -162,24 +178,26 @@ CAUSTIQ describes this honestly in `NvidiumIrisTerrainAbi`: a *capability* contr
 | `gl_Vertex` / `vaPosition`, `gl_MultiTexCoord0` / `vaUV0`, `gl_Color` / `vaColor`, matrix inverses, `viewWidth` / `viewHeight`, `frameTimeCounter` | 🟡 derived |
 | `viewSpacePosition` | ❌ unavailable — Nvidium's position is region-transformed and camera-relative, not Iris view space |
 | `normals`, `specular`, `depthtex1`, Distant Horizons / Voxy depth textures, `taa_offset` | ❌ rejected at translation |
+| `shadowtex0/1`, `shadowcolor0/1`, `shadowModelView` / `shadowProjection` and inverses | 🟡 provided by the isolated shadow pass when the pack ships a `shadow` program |
+| `sunPosition`, `temperature`, `rainfall`, previous-frame matrices (as custom-uniform inputs) | 🟡 derived from the level and camera |
 | `colortex15` | 🟡 available to fullscreen passes; not a Nvidium terrain attachment |
 
-Two caveats worth knowing: the extra normal is the **per-triangle geometric normal** reconstructed from transformed packed positions (degenerate triangles are guarded), not a smooth interpolated vertex normal; and the audited sampler bindings are the terrain atlas on unit 0 and Minecraft's lightmap on unit 1.
+Two caveats worth knowing: the extra normal is the **per-triangle geometric normal** reconstructed from transformed packed positions (degenerate triangles are guarded), not a smooth interpolated vertex normal; and the audited sampler bindings are the terrain atlas on unit 0 and Minecraft's lightmap on unit 1, with the shadow and auxiliary textures on higher shared units.
 
 ## 🧪 How this branch is kept honest
 
 Because it hooks into someone else's renderer internals, this branch leans hard on CI. On every push to `main` or `nvidium`:
 
 - **Pinned Nvidium source audit** — downloads Nvidium at a fixed revision and asserts that every method signature, field and shader anchor the mixins rely on still exists.
-- **Pinned Photon terrain audit** — translates every dimension of a pinned [Photon](https://github.com/sixthsurge/photon) revision against Nvidium's real task/mesh/fragment stages. The workflow fails if that test is *skipped*, not just if it fails.
+- **Pinned Photon audits** — translates every dimension of a pinned [Photon](https://github.com/sixthsurge/photon) revision (terrain and shadow programs) against Nvidium's real task/mesh/fragment stages, runs its LPV compute program, and renders the translated terrain programs on Mesa under Xvfb. The workflow fails if these tests are *skipped*, not just if they fail.
 - **Combined integration test** — native ABI adapter and Iris translator composed against the pinned sources.
-- **GLSL validation** with `glslangValidator`, plus unit tests across the parser, analyzer, scheduler, G-buffers and bridges.
+- **GLSL validation** with `glslangValidator` of the bundled packs, plus unit tests across the parser, analyzer, scheduler, G-buffers, uniform bridge and Lumina.
 - **JAR audit** — checks `fabric.mod.json` pins, the full mixin list and required classes, and that the artifact is named `caustiq-nvidium`.
 
 > [!NOTE]
-> These prove the translated shaders *compose with the pinned Nvidium sources*. They don't prove the frame looks right on a real GPU.
+> These prove the translated shaders *compose with the pinned Nvidium sources* and run on a software GL driver. They don't prove the frame looks right on a real GPU with Nvidium's mesh shaders.
 
-**Upgrading Nvidium?** Update the Nvidium and Sodium pins together, update the pinned source revision in CI, and re-verify that every mixin applies.
+**Upgrading Nvidium?** Update the Nvidium and Sodium pins together, update the pinned source revisions in CI, and re-verify that every mixin applies.
 
 ## 🔨 Build from source
 
@@ -206,9 +224,10 @@ Produces `build/libs/caustiq-nvidium-*.jar` and the Lumina and Stillwater shader
 ## 🗺️ Roadmap
 
 - [ ] **In-game validation** of mixin application, shader linking and visuals on the pinned Sodium + Nvidium stack.
-- [ ] **Shadows** — a light-space Nvidium terrain pass.
+- [ ] **Shadow polish** — check the light direction against the vanilla sun, add texel snapping to stop shimmer, and validate `shadowtex1` and `shadowcolor` against real packs.
 - [ ] **Depth & remaining resources** — depth attachments, `depthtex1`, specular/normal buffers, and additional Iris built-in samplers.
-- [ ] **Compute, geometry and tessellation** pass support.
+- [ ] **Temporal state** — real `smooth()` and previous-frame history for TAA.
+- [ ] **Geometry and tessellation** pass support.
 - [ ] **GLSL** — AST-based transforms in place of regex rewriting.
 - [ ] **Validation** — Complementary Reimagined, BSL and other real packs against Iris output, with Nvidium benchmarked against Sodium.
 
