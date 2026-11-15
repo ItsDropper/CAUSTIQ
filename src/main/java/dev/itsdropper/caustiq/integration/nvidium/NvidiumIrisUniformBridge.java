@@ -8,6 +8,7 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL20C;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.InteractionHand;
@@ -139,7 +140,8 @@ public final class NvidiumIrisUniformBridge {
         scalar(program, "caustiqNear", near);
         scalar(program, "caustiqFar", far);
         scalar(program, "caustiqAspectRatio", aspectRatio);
-        integer2(program, "caustiqAtlasSize", 0, 0);
+        int[] atlasSize = blockAtlasSize();
+        integer2(program, "caustiqAtlasSize", atlasSize[0], atlasSize[1]);
         scalar(program, "caustiqRainStrength", rain);
         scalar(program, "caustiqWetness", wetness);
         vector2(program, "caustiqTaaOffset", 0.0f, 0.0f);
@@ -182,6 +184,35 @@ public final class NvidiumIrisUniformBridge {
         if (player == null) return 0;
         ItemStack stack = player.getItemInHand(hand);
         return stack.isEmpty() ? 0 : BuiltInRegistries.ITEM.getId(stack.getItem());
+    }
+
+    private static int[] blockAtlasSize() {
+        try {
+            Object atlas = Minecraft.getInstance().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
+            int width = readIntegerField(atlas, "width");
+            int height = readIntegerField(atlas, "height");
+            if (width > 0 && height > 0) return new int[]{width, height};
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            // Keep a finite fallback while the block atlas is being rebuilt.
+        }
+        return new int[]{1024, 1024};
+    }
+
+    private static int readIntegerField(Object target, String name) throws ReflectiveOperationException {
+        Class<?> type = target.getClass();
+        while (type != null) {
+            try {
+                Field field = type.getDeclaredField(name);
+                field.setAccessible(true);
+                Object value = field.get(target);
+                if (value instanceof Number number) return number.intValue();
+            } catch (NoSuchFieldException ignored) {
+                type = type.getSuperclass();
+                continue;
+            }
+            break;
+        }
+        throw new NoSuchFieldException(name);
     }
 
     /** Mirrors Minecraft's eight-step lunar phase, derived from the world's day time. */
