@@ -47,6 +47,36 @@ class IrisGlslConditionalPreprocessorTest {
     }
 
     @Test
+    void preservesCodeInsideIrisSlashStarToggleComments() {
+        String source = """
+                //*
+                float hash1(float value) { return value; }
+                //*/
+                """;
+
+        String result = preprocessor.stripComments(source);
+
+        assertTrue(result.contains("float hash1(float value)"));
+    }
+
+    @Test
+    void removesBlockAndLineCommentsWithoutEatingCommentMarkersInsideStrings() {
+        String source = """
+                /* block comment */
+                const charLikeValue = "// not a comment";
+                // line comment
+                float activeCode;
+                """;
+
+        String result = preprocessor.stripComments(source);
+
+        assertTrue(result.contains("const charLikeValue = \"// not a comment\";"));
+        assertTrue(result.contains("float activeCode;"));
+        assertFalse(result.contains("block comment"));
+        assertFalse(result.contains("line comment"));
+    }
+
+    @Test
     void stripsCommentsFromDirectiveExpressionsWithoutChangingEmittedLines() {
         String source = """
                 #define ENABLED 1 // define comment
