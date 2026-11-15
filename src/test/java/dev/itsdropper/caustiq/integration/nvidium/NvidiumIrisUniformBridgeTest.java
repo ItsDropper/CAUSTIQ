@@ -9,6 +9,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class NvidiumIrisUniformBridgeTest {
     @Test
+    void exposesSunPositionInViewSpaceUsingMinecraftCelestialTransform() {
+        Map<String, Double> values = new HashMap<>();
+        float[] identity = new org.joml.Matrix4f().get(new float[16]);
+        NvidiumIrisUniformBridge.putSunPositionComponents(values, identity, 0.0f);
+        assertEquals(0.0, values.get("sunPosition.x"), 1.0e-5);
+        assertEquals(100.0, values.get("sunPosition.y"), 1.0e-5);
+        assertEquals(0.0, values.get("sunPosition.z"), 1.0e-5);
+
+        values.clear();
+        NvidiumIrisUniformBridge.putSunPositionComponents(values, identity, (float) (Math.PI / 2.0));
+        assertEquals(0.0, values.get("sunPosition.x"), 1.0e-4);
+        assertEquals(0.0, values.get("sunPosition.y"), 1.0e-4);
+        assertEquals(100.0, values.get("sunPosition.z"), 1.0e-4);
+    }
+
+    @Test
     void exposesColumnMajorMatrixComponentsForIrisCustomExpressions() {
         Map<String, Double> values = new HashMap<>();
         float[] matrix = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};

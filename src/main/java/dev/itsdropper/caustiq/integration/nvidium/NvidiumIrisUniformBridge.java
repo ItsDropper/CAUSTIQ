@@ -477,8 +477,26 @@ public final class NvidiumIrisUniformBridge {
             values.put("cameraPosition.z", (double) snapshot.cameraZ());
             values.put("near", (double) projectionDistance(snapshot.projection(), false));
             values.put("far", (double) projectionDistance(snapshot.projection(), true));
+            putSunPositionComponents(values, snapshot.modelView(), sunAngle);
         }
         return java.util.Map.copyOf(values);
+    }
+
+    static void putSunPositionComponents(java.util.Map<String, Double> values,
+                                         float[] modelView, float sunAngle) {
+        // Minecraft's SkyRenderer builds the celestial pose as Y(-90 degrees) * X(sunAngle),
+        // then multiplies it by the active camera model-view matrix before translating the
+        // sun quad to (0, 100, 0). Iris exposes that transformed point in view space.
+        org.joml.Matrix4f celestial = new org.joml.Matrix4f()
+                .rotationY((float) -Math.PI / 2.0f)
+                .rotateX(sunAngle);
+        org.joml.Vector3f sunPosition = new org.joml.Matrix4f()
+                .set(modelView)
+                .mul(celestial)
+                .transformPosition(0.0f, 100.0f, 0.0f, new org.joml.Vector3f());
+        values.put("sunPosition.x", (double) sunPosition.x);
+        values.put("sunPosition.y", (double) sunPosition.y);
+        values.put("sunPosition.z", (double) sunPosition.z);
     }
 
     static void putMatrixComponents(java.util.Map<String, Double> values,
