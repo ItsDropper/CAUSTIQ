@@ -55,10 +55,38 @@ public final class CaustiqClient implements ClientModInitializer {
         }
         LOGGER.info("Caustiq initialized for Minecraft 1.21.11. Shader-pack directory: {}",
                 shaderPackDirectory.toAbsolutePath());
-        refreshShaderPacks();
+        scanShaderPacksAtStartup();
     }
 
     public static ShaderPackScanResult scanResult() { return scanResult; }
+
+    private static void logScanResult(ShaderPackScanResult result, Path directory) {
+        LOGGER.info("Shader-pack discovery completed: {} valid pack(s), {} rejected candidate(s).",
+                result.packs().size(), result.issues().size());
+        result.packs().forEach(pack -> LOGGER.info(
+                "Found shader pack '{}' ({}, {} shader source file(s)).",
+                pack.displayName(), pack.sourceType().name().toLowerCase(Locale.ROOT),
+                pack.shaderFileCount()));
+        result.issues().stream().limit(MAX_LOGGED_ISSUES)
+                .map(ShaderPackIssue::toString)
+                .forEach(issue -> LOGGER.warn("Shader-pack candidate rejected: {}", issue));
+        if (result.issues().size() > MAX_LOGGED_ISSUES) {
+            LOGGER.warn("{} additional shader-pack issue(s) were omitted from the log.",
+                    result.issues().size() - MAX_LOGGED_ISSUES);
+        }
+    }
+
+    /**
+     * The initial scan is intentionally completed before the first world is
+     * entered: Nvidium decides whether it can run with Iris while constructing
+     * its section manager, before the first world-render callback.
+     */
+    private static void scanShaderPacksAtStartup() {
+        ShaderPackScanResult result = new ShaderPackScanner().scan(shaderPackDirectory);
+        scanResult = result;
+        ShaderRuntime.publishScanResult(result);
+        logScanResult(result, shaderPackDirectory);
+    }
 
     public static void refreshShaderPacks() {
         Path directory = shaderPackDirectory;
@@ -73,19 +101,7 @@ public final class CaustiqClient implements ClientModInitializer {
                         ShaderRuntime.requestReload();
                         scanResult = result;
                         ShaderRuntime.publishScanResult(result);
-                        LOGGER.info("Shader-pack discovery completed: {} valid pack(s), {} rejected candidate(s).",
-                                result.packs().size(), result.issues().size());
-                        result.packs().forEach(pack -> LOGGER.info(
-                                "Found shader pack '{}' ({}, {} shader source file(s)).",
-                                pack.displayName(), pack.sourceType().name().toLowerCase(Locale.ROOT),
-                                pack.shaderFileCount()));
-                        result.issues().stream().limit(MAX_LOGGED_ISSUES)
-                                .map(ShaderPackIssue::toString)
-                                .forEach(issue -> LOGGER.warn("Shader-pack candidate rejected: {}", issue));
-                        if (result.issues().size() > MAX_LOGGED_ISSUES) {
-                            LOGGER.warn("{} additional shader-pack issue(s) were omitted from the log.",
-                                    result.issues().size() - MAX_LOGGED_ISSUES);
-                        }
+                        logScanResult(result, directory);
                         if (Minecraft.getInstance().screen instanceof CaustiqSettingsScreen settingsScreen) {
                             settingsScreen.refreshView();
                         }
