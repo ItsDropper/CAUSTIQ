@@ -322,3 +322,12 @@ jobs:
           name: caustiq-build-log
           path: build.log
           if-no-files-found: ignore
+ 
+      - name: Upload generated Nvidium shader sources
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: caustiq-nvidium-shader-sources-${{ github.sha }}
+          path: build/nvidium-compat/
+          if-no-files-found: ignore
+          retention-days: 14

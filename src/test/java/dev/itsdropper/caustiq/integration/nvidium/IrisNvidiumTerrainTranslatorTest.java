@@ -116,6 +116,13 @@ class IrisNvidiumTerrainTranslatorTest {
                     "Photon shadow color must map to Iris shadowcolor0, not the G-buffer colortex0");
             Map<String, String> shadowStages = shadowTranslator.adapt(
                     NvidiumTerrainVaryingAdapter.adapt(pinnedNvidiumStages()));
+            String shadowOutputDirectory = System.getenv("CAUSTIQ_COMPAT_OUTPUT_DIR");
+            if (shadowOutputDirectory != null && !shadowOutputDirectory.isBlank()) {
+                Path output = Path.of(shadowOutputDirectory);
+                Files.createDirectories(output);
+                Files.writeString(output.resolve("photon-nvidium-shadow.mesh"), shadowStages.get("MESH"));
+                Files.writeString(output.resolve("photon-nvidium-shadow.frag"), shadowStages.get("FRAGMENT"));
+            }
             assertTrue(shadowStages.get("MESH").contains("void caustiqIrisVertexMain()"),
                     "Photon shadow vertex stage was not translated into Nvidium's mesh stage");
             assertTrue(shadowStages.get("MESH").contains("caustiqShadowProjection"),
@@ -128,20 +135,14 @@ class IrisNvidiumTerrainTranslatorTest {
                     "Nvidium terrain translation must define Iris hand-depth compatibility");
             assertTrue(shadowStages.get("MESH").contains("#define WATER_WAVE_ITERATIONS 3"),
                     "Shader-pack option values must survive conditional preprocessing");
+            String leftoverNativeOutputs = String.join("\\n", shadowStages.get("FRAGMENT").lines()
+                    .filter(line -> line.contains("caustiqGBuffer")).toList());
             assertFalse(shadowStages.get("FRAGMENT").contains("caustiqGBufferPosition"),
-                    "Pack MRT translation must remove native-only G-buffer output writes");
+                    "Pack MRT translation must remove native-only G-buffer output writes: " + leftoverNativeOutputs);
             assertFalse(shadowStages.get("FRAGMENT").contains("caustiqGBufferLightmap"),
-                    "Pack MRT translation must remove native-only G-buffer output writes");
+                    "Pack MRT translation must remove native-only G-buffer output writes: " + leftoverNativeOutputs);
             assertTrue(shadowStages.get("FRAGMENT").contains("void caustiqIrisFragmentMain()"),
                     "Photon shadow fragment stage was not translated into Nvidium's fragment stage");
-            String shadowOutputDirectory = System.getenv("CAUSTIQ_COMPAT_OUTPUT_DIR");
-            if (shadowOutputDirectory != null && !shadowOutputDirectory.isBlank()) {
-                Path output = Path.of(shadowOutputDirectory);
-                Files.createDirectories(output);
-                Files.writeString(output.resolve("photon-nvidium-shadow.mesh"), shadowStages.get("MESH"));
-                Files.writeString(output.resolve("photon-nvidium-shadow.frag"), shadowStages.get("FRAGMENT"));
-            }
-
             IrisNvidiumTerrainTranslator defaults = IrisNvidiumTerrainTranslator.from(
                     model, "world0", "gbuffers_terrain",
                     Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false", "TAA", "false"));
