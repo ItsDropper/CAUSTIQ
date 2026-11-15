@@ -82,7 +82,10 @@ assert 'me.cortex.nvidium.sodiumCompat.IrisCheck' in iris_mixin
 assert 'method = "checkIrisShouldDisable"' in iris_mixin
 assert "callbackInfo.setReturnValue(true)" in iris_mixin
 assert "if (ShaderRuntime.activateTerrainAdapterForCurrentWorld())" in iris_mixin
-assert "nativeSourceAdapter = NvidiumTerrainVaryingAdapter::adapt" in bridge
+assert "private static volatile UnaryOperator<Map<String, String>> nativeSourceAdapter;" in bridge
+client = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/CaustiqClient.java").read_text(encoding="utf-8")
+assert "requestExtendedVertexFormat()" in client
+assert "registerNativeSourceAdapter(NvidiumTerrainVaryingAdapter::adapt)" in client
 assert "public static boolean hasTerrainAdapter()" in bridge
 assert "primaryTerrainAdapter != null || translucentTerrainAdapter != null" in bridge
 runtime = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/ShaderRuntime.java").read_text(encoding="utf-8")
@@ -168,6 +171,10 @@ assert 'Map.entry("moonPhase", "caustiqMoonPhase")' in translator
 assert "uniform int caustiqMoonPhase;" in translator
 assert 'case "isEyeInWater", "moonPhase", "heldBlockLightValue"' in translator
 assert 'case "worldTime" -> "int";' in translator
+assert 'case "worldDay" -> "int";' in translator
+assert 'Map.entry("worldDay", "caustiqWorldDay")' in translator
+assert 'uniform int caustiqWorldDay;' in translator
+assert 'integer(program, "caustiqWorldDay"' in uniform_bridge
 assert 'uniform int caustiqWorldTime;' in translator
 assert 'uniform vec2 caustiqTaaOffset;' in translator
 assert '"taa_offset"' not in translator.split('UNSUPPORTED_RUNTIME_UNIFORMS', 1)[1].split(');', 1)[0]
@@ -209,6 +216,10 @@ format_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/Nvidi
 stride_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumRepackagedStrideMixin.java").read_text(encoding="utf-8")
 assert "NvidiumIrisChunkVertex.INSTANCE" in format_mixin
 assert "NvidiumIrisChunkVertex.isRequested()" in format_mixin
+assert 'method = "<init>", at = @At("HEAD")' in format_mixin
+assert "enableExtendedVertexFormat()" in format_mixin
+assert "requestExtendedVertexFormat()" in compatibility
+assert "NvidiumIrisChunkVertex.disable()" in compatibility
 compatibility = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumCompatibility.java").read_text(encoding="utf-8")
 assert "CaustiqConfig.get().enabled()" in compatibility
 assert "IS_COMPATIBLE" in compatibility and "FORCE_DISABLE" in compatibility
@@ -237,6 +248,8 @@ scene = source("src/main/resources/assets/nvidium/shaders/occlusion/scene.glsl")
 assert "decodeVertexUV" in nvidium_vertex_format and "decodeLightUV" in nvidium_vertex_format and "decodeVertexColour" in nvidium_vertex_format
 assert "decodeVertexUV" in sodium_vertex_format and "decodeLightUV" in sodium_vertex_format and "decodeVertexColour" in sodium_vertex_format
 assert "mat4 MVP;" in scene and "vec4 fogColour;" in scene and "vec2 screenSize;" in scene
+assert "#define Vertex uvec4" in scene, "Pinned Nvidium fallback Vertex ABI changed"
+assert "struct Vertex {" in scene, "Pinned Nvidium Sodium Vertex ABI changed"
 assert "NvidiumTerrainVaryingAdapter.class" in (caustiq_root / ".github/workflows/build.yml").read_text(encoding="utf-8")
 
 block_parser = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/IrisBlockPropertiesParser.java").read_text(encoding="utf-8")
