@@ -124,14 +124,6 @@ public final class NvidiumIrisUniformBridge {
         integer(program, "caustiqColortex1", 5);
         integer(program, "caustiqColortex2", 6);
         integer(program, "caustiqColortex4", 7);
-        integer(program, "caustiqDepthTexture1", 8);
-        integer(program, "caustiqNormalTexture", 3);
-        integer(program, "caustiqSpecularTexture", 4);
-        integer(program, "caustiqColortex15", 15);
-        integer(program, "caustiqVxDepthTextureOpaque", 10);
-        integer(program, "caustiqVxDepthTextureTrans", 11);
-        integer(program, "caustiqDhDepthTexture", 12);
-        integer(program, "caustiqDhDepthTexture1", 13);
     }
 
     private static float projectionDistance(float[] projection, boolean farPlane) {
