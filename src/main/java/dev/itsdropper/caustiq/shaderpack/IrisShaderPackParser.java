@@ -137,9 +137,6 @@ public final class IrisShaderPackParser {
                         diagnostics.add("Nvidium " + scope + programName + " ABI: " + issue));
             }
         }
-        if (!conditionalPrograms.isEmpty()) {
-            diagnostics.add("Conditional program enablement was parsed but Iris option-expression evaluation is not implemented.");
-        }
         validateNvidiumRenderTargets(renderTargets, diagnostics);
         if (paths.stream().anyMatch(path -> path.endsWith(".tcs") || path.endsWith(".tes") || path.endsWith(".gsh"))) {
             diagnostics.add("Geometry/tessellation stages were discovered and preprocessed; no equivalent Nvidium terrain-stage translation is registered.");

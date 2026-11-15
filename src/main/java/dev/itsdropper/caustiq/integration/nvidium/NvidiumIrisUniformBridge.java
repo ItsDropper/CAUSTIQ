@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public final class NvidiumIrisUniformBridge {
     private static final AtomicReference<Snapshot> CURRENT = new AtomicReference<>();
+    private static final AtomicReference<Snapshot> PREVIOUS = new AtomicReference<>();
     private static final AtomicInteger FRAME_COUNTER = new AtomicInteger();
     private static volatile long worldStartNanos;
     private static volatile boolean warnedUploadFailure;
@@ -39,7 +40,7 @@ public final class NvidiumIrisUniformBridge {
             long now = System.nanoTime();
             if (worldStartNanos == 0L) worldStartNanos = now;
 
-            CURRENT.set(new Snapshot(
+            Snapshot next = new Snapshot(
                     matrix(projection),
                     matrix(modelView),
                     matrix(projectionInverse),
@@ -49,7 +50,9 @@ public final class NvidiumIrisUniformBridge {
                     (float) cameraY,
                     (float) cameraZ,
                     (now - worldStartNanos) / 1_000_000_000.0f,
-                    FRAME_COUNTER.incrementAndGet()));
+                    FRAME_COUNTER.incrementAndGet());
+            Snapshot previous = CURRENT.getAndSet(next);
+            PREVIOUS.set(previous == null ? next : previous);
         } catch (ReflectiveOperationException | ClassCastException exception) {
             CaustiqClient.LOGGER.error("Could not capture Nvidium's ChunkRenderMatrices for Iris terrain uniforms.", exception);
             CURRENT.set(null);
@@ -255,6 +258,13 @@ public final class NvidiumIrisUniformBridge {
         matrix(program, "gl_ModelViewMatrixInverse", snapshot.modelViewInverse());
         matrix3(program, "gl_NormalMatrix", snapshot.normalMatrix());
         vector3(program, "cameraPosition", snapshot.cameraX(), snapshot.cameraY(), snapshot.cameraZ());
+        Snapshot previous = PREVIOUS.get() == null ? snapshot : PREVIOUS.get();
+        matrix(program, "gbufferPreviousModelView", previous.modelView());
+        vector3(program, "previousCameraPosition",
+                previous.cameraX(), previous.cameraY(), previous.cameraZ());
+        if (NvidiumShadowRenderer.isShadowRasterization()) {
+            ShaderRuntime.prepareShadowVoxelImage(snapshot.frameCounter());
+        }
         int timeLocation = GL20C.glGetUniformLocation(program, "frameTimeCounter");
         if (timeLocation >= 0) GL20C.glUniform1f(timeLocation, snapshot.frameTimeCounter());
         int frameLocation = GL20C.glGetUniformLocation(program, "frameCounter");
@@ -313,6 +323,7 @@ public final class NvidiumIrisUniformBridge {
 
     static void resetForTests() {
         CURRENT.set(null);
+        PREVIOUS.set(null);
         FRAME_COUNTER.set(0);
         worldStartNanos = 0L;
         warnedUploadFailure = false;
