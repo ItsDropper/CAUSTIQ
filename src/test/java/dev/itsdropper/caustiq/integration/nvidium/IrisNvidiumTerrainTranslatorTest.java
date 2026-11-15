@@ -84,7 +84,7 @@ class IrisNvidiumTerrainTranslatorTest {
             for (String dimension : List.of("world0", "world-1", "world1")) {
                 IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
                         model, dimension, "gbuffers_terrain",
-                        Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false"));
+                        Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false", "TAA", "false"));
                 Map<String, String> translated = translator.adapt(
                         NvidiumTerrainVaryingAdapter.adapt(pinnedNvidiumStages()));
                 assertTrue(translated.get("MESH").contains("void caustiqIrisVertexMain()"),
@@ -100,7 +100,7 @@ class IrisNvidiumTerrainTranslatorTest {
 
             IrisNvidiumTerrainTranslator defaults = IrisNvidiumTerrainTranslator.from(
                     model, "world0", "gbuffers_terrain",
-                    Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false"));
+                    Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false", "TAA", "false"));
             assertEquals(List.of(1), defaults.renderTargetIndices());
         }
     }
@@ -221,7 +221,7 @@ class IrisNvidiumTerrainTranslatorTest {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
             IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
                     model, "world0", "gbuffers_terrain",
-                    Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false"));
+                    Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false", "TAA", "false"));
             Map<String, String> combined = translator.adapt(extended);
             assertTrue(combined.get("MESH").contains("caustiqIrisVertexMain"));
             assertTrue(combined.get("FRAGMENT").contains("caustiqIrisFragmentMain"));
