@@ -532,9 +532,9 @@ public final class IrisNvidiumTerrainTranslator {
 
     private static String removeNativeGBufferOutputs(String fragment) {
         fragment = fragment.replaceAll(
-                "(?m)^\\s*layout\\(location = [1-4]\\) out vec4 caustiqGBuffer(?:Normal|Position|Material|Lightmap);\\s*\\R?", "");
+                "(?m)^[\\t ]*layout\\(location = [1-4]\\)[\\t ]+out vec4 caustiqGBuffer(?:Normal|Position|Material|Lightmap);[\\t ]*(?:\\r?\\n|$)", "");
         fragment = fragment.replaceAll(
-                "(?m)^\\s*caustiqGBuffer(?:Normal|Position|Material|Lightmap)\\s*=.*;\\s*\\R?", "");
+                "(?m)^[\\t ]*caustiqGBuffer(?:Normal|Position|Material|Lightmap)[\\t ]*=[^\\r\\n]*;[\\t ]*(?:\\r?\\n|$)", "");
         return fragment;
     }
 
