@@ -709,18 +709,10 @@ public final class ShaderRuntime {
     }
 
     private static ShaderPackProgramCatalog.Group classifyProgram(String name) {
-        String lower = name.toLowerCase(java.util.Locale.ROOT);
-        if (lower.equals("final")) return ShaderPackProgramCatalog.Group.FINAL;
-        if (lower.startsWith("composite")) return ShaderPackProgramCatalog.Group.COMPOSITE;
-        if (lower.startsWith("deferred")) return ShaderPackProgramCatalog.Group.DEFERRED;
-        if (lower.startsWith("clrwl_")) lower = lower.substring("clrwl_".length());
-        if (lower.startsWith("gbuffers_")) return ShaderPackProgramCatalog.Group.GBUFFERS;
-        if (lower.startsWith("shadowcomp")) return ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE;
-        if (lower.startsWith("shadow")) return ShaderPackProgramCatalog.Group.SHADOW;
-        if (lower.startsWith("prepare")) return ShaderPackProgramCatalog.Group.PREPARE;
-        if (lower.startsWith("begin")) return ShaderPackProgramCatalog.Group.BEGIN;
-        if (lower.startsWith("setup")) return ShaderPackProgramCatalog.Group.SETUP;
-        return ShaderPackProgramCatalog.Group.UNKNOWN;
+        // Keep runtime activation consistent with discovery and scheduling.
+        // In particular, Photon uses the exact program name "clrwl_gbuffers";
+        // after removing its prefix this is "gbuffers", not "gbuffers_*".
+        return ShaderPackProgramCatalog.Group.classify(name);
     }
 
     private static void closeSources() {
