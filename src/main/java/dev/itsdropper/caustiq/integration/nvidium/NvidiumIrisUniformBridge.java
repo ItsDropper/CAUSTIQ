@@ -113,10 +113,10 @@ public final class NvidiumIrisUniformBridge {
         float biomeHumidity = biomeFloat(level, "getDownfall");
         if (Float.isFinite(biomeTemperature)) scalar(program, "caustiqBiomeTemperature", biomeTemperature);
         if (Float.isFinite(biomeHumidity)) scalar(program, "caustiqBiomeHumidity", biomeHumidity);
-        scalar(program, "caustiqTimeSunrise", 0.0f);
-        scalar(program, "caustiqTimeNoon", 0.0f);
-        scalar(program, "caustiqTimeSunset", 0.0f);
-        scalar(program, "caustiqTimeMidnight", 0.0f);
+        scalar(program, "caustiqTimeSunrise", dayPhaseWeight(worldTime, 0.0f));
+        scalar(program, "caustiqTimeNoon", dayPhaseWeight(worldTime, 0.25f));
+        scalar(program, "caustiqTimeSunset", dayPhaseWeight(worldTime, 0.5f));
+        scalar(program, "caustiqTimeMidnight", dayPhaseWeight(worldTime, 0.75f));
         scalar(program, "caustiqAlphaTestRef", 0.1f);
         integer(program, "caustiqBlockEntityId", 0);
         integer(program, "caustiqEntityId", 0);
@@ -126,6 +126,11 @@ public final class NvidiumIrisUniformBridge {
         integer(program, "caustiqColortex1", 5);
         integer(program, "caustiqColortex2", 6);
         integer(program, "caustiqColortex4", 7);
+    }
+
+    /** Smooth, clock-derived weights peaking at Minecraft dawn, noon, dusk and midnight. */
+    private static float dayPhaseWeight(float phase, float peak) {
+        return Math.max(0.0f, (float) Math.cos((phase - peak) * Math.PI * 2.0));
     }
 
     private static float biomeFloat(Object level, String methodName) {
