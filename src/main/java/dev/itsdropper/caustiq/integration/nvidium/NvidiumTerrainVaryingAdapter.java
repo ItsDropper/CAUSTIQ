@@ -15,6 +15,8 @@ public final class NvidiumTerrainVaryingAdapter {
     public static final String PROFILE_ID = "caustiq-iris-vertex-abi-v4";
     private static final String MARKER = "#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4";
     private static final String TRANSLUCENT_MARKER = "#define CAUSTIQ_NVIDIUM_TRANSLUCENT_VERTEX_ABI 1";
+    private static final Pattern SODIUM_VERTEX_FORMAT_DEFINE = Pattern.compile(
+            "(?m)^[\\t ]*#[\\t ]*define[\\t ]+USE_SODIUM_VERTEX_FORMAT\\b");
     private static final Pattern BARYCENTRIC_DEFINE = Pattern.compile(
             "(?m)^\\s*#\\s*define\\s+USE_NV_FRAGMENT_SHADER_BARYCENTRIC\\b[^\\r\n]*");
     private static final Pattern PRIMARY_FRAGMENT_INTERFACE = Pattern.compile(
@@ -159,6 +161,11 @@ public final class NvidiumTerrainVaryingAdapter {
 
         String mesh = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("MESH"), "MESH source"));
         String fragment = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("FRAGMENT"), "FRAGMENT source"));
+        if ((isPrimaryMesh(sourceStages) || isTranslucentMesh(sourceStages))
+                && (!SODIUM_VERTEX_FORMAT_DEFINE.matcher(mesh).find()
+                || !SODIUM_VERTEX_FORMAT_DEFINE.matcher(fragment).find())) {
+            throw new IllegalStateException("Nvidium did not preprocess USE_SODIUM_VERTEX_FORMAT into both terrain stages; refusing to pair CAUSTIQ's 40-byte encoder with Nvidium's native uvec4 vertex ABI.");
+        }
         boolean meshMarked = mesh.contains(MARKER);
         boolean fragmentMarked = fragment.contains(MARKER);
         boolean translucentMeshMarked = mesh.contains(TRANSLUCENT_MARKER);
