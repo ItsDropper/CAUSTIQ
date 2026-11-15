@@ -5,12 +5,14 @@ import dev.itsdropper.caustiq.integration.nvidium.NvidiumGBufferTargets;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTextureBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(targets = "me.cortex.nvidium.renderers.TranslucentTerrainRasterizer")
+@Pseudo
 public abstract class NvidiumTranslucentTerrainRasterizerMixin {
     @Inject(method = "<init>", at = @At("HEAD"), remap = false, require = 1)
     private void caustiq$beginTranslucentShaderCompilation(CallbackInfo callbackInfo) {
