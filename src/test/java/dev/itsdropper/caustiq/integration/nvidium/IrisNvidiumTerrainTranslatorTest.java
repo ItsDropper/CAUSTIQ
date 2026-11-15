@@ -97,6 +97,33 @@ class IrisNvidiumTerrainTranslatorTest {
                 }
             }
 
+            String shadowProgramName = java.util.stream.Stream.concat(
+                            model.base().programs().keySet().stream(),
+                            model.dimensionOverrides().values().stream()
+                                    .flatMap(programSet -> programSet.programs().keySet().stream()))
+                    .filter(name -> ShaderPackProgramCatalog.Group.classify(name)
+                            == ShaderPackProgramCatalog.Group.SHADOW)
+                    .findFirst().orElseThrow(() -> new AssertionError(
+                            "Photon source fixture must expose an Iris shadow terrain program"));
+            IrisNvidiumTerrainTranslator shadowTranslator = IrisNvidiumTerrainTranslator.from(
+                    model, "world0", shadowProgramName,
+                    Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false", "TAA", "false"));
+            Map<String, String> shadowStages = shadowTranslator.adapt(
+                    NvidiumTerrainVaryingAdapter.adapt(pinnedNvidiumStages()));
+            assertTrue(shadowStages.get("MESH").contains("void caustiqIrisVertexMain()"),
+                    "Photon shadow vertex stage was not translated into Nvidium's mesh stage");
+            assertTrue(shadowStages.get("MESH").contains("caustiqShadowProjection"),
+                    "Photon shadow vertex stage did not use the light-space projection");
+            assertTrue(shadowStages.get("FRAGMENT").contains("void caustiqIrisFragmentMain()"),
+                    "Photon shadow fragment stage was not translated into Nvidium's fragment stage");
+            String shadowOutputDirectory = System.getenv("CAUSTIQ_COMPAT_OUTPUT_DIR");
+            if (shadowOutputDirectory != null && !shadowOutputDirectory.isBlank()) {
+                Path output = Path.of(shadowOutputDirectory);
+                Files.createDirectories(output);
+                Files.writeString(output.resolve("photon-nvidium-shadow.mesh"), shadowStages.get("MESH"));
+                Files.writeString(output.resolve("photon-nvidium-shadow.frag"), shadowStages.get("FRAGMENT"));
+            }
+
             IrisNvidiumTerrainTranslator defaults = IrisNvidiumTerrainTranslator.from(
                     model, "world0", "gbuffers_terrain",
                     Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false", "TAA", "false"));
