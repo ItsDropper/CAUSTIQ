@@ -227,7 +227,7 @@ class IrisNvidiumTerrainTranslatorTest {
                 .replaceAll("(?m)^\\s*#pragma optionNV[^\\r\\n]*\\R?", "")
                 .replaceAll("(?m)^\\s*#import <sodium:[^>]+>\\s*\\R?", "");
         return prepared.replaceFirst("(?m)^(#version[^\\r\\n]*\\R)",
-                "$1#define USE_SODIUM_VERTEX_FORMAT 1\\n");
+                "$1#define USE_SODIUM_VERTEX_FORMAT 1\n");
     }
 
     private static void compileGlsl(String validator, String stage, Path source) throws Exception {
