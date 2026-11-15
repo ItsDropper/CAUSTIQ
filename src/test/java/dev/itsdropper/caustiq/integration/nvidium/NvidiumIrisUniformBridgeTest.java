@@ -19,9 +19,9 @@ class NvidiumIrisUniformBridgeTest {
 
         values.clear();
         NvidiumIrisUniformBridge.putSunPositionComponents(values, identity, (float) (Math.PI / 2.0));
-        assertEquals(0.0, values.get("sunPosition.x"), 1.0e-4);
+        assertEquals(-100.0, values.get("sunPosition.x"), 1.0e-4);
         assertEquals(0.0, values.get("sunPosition.y"), 1.0e-4);
-        assertEquals(100.0, values.get("sunPosition.z"), 1.0e-4);
+        assertEquals(0.0, values.get("sunPosition.z"), 1.0e-4);
     }
 
     @Test
