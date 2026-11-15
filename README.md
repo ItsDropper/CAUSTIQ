@@ -46,7 +46,7 @@ The `nvidium` branch builds the missing bridge, **without taking over terrain su
 The exact pins are enforced in `fabric.mod.json`: Nvidium-specific mixins target that precise method surface, so other versions won't load.
 
 1. [Build](#-build-from-source) the mod (or take the `caustiq-<commit-sha>` JAR artifact from a successful GitHub Actions run) and put `caustiq-nvidium-*.jar` in `.minecraft/mods/` alongside Sodium and Nvidium.
-2. Copy a shader pack into `.minecraft/shaderpacks/` — the bundled **Stillwater** example (`build/distributions/caustiq-stillwater-<version>.zip`) works as a first test. *Don't extract it.*
+2. Copy a shader pack into `.minecraft/shaderpacks/` — the bundled **Lumina** pack (`build/distributions/caustiq-lumina-<version>.zip`) is written for this branch's terrain pipeline and shadow map ([details](examples/caustiq-lumina/README.md)); **Stillwater** (`caustiq-stillwater-<version>.zip`) is a lighter final-pass grade that works as a first test. *Don't extract either.*
 3. In-game: **Options → Video Settings → Caustiq Shaders**, pick a pack, enable Caustiq.
 
 > [!TIP]
@@ -201,7 +201,7 @@ Because it hooks into someone else's renderer internals, this branch leans hard 
 gradlew.bat build
 ```
 
-Produces `build/libs/caustiq-nvidium-*.jar` and the Stillwater shader ZIP in `build/distributions/`.
+Produces `build/libs/caustiq-nvidium-*.jar` and the Lumina and Stillwater shader ZIPs in `build/distributions/`.
 
 ## 🗺️ Roadmap
 

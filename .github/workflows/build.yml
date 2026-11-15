@@ -248,6 +248,13 @@ jobs:
           set -euo pipefail
           glslangValidator -S vert examples/caustiq-stillwater/shaders/final.vsh
           glslangValidator -S frag examples/caustiq-stillwater/shaders/final.fsh
+          for stage in gbuffers_terrain shadow; do
+            glslangValidator -S vert "examples/caustiq-lumina/shaders/$stage.vsh"
+            glslangValidator -S frag "examples/caustiq-lumina/shaders/$stage.fsh"
+          done
+          for stage in deferred composite final; do
+            glslangValidator -S frag "examples/caustiq-lumina/shaders/$stage.fsh"
+          done
 
       - name: Verify distributable JAR
         shell: bash
@@ -353,6 +360,19 @@ jobs:
           PY
           echo "CAUSTIQ_SHADER_ZIP=${zips[0]}" >> "$GITHUB_ENV"
 
+      - name: Verify Lumina shader ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          zips=(build/distributions/caustiq-lumina-*.zip)
+          if (( ${#zips[@]} != 1 )); then
+            printf 'Expected exactly one Lumina shader ZIP, found %s.\n' "${#zips[@]}" >&2
+            exit 1
+          fi
+          test -s "${zips[0]}"
+          echo "CAUSTIQ_LUMINA_ZIP=${zips[0]}" >> "$GITHUB_ENV"
+
       - name: Upload Caustiq JAR
         uses: actions/upload-artifact@v4
         with:
@@ -366,6 +386,14 @@ jobs:
         with:
           name: caustiq-stillwater-${{ github.sha }}
           path: ${{ env.CAUSTIQ_SHADER_ZIP }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Lumina shader pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: caustiq-lumina-${{ github.sha }}
+          path: ${{ env.CAUSTIQ_LUMINA_ZIP }}
           if-no-files-found: error
           retention-days: 30
 

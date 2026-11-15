@@ -98,6 +98,50 @@ val verifyStillwaterPackage by tasks.registering {
     }
 }
 
+val luminaDirectory = layout.projectDirectory.dir("examples/caustiq-lumina")
+
+val packageLumina by tasks.registering(Zip::class) {
+    group = "distribution"
+    description = "Packages the bundled CAUSTIQ Lumina shader pack (Nvidium branch) as an installable ZIP."
+    from(luminaDirectory) {
+        include("shaders/**", "README.md")
+    }
+    archiveFileName.set("caustiq-lumina-" + project.version + ".zip")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
+val verifyLuminaPackage by tasks.registering {
+    group = "verification"
+    description = "Verifies the generated Lumina ZIP has a valid shader-pack root and every required stage."
+    dependsOn(packageLumina)
+
+    doLast {
+        val archive = packageLumina.get().archiveFile.get().asFile
+        check(archive.isFile && archive.length() > 0L) {
+            "Lumina shader-pack ZIP was not generated or is empty: " + archive
+        }
+        ZipFile(archive).use { zip ->
+            val required = setOf(
+                "README.md", "shaders/shaders.properties", "shaders/block.properties",
+                "shaders/gbuffers_terrain.vsh", "shaders/gbuffers_terrain.fsh",
+                "shaders/shadow.vsh", "shaders/shadow.fsh",
+                "shaders/deferred.fsh", "shaders/composite.fsh", "shaders/final.fsh"
+            )
+            val actual = zip.entries().asSequence().filterNot { it.isDirectory }.map { it.name }.toSet()
+            check(actual.containsAll(required)) {
+                "Lumina ZIP is missing required root entries. Missing: " + (required - actual)
+            }
+            check(actual.none { it.startsWith("caustiq-lumina/") || it.startsWith("../") || it.startsWith("/") }) {
+                "Lumina ZIP contains an unexpected nested or unsafe root path."
+            }
+        }
+        logger.lifecycle("Verified Lumina shader pack: " + archive.absolutePath)
+    }
+}
+
 tasks.named("build") {
     dependsOn(verifyStillwaterPackage)
+    dependsOn(verifyLuminaPackage)
 }
