@@ -151,6 +151,7 @@ public final class NvidiumIrisUniformBridge {
         integer(program, "caustiqNoiseTexture", 2);
         integer(program, "caustiqHeavyFog", isHeavyFog() ? 1 : 0);
         integer(program, "caustiqIsElytraFlying", isElytraFlying() ? 1 : 0);
+        integer(program, "caustiqIsEyeInWater", isEyeInWater());
         integer(program, "caustiqHeldBlockLightValue", heldBlockLightValue(InteractionHand.MAIN_HAND));
         integer(program, "caustiqHeldBlockLightValue2", heldBlockLightValue(InteractionHand.OFF_HAND));
         integer(program, "caustiqHeldItemId", heldItemId(InteractionHand.MAIN_HAND));
@@ -166,6 +167,23 @@ public final class NvidiumIrisUniformBridge {
         if (player == null) return 0;
         ItemStack stack = player.getItemInHand(hand);
         return stack.isEmpty() ? 0 : BuiltInRegistries.ITEM.getId(stack.getItem());
+    }
+
+    /** Mirrors Iris isEyeInWater(): 0=none, 1=water, 2=lava, 3=powder snow. */
+    private static int isEyeInWater() {
+        try {
+            Object camera = invoke(Minecraft.getInstance().gameRenderer, "getMainCamera");
+            Object fluid = invoke(camera, "getFluidInCamera");
+            if (!(fluid instanceof Enum<?> fogType)) return 0;
+            return switch (fogType.name()) {
+                case "WATER" -> 1;
+                case "LAVA" -> 2;
+                case "POWDER_SNOW" -> 3;
+                default -> 0;
+            };
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return 0;
+        }
     }
 
     /** Mirrors Iris IrisExclusiveUniforms.isElytraFlying(): the local player's fall-flying state. */
