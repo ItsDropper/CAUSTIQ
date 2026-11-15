@@ -32,9 +32,8 @@ public final class NvidiumCompatibility {
                 NvidiumIrisChunkVertex.disable();
                 return false;
             }
-            setSodiumVertexFormat(nvidium);
             NvidiumIrisChunkVertex.enable();
-            LOGGER.info("Requested CAUSTIQ's 40-byte Nvidium vertex ABI; use_sodium_vertex_format=true was set before Nvidium shader preprocessing.");
+            LOGGER.info("Requested CAUSTIQ's 40-byte Nvidium vertex ABI; configuration will be committed after Nvidium's capability check and before its shader preprocessing.");
             return true;
         } catch (ReflectiveOperationException | RuntimeException exception) {
             NvidiumIrisChunkVertex.disable();
