@@ -62,6 +62,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         GlState previous = captureState();
         boolean[] alternateCurrent = new boolean[MAX_COLOR_TARGET + 1];
         boolean[] hasWritten = new boolean[MAX_COLOR_TARGET + 1];
+        boolean[] clearedTargets = new boolean[MAX_COLOR_TARGET + 1];
         try {
             Set<Integer> usedTargets = new HashSet<>();
             Set<Integer> terrainWrites = new HashSet<>();
