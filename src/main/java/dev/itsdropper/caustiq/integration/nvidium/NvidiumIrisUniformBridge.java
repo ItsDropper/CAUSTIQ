@@ -79,7 +79,9 @@ public final class NvidiumIrisUniformBridge {
             int frameLocation = GL20C.glGetUniformLocation(program, "caustiqFrameCounter");
             if (frameLocation >= 0) GL20C.glUniform1i(frameLocation, snapshot.frameCounter());
             uploadPhotonUniforms(program, snapshot);
-            NvidiumIrisTextureBridge.bindForTerrain(program);
+            NvidiumIrisTextureBridge.bindForTerrain();
+            int noiseLocation = GL20C.glGetUniformLocation(program, "noisetex");
+            if (noiseLocation >= 0) GL20C.glUniform1i(noiseLocation, 2);
             ShaderRuntime.uploadTerrainCustomUniforms(program);
             ShaderRuntime.bindTerrainCustomTextures(program);
             warnedUploadFailure = false;
