@@ -102,9 +102,10 @@ public final class NvidiumIrisChunkVertex implements ChunkVertexType {
         return ColorARGB.mulRGB(color, brightness);
     }
 
-    private static int compactLight(int light) {
-        int sky = Mth.clamp(((light >>> 16) & 0xFF) + 8, 8, 248);
-        int block = Mth.clamp((light & 0xFF) + 8, 8, 248);
+    static int compactLight(int light) {
+        // Match Nvidium's native Sodium-format encoder without shifting UV light.
+        int sky = Mth.clamp((light >>> 16) & 0xFF, 8, 248);
+        int block = Mth.clamp(light & 0xFF, 8, 248);
         return block | (sky << 8);
     }
 
