@@ -754,7 +754,7 @@ public final class IrisNvidiumTerrainTranslator {
 
     private static String expectedUniformType(String name) {
         return switch (name) {
-            case "gtexture", "lightmap", "noisetex", "normals", "specular", "shadowtex0", "shadowtex1", "shadow",
+            case "gtexture", "tex", "lightmap", "noisetex", "normals", "specular", "shadowtex0", "shadowtex1", "shadow",
                     "colortex1", "colortex2", "colortex4", "depthtex1", "colortex15",
                     "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans" -> "sampler2D";
             case "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
