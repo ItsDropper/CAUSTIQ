@@ -74,12 +74,12 @@ class IrisTerrainPassSchedulerTest {
         writeProgram(shaders, "composite", """
                 /* RENDERTARGETS: 0,3,7 */
                 layout(location = 0) out vec4 scene;
-                layout(location = 1) out vec4 normal;
-                layout(location = 2) out vec4 material;
+                layout(location = 1) flat out vec4 normal;
+                out vec4 outColor2;
                 void main() {
                     scene = vec4(1.0);
                     normal = vec4(0.0, 1.0, 0.0, 1.0);
-                    material = vec4(0.5);
+                    outColor2 = vec4(0.5);
                 }
                 """);
         writeProgram(shaders, "composite1", """
