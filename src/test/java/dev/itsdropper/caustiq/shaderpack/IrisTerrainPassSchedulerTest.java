@@ -156,6 +156,44 @@ class IrisTerrainPassSchedulerTest {
         }
     }
 
+    @Test
+    void schedulesConditionalDimensionScopedComputePassesInDependencyOrder() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("ComputePack/shaders"));
+        Files.writeString(shaders.resolve("dimension.properties"),
+                "dimension.world0=minecraft:overworld\\n");
+        Files.writeString(shaders.resolve("shaders.properties"), """
+                program.world0/setup.enabled=COLORED_LIGHTS
+                program.world0/shadowcomp.enabled=COLORED_LIGHTS
+                """);
+        Path world = Files.createDirectories(shaders.resolve("world0"));
+        Files.writeString(world.resolve("setup.csh"), """
+                #version 430
+                layout(local_size_x = 1) in;
+                void main() { }
+                """);
+        Files.writeString(world.resolve("shadowcomp.csh"), """
+                #version 430
+                layout(local_size_x = 32) in;
+                void main() { }
+                """);
+
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor("ComputePack", 4))) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisTerrainPassScheduler scheduler = new IrisTerrainPassScheduler();
+            IrisTerrainPassScheduler.Plan enabled = scheduler.schedule(
+                    model, "minecraft:overworld", java.util.Map.of("COLORED_LIGHTS", "1"));
+            assertEquals(java.util.List.of("setup", "shadowcomp"), enabled.orderedProgramNames());
+            assertTrue(enabled.passes().stream().allMatch(pass -> pass.pass().compute()));
+            assertEquals(ShaderPackProgramCatalog.Group.SETUP, enabled.passes().getFirst().pass().group());
+            assertEquals(ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE,
+                    enabled.passes().getLast().pass().group());
+
+            IrisTerrainPassScheduler.Plan disabled = scheduler.schedule(
+                    model, "minecraft:overworld", java.util.Map.of("COLORED_LIGHTS", "false"));
+            assertTrue(disabled.passes().isEmpty());
+        }
+    }
+
     private void writeProgram(Path directory, String name, String fragment) throws IOException {
         Files.writeString(directory.resolve(name + ".vsh"), """
                 #version 150
