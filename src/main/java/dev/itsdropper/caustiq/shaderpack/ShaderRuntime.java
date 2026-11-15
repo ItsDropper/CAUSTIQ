@@ -26,6 +26,11 @@ public final class ShaderRuntime {
     private static ShaderPackSources sources;
     private static IrisShaderPackModel preparedPackModel;
     private static String preparedPackId = "";
+    private static IrisNvidiumTerrainTranslator preparedTerrainTranslator;
+    private static IrisTerrainPassScheduler.Plan preparedTerrainPlan;
+    private static String preparedTerrainDimensionKey = "";
+    private static Map<String, String> preparedDimensionMappings = Map.of();
+    private static boolean preparedTerrainAdapterRegistered;
     private static List<ShaderPackProgramCatalog.Program> pending = List.of();
     private static IrisTerrainPassScheduler.Plan activePassPlan;
     private static Map<String, String> selectedDefines = Map.of();
@@ -61,6 +66,11 @@ public final class ShaderRuntime {
         postProcessFailureLogged = false;
         preparedPackModel = null;
         preparedPackId = "";
+        preparedTerrainTranslator = null;
+        preparedTerrainPlan = null;
+        preparedTerrainDimensionKey = "";
+        preparedDimensionMappings = Map.of();
+        preparedTerrainAdapterRegistered = false;
         prepareSelectedNvidiumTerrainAdapter();
     }
 
@@ -76,6 +86,11 @@ public final class ShaderRuntime {
         NvidiumShaderProgramBridge.unregisterTerrainAdapter();
         preparedPackModel = null;
         preparedPackId = "";
+        preparedTerrainTranslator = null;
+        preparedTerrainPlan = null;
+        preparedTerrainDimensionKey = "";
+        preparedDimensionMappings = Map.of();
+        preparedTerrainAdapterRegistered = false;
         if (!CaustiqConfig.get().enabled()
                 || !FabricLoader.getInstance().isModLoaded("nvidium")
                 || !NvidiumShaderProgramBridge.hasNativeSourceAdapter()) {
@@ -92,38 +107,112 @@ public final class ShaderRuntime {
 
         try (ShaderPackSources selectedSources = ShaderPackSources.open(selected)) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(selectedSources);
-            if (!model.dimensionOverrides().isEmpty()
-                    || !model.requiredFeatures().isEmpty()
-                    || !model.diagnostics().isEmpty()
-                    || !model.base().programs().containsKey("gbuffers_terrain")) {
+            if (!model.requiredFeatures().isEmpty()) {
+                CaustiqClient.LOGGER.warn(
+                        "Shader pack '{}' requires Iris feature flags {}; Nvidium terrain translation remains disabled.",
+                        selected.displayName(), model.requiredFeatures());
                 return;
             }
 
-            IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(model);
-            IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
-            NvidiumGBufferTargets.configureTargets(plan.targets());
-            NvidiumShaderProgramBridge.registerTerrainAdapter(
-                    translator::adapt, translator.renderTargetIndices());
+            String dimensionKey = selectSupportedTerrainDimension(model);
+            if (dimensionKey == null) {
+                CaustiqClient.LOGGER.warn(
+                        "Shader pack '{}' has terrain programs in multiple dimension sets that CAUSTIQ cannot select safely yet.",
+                        selected.displayName());
+                return;
+            }
+
+            Map<String, String> optionDefines = new LinkedHashMap<>();
+            for (ShaderPackMetadata.Option option : model.options().options()) {
+                optionDefines.put(option.name(), CaustiqConfig.get().option(
+                        selected.id(), option.name(), option.defaultValue()));
+            }
+            IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
+                    model, dimensionKey.isEmpty() ? null : dimensionKey,
+                    "gbuffers_terrain", optionDefines);
+            IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler()
+                    .schedule(model, dimensionKey.isEmpty() ? null : dimensionKey);
+
             preparedPackModel = model;
             preparedPackId = selected.id();
+            preparedTerrainTranslator = translator;
+            preparedTerrainPlan = plan;
+            preparedTerrainDimensionKey = dimensionKey;
+            preparedDimensionMappings = model.dimensionMappings();
 
-            if (NvidiumRenderBridge.reloadShaders()) {
-                CaustiqClient.LOGGER.info(
-                        "Installed selected pack '{}' into Nvidium's terrain shader compiler; MRT routing: {}.",
-                        selected.displayName(), translator.renderTargetIndices());
-            } else {
-                CaustiqClient.LOGGER.info(
-                        "Installed selected pack '{}' before Nvidium renderer construction; its next terrain shader build will use MRT routing {}.",
-                        selected.displayName(), translator.renderTargetIndices());
-            }
+            CaustiqClient.LOGGER.info(
+                    "Prepared selected pack '{}' for Nvidium terrain translation in dimension set '{}'; MRT routing: {}.",
+                    selected.displayName(), dimensionKey.isEmpty() ? "base" : dimensionKey,
+                    translator.renderTargetIndices());
+            activateTerrainAdapterForCurrentWorld();
         } catch (IOException | RuntimeException exception) {
             NvidiumShaderProgramBridge.unregisterTerrainAdapter();
             preparedPackModel = null;
             preparedPackId = "";
+            preparedTerrainTranslator = null;
+            preparedTerrainPlan = null;
+            preparedTerrainDimensionKey = "";
+            preparedDimensionMappings = Map.of();
+            preparedTerrainAdapterRegistered = false;
             CaustiqClient.LOGGER.warn(
                     "Selected shader pack '{}' cannot be installed into Nvidium's terrain compiler; preserving Nvidium's Iris safety gate: {}",
                     selected.displayName(), exception.getMessage());
         }
+    }
+
+    /**
+     * Returns the one terrain program-set key that can be selected without
+     * guessing a dimension. Root programs apply everywhere; a single
+     * dimension-only terrain set is activated only in that dimension.
+     */
+    private static String selectSupportedTerrainDimension(IrisShaderPackModel model) {
+        boolean hasBaseTerrain = model.base().programs().containsKey("gbuffers_terrain");
+        List<String> overrides = model.dimensionOverrides().entrySet().stream()
+                .filter(entry -> entry.getValue().programs().containsKey("gbuffers_terrain"))
+                .map(Map.Entry::getKey)
+                .toList();
+        if (hasBaseTerrain) return overrides.isEmpty() ? "" : null;
+        return overrides.size() == 1 ? overrides.getFirst() : null;
+    }
+
+    /**
+     * Called from Nvidium's Iris compatibility check while RenderSectionManager
+     * is being constructed. This is the last safe point to select a
+     * dimension-specific terrain program before Nvidium compiles its shaders.
+     */
+    public static boolean activateTerrainAdapterForCurrentWorld() {
+        IrisNvidiumTerrainTranslator translator = preparedTerrainTranslator;
+        if (translator == null) return false;
+        if (!preparedTerrainDimensionKey.isEmpty()) {
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.level == null) return false;
+            String dimensionId = minecraft.level.dimension().location().toString();
+            String directory = preparedDimensionMappings.getOrDefault(
+                    dimensionId, builtInDimensionDirectory(dimensionId));
+            if (!preparedTerrainDimensionKey.equals(directory)) return false;
+        }
+
+        if (!preparedTerrainAdapterRegistered) {
+            NvidiumGBufferTargets.configureTargets(
+                    preparedTerrainPlan == null ? Map.of() : preparedTerrainPlan.targets());
+            NvidiumShaderProgramBridge.registerTerrainAdapter(
+                    translator::adapt, translator.renderTargetIndices());
+            preparedTerrainAdapterRegistered = true;
+            if (!NvidiumRenderBridge.reloadShaders()) {
+                CaustiqClient.LOGGER.info(
+                        "Nvidium terrain adapter is ready for its next renderer shader build; no live renderer was available to reload.");
+            }
+        }
+        return true;
+    }
+
+    private static String builtInDimensionDirectory(String dimensionId) {
+        return switch (dimensionId) {
+            case "minecraft:overworld" -> "world0";
+            case "minecraft:the_nether" -> "world-1";
+            case "minecraft:the_end" -> "world1";
+            default -> dimensionId;
+        };
     }
 
     public static void onWorldRender() {
@@ -236,7 +325,8 @@ public final class ShaderRuntime {
             }
             IrisShaderPackModel packModel = selected.id().equals(preparedPackId) && preparedPackModel != null
                     ? preparedPackModel : new IrisShaderPackParser().parse(sources);
-            activePassPlan = new IrisTerrainPassScheduler().schedule(packModel, null);
+            activePassPlan = new IrisTerrainPassScheduler().schedule(
+                    packModel, preparedTerrainDimensionKey.isEmpty() ? null : preparedTerrainDimensionKey);
             NvidiumGBufferTargets.configureTargets(activePassPlan.targets());
             CaustiqClient.LOGGER.info(
                     "Built Iris pass schedule for '{}': {} ordered program pass(es), {} declared render target(s): {}.",

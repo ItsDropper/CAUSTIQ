@@ -148,9 +148,12 @@ public final class IrisNvidiumTerrainTranslator {
     private final int fragDataCount;
     private final List<Integer> renderTargetIndices;
 
-    private IrisNvidiumTerrainTranslator(String vertexSource, String fragmentSource) {
-        String activeVertex = preprocessTerrainStage(Objects.requireNonNull(vertexSource, "vertexSource"), true);
-        String activeFragment = preprocessTerrainStage(Objects.requireNonNull(fragmentSource, "fragmentSource"), false);
+    private IrisNvidiumTerrainTranslator(
+            String vertexSource, String fragmentSource, Map<String, String> optionDefines) {
+        String activeVertex = preprocessTerrainStage(
+                Objects.requireNonNull(vertexSource, "vertexSource"), true, optionDefines);
+        String activeFragment = preprocessTerrainStage(
+                Objects.requireNonNull(fragmentSource, "fragmentSource"), false, optionDefines);
         StageSource vertex = prepareVertex(activeVertex);
         StageSource fragment = prepareFragment(activeFragment);
         this.vertexSource = vertex.source();
@@ -162,8 +165,19 @@ public final class IrisNvidiumTerrainTranslator {
         this.renderTargetIndices = parseRenderTargetIndices(activeFragment);
     }
 
-    private static String preprocessTerrainStage(String source, boolean vertex) {
+    private static String preprocessTerrainStage(
+            String source, boolean vertex, Map<String, String> optionDefines) {
         Map<String, String> defines = new LinkedHashMap<>();
+        if (optionDefines != null) {
+            optionDefines.forEach((name, rawValue) -> {
+                String value = rawValue == null ? "" : rawValue.trim();
+                if (value.equalsIgnoreCase("false") || value.equalsIgnoreCase("off")
+                        || value.equalsIgnoreCase("no")) return;
+                if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("on")
+                        || value.equalsIgnoreCase("yes")) value = "1";
+                if (!value.isEmpty()) defines.put(name, value);
+            });
+        }
         defines.put("PROGRAM_GBUFFERS_TERRAIN", "1");
         defines.put("WORLD_OVERWORLD", "1");
         defines.put("OVERWORLD", "1");
@@ -175,16 +189,22 @@ public final class IrisNvidiumTerrainTranslator {
     }
 
     public static IrisNvidiumTerrainTranslator from(IrisShaderPackModel model) {
-        return from(model, null, "gbuffers_terrain");
+        return from(model, null, "gbuffers_terrain", Map.of());
     }
 
     public static IrisNvidiumTerrainTranslator from(IrisShaderPackModel model, String dimensionKey) {
-        return from(model, dimensionKey, "gbuffers_terrain");
+        return from(model, dimensionKey, "gbuffers_terrain", Map.of());
     }
 
     /** Selects a named Iris terrain program from the active dimension's program set. */
     public static IrisNvidiumTerrainTranslator from(
             IrisShaderPackModel model, String dimensionKey, String programName) {
+        return from(model, dimensionKey, programName, Map.of());
+    }
+
+    public static IrisNvidiumTerrainTranslator from(
+            IrisShaderPackModel model, String dimensionKey, String programName,
+            Map<String, String> optionDefines) {
         Objects.requireNonNull(model, "model");
         Objects.requireNonNull(programName, "programName");
         IrisShaderPackModel.ProgramSet programSet = model.base();
@@ -220,7 +240,7 @@ public final class IrisNvidiumTerrainTranslator {
         if (vertex == null || fragment == null) {
             throw new IllegalArgumentException(programName + " references a missing preprocessed shader stage.");
         }
-        return new IrisNvidiumTerrainTranslator(vertex, fragment);
+        return new IrisNvidiumTerrainTranslator(vertex, fragment, optionDefines);
     }
 
     public List<Integer> renderTargetIndices() {
