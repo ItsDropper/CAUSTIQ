@@ -711,6 +711,7 @@ public final class NvidiumIrisUniformBridge {
         values.put("PPT_NONE", 0.0);
         values.put("PPT_RAIN", 1.0);
         values.put("PPT_SNOW", 2.0);
+        values.put("BIOME_PALE_GARDEN", -1.0);
         values.put("IS_IRIS", 1.0);
         values.put("MC_VERSION", 12111.0);
     }
@@ -739,7 +740,13 @@ public final class NvidiumIrisUniformBridge {
             String path = key == null ? "" : key.getPath().toLowerCase(java.util.Locale.ROOT);
             int category = biomeCategory(path);
             putScalar(values, "biome_category", category);
-            values.put("BIOME_" + path.toUpperCase(java.util.Locale.ROOT), (double) id);
+            for (net.minecraft.world.level.biome.Biome registered : BuiltInRegistries.BIOME) {
+                var registeredKey = BuiltInRegistries.BIOME.getKey(registered);
+                if (registeredKey != null) {
+                    values.put("BIOME_" + registeredKey.getPath().toUpperCase(java.util.Locale.ROOT),
+                            (double) BuiltInRegistries.BIOME.getId(registered));
+                }
+            }
             if (path.equals("pale_garden")) values.put("BIOME_PALE_GARDEN", (double) id);
             Object precipitation = precipitationAt(Minecraft.getInstance().level,
                     Minecraft.getInstance().player);
@@ -870,7 +877,8 @@ public final class NvidiumIrisUniformBridge {
             if (!method.getName().equals(name) || method.getParameterCount() != arguments.length) continue;
             boolean compatible = true;
             for (int i = 0; i < arguments.length; i++) {
-                if (arguments[i] != null && !method.getParameterTypes()[i].isInstance(arguments[i])) {
+                if (arguments[i] != null && !isReflectionArgumentCompatible(
+                        method.getParameterTypes()[i], arguments[i])) {
                     compatible = false;
                     break;
                 }
@@ -878,6 +886,19 @@ public final class NvidiumIrisUniformBridge {
             if (compatible) return method.invoke(target, arguments);
         }
         throw new NoSuchMethodException(name);
+    }
+
+    private static boolean isReflectionArgumentCompatible(Class<?> parameter, Object argument) {
+        if (parameter.isInstance(argument)) return true;
+        if (!parameter.isPrimitive()) return false;
+        return (parameter == float.class && argument instanceof Float)
+                || (parameter == double.class && argument instanceof Double)
+                || (parameter == int.class && argument instanceof Integer)
+                || (parameter == long.class && argument instanceof Long)
+                || (parameter == boolean.class && argument instanceof Boolean)
+                || (parameter == short.class && argument instanceof Short)
+                || (parameter == byte.class && argument instanceof Byte)
+                || (parameter == char.class && argument instanceof Character);
     }
 
     private static double[] eyePosition(Object player, Snapshot snapshot) {
