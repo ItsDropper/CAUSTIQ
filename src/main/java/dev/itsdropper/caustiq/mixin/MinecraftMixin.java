@@ -17,9 +17,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MinecraftMixin {
     private int caustiq$titleScreenFrames;
     private int caustiq$elapsedFrames;
+    private boolean caustiq$validationTriggered;
 
     @Inject(method = "runTick", at = @At("TAIL"))
     private void caustiq$runCiShaderValidation(CallbackInfo callbackInfo) {
+        if (caustiq$validationTriggered
+                || !"1".equals(System.getenv("CAUSTIQ_CI_SHADER_VALIDATION"))) return;
         Minecraft client = Minecraft.getInstance();
         caustiq$elapsedFrames++;
         if (client.screen instanceof TitleScreen) {
@@ -29,8 +32,10 @@ public abstract class MinecraftMixin {
         }
 
         if (caustiq$titleScreenFrames >= 20) {
+            caustiq$validationTriggered = true;
             CaustiqCiShaderValidation.runFromEnvironment();
         } else if (caustiq$elapsedFrames >= 200) {
+            caustiq$validationTriggered = true;
             CaustiqClient.LOGGER.warn(
                     "Photon CI capture reached its 10-second startup fallback before the title screen.");
             CaustiqCiShaderValidation.runFromEnvironment();
