@@ -77,18 +77,20 @@ public final class CaustiqCiShaderValidation {
             throw new IOException("Minecraft exposed an empty OpenGL viewport: " + width + "x" + height);
         }
 
-        int previousReadFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
-        int previousReadBuffer = GL11C.glGetInteger(GL11C.GL_READ_BUFFER);
+        int readFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
+        int readBuffer = GL11C.glGetInteger(GL11C.GL_READ_BUFFER);
         int previousPackAlignment = GL11C.glGetInteger(GL11C.GL_PACK_ALIGNMENT);
         try {
-            GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, 0);
-            GL11C.glReadBuffer(GL11C.GL_BACK);
+            // GameRenderer has rendered into Minecraft's main RenderTarget at this
+            // injection point; the window back buffer is not blitted until later.
+            // Read the currently bound render target instead of framebuffer zero.
             GL11C.glPixelStorei(GL11C.GL_PACK_ALIGNMENT, 1);
             GL11C.glFinish();
 
             ByteBuffer pixels = BufferUtils.createByteBuffer(Math.multiplyExact(Math.multiplyExact(width, height), 4));
             GL11C.glReadPixels(x, y, width, height, GL11C.GL_RGBA, GL11C.GL_UNSIGNED_BYTE, pixels);
             BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            boolean nonBlackPixel = false;
             for (int row = 0; row < height; row++) {
                 for (int column = 0; column < width; column++) {
                     int offset = (row * width + column) * 4;
@@ -96,21 +98,24 @@ public final class CaustiqCiShaderValidation {
                     int green = Byte.toUnsignedInt(pixels.get(offset + 1));
                     int blue = Byte.toUnsignedInt(pixels.get(offset + 2));
                     int alpha = Byte.toUnsignedInt(pixels.get(offset + 3));
+                    nonBlackPixel |= red > 8 || green > 8 || blue > 8;
                     image.setRGB(column, height - row - 1,
                             (alpha << 24) | (red << 16) | (green << 8) | blue);
                 }
+            }
+            if (!nonBlackPixel) {
+                throw new IOException("Minecraft render target was entirely black (read FBO "
+                        + readFramebuffer + ", read buffer 0x" + Integer.toHexString(readBuffer) + ").");
             }
             Path output = Path.of(configuredPath).toAbsolutePath().normalize();
             Files.createDirectories(output.getParent());
             if (!ImageIO.write(image, "png", output.toFile())) {
                 throw new IOException("No PNG image writer is available.");
             }
-            CaustiqClient.LOGGER.info("Captured actual Minecraft framebuffer screenshot: {} ({}x{}).",
-                    output, width, height);
+            CaustiqClient.LOGGER.info("Captured actual Minecraft framebuffer screenshot: {} ({}x{}, FBO {}, read buffer 0x{}).",
+                    output, width, height, readFramebuffer, Integer.toHexString(readBuffer));
         } finally {
             GL11C.glPixelStorei(GL11C.GL_PACK_ALIGNMENT, previousPackAlignment);
-            GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
-            GL11C.glReadBuffer(previousReadBuffer);
         }
     }
 
