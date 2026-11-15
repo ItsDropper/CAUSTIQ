@@ -153,6 +153,25 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesIrisElytraFlyingBooleanToTheRuntimeUniform() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform bool isElytraFlying;
+                void main() {
+                    gl_FragColor = isElytraFlying ? vec4(1.0) : vec4(0.0);
+                }
+                """);
+
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform bool caustiqIsElytraFlying;"));
+        assertTrue(fragment.contains("caustiqIsElytraFlying ? vec4(1.0) : vec4(0.0)"));
+        assertFalse(fragment.contains("uniform bool isElytraFlying;"));
+    }
+
+    @Test
     void rejectsIrisHeavyFogWithAnIncorrectUniformType() {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                 translator("""

@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Pseudo
 public abstract class NvidiumPrimaryTerrainRasterizerMixin {
     @Inject(method = "<init>", at = @At("HEAD"), remap = false, require = 1)
-    private void caustiq$beginPrimaryShaderCompilation(CallbackInfo callbackInfo) {
+    private static void caustiq$beginPrimaryShaderCompilation(CallbackInfo callbackInfo) {
         NvidiumShaderProgramBridge.beginPipelineCompile(NvidiumShaderProgramBridge.pipelineForConstructor());
     }
 

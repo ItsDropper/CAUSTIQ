@@ -144,9 +144,15 @@ public final class NvidiumIrisUniformBridge {
         vector4(program, "caustiqEntityColor", 1.0f, 1.0f, 1.0f, 1.0f);
         integer(program, "caustiqNoiseTexture", 2);
         integer(program, "caustiqHeavyFog", isHeavyFog() ? 1 : 0);
+        integer(program, "caustiqIsElytraFlying", isElytraFlying() ? 1 : 0);
         integer(program, "caustiqColortex1", 5);
         integer(program, "caustiqColortex2", 6);
         integer(program, "caustiqColortex4", 7);
+    }
+
+    /** Mirrors Iris IrisExclusiveUniforms.isElytraFlying(): the local player's fall-flying state. */
+    private static boolean isElytraFlying() {
+        return invokeBoolean(Minecraft.getInstance().player, "isFallFlying", false);
     }
 
     /** Mirrors Iris IrisExclusiveUniforms.isHeavyFog(): boss-overlay world-fog request. */

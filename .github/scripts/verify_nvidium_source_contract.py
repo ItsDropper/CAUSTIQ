@@ -48,6 +48,10 @@ assert "NvidiumTerrainRasterizerMixin" in mixins_json["client"]
 rasterizer_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumTerrainRasterizerMixin.java").read_text(encoding="utf-8")
 assert 'me.cortex.nvidium.renderers.PrimaryTerrainRasterizer' in rasterizer_mixin
 assert 'method = "raster"' in rasterizer_mixin
+primary_rasterizer_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumPrimaryTerrainRasterizerMixin.java").read_text(encoding="utf-8")
+assert 'method = "<init>", at = @At("HEAD")' in primary_rasterizer_mixin
+assert "private static void caustiq$beginPrimaryShaderCompilation(CallbackInfo callbackInfo)" in primary_rasterizer_mixin, "Constructor HEAD injection must be static because it runs before super()"
+assert 'method = "<init>", at = @At("TAIL")' in primary_rasterizer_mixin
 gbuffer_manager = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumGBufferTargets.java").read_text(encoding="utf-8")
 assert "GL_COLOR_ATTACHMENT1" in gbuffer_manager and "GL_COLOR_ATTACHMENT0 + i" in gbuffer_manager
 assert "glCheckFramebufferStatus" in gbuffer_manager and "glDrawBuffers" in gbuffer_manager
@@ -145,6 +149,10 @@ assert "photonUniformDeclarations()" in translator
 assert 'Map.entry("noisetex", "caustiqNoiseTexture")' in translator
 assert "layout(binding = 2) uniform sampler2D caustiqNoiseTexture;" in translator
 assert "NvidiumIrisTextureBridge.bindForTerrain()" in uniform_bridge
+assert 'Map.entry("isElytraFlying", "caustiqIsElytraFlying")' in translator
+assert 'uniform bool caustiqIsElytraFlying;' in translator
+assert 'integer(program, "caustiqIsElytraFlying", isElytraFlying() ? 1 : 0)' in uniform_bridge
+assert 'invokeBoolean(Minecraft.getInstance().player, "isFallFlying", false)' in uniform_bridge
 assert "GL_TEXTURE2" in texture_bridge and "GL_TEXTURE5" in texture_bridge
 assert "NvidiumGBufferTargets.texture(1)" in texture_bridge
 assert "NvidiumGBufferTargets.texture(2)" in texture_bridge

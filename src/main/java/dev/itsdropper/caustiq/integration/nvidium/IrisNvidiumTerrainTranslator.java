@@ -73,6 +73,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("viewHeight", "(screenSize.y * 2.0)"),
             Map.entry("fogColor", "fogColour"),
             Map.entry("heavyFog", "caustiqHeavyFog"),
+            Map.entry("isElytraFlying", "caustiqIsElytraFlying"),
             Map.entry("noisetex", "caustiqNoiseTexture"),
             Map.entry("colortex1", "caustiqColortex1"),
             Map.entry("colortex2", "caustiqColortex2"),
@@ -759,6 +760,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform int caustiqCurrentRenderedItemId;
                 uniform vec4 caustiqEntityColor;
                 uniform bool caustiqHeavyFog;
+                uniform bool caustiqIsElytraFlying;
                 """;
     }
 
@@ -772,7 +774,7 @@ public final class IrisNvidiumTerrainTranslator {
                     "dhProjection", "dhProjectionInverse", "dhPreviousProjection", "dhModelView",
                     "dhModelViewInverse", "vxProj", "vxProjInv", "vxProjPrev" -> "mat4";
             case "cameraPosition", "fogColor", "light_dir", "eyePosition" -> "vec3";
-            case "heavyFog" -> "bool";
+            case "heavyFog", "isElytraFlying" -> "bool";
             case "frameTimeCounter", "viewWidth", "viewHeight", "near", "far", "rainStrength",
                     "wetness", "world_age", "day_factor", "worldTime", "time_sunrise", "time_noon", "time_sunset",
                     "time_midnight", "biome_temperature", "biome_humidity", "alphaTestRef",
