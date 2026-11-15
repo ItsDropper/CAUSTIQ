@@ -313,10 +313,10 @@ public final class IrisShaderResources implements AutoCloseable {
                         + String.join(" -> ", stack) + " -> " + marker);
             }
             stack.add(marker);
-            double value = IrisExpression.evaluate(scalarUniform.expression(), identifier ->
+            double uniformValue = IrisExpression.evaluate(scalarUniform.expression(), identifier ->
                     resolveVariable(identifier, context, evaluated, stack));
             stack.removeLast();
-            return value;
+            return uniformValue;
         }
         return evaluateVariable(name, context, evaluated, stack);
     }
