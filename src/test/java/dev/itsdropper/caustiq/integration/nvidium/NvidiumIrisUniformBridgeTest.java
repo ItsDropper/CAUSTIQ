@@ -137,6 +137,7 @@ class NvidiumIrisUniformBridgeTest {
                 base.put("eyeBrightness.y", 120.0);
                 base.put("cameraPosition.x", 100.0);
                 base.put("previousCameraPosition.x", 99.5);
+                base.put("biome", -1.0);
                 Map<String, double[]> evaluated = resources.evaluateUniformValues(base);
                 assertEquals(0.0, evaluated.get("isEyeInCave")[0], 1.0e-9);
                 assertEquals(1.0, evaluated.get("inDry")[0], 1.0e-9);
