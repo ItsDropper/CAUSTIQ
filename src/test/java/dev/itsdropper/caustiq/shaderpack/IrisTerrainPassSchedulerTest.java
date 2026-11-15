@@ -109,12 +109,12 @@ class IrisTerrainPassSchedulerTest {
         Files.writeString(shaders.resolve("shaders.properties"), "colortex1Scale=0.5\n");
         writeProgram(shaders, "gbuffers_terrain", """
                 /* RENDERTARGETS: 0 */
-                out vec4 color;
+                layout(location = 0) out vec4 color;
                 void main(){ color=vec4(1.0); }
                 """);
         writeProgram(shaders, "composite", """
                 /* RENDERTARGETS: 1 */
-                out vec4 color;
+                layout(location = 0) out vec4 color;
                 void main(){ color=vec4(0.5); }
                 """);
         try (ShaderPackSources sources = ShaderPackSources.open(descriptor("ScaledPack", 5))) {
@@ -128,7 +128,7 @@ class IrisTerrainPassSchedulerTest {
         Files.writeString(terrainShaders.resolve("shaders.properties"), "colortex1Scale=0.5\n");
         writeProgram(terrainShaders, "gbuffers_terrain", """
                 /* RENDERTARGETS: 1 */
-                out vec4 color;
+                layout(location = 0) out vec4 color;
                 void main(){ color=vec4(1.0); }
                 """);
         try (ShaderPackSources sources = ShaderPackSources.open(descriptor("ScaledTerrainPack", 3))) {
