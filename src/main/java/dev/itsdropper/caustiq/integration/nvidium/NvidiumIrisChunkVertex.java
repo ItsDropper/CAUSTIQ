@@ -28,6 +28,7 @@ public final class NvidiumIrisChunkVertex implements ChunkVertexType {
     private NvidiumIrisChunkVertex() { }
 
     public static void enable() { enabled = true; }
+    public static void disable() { enabled = false; }
 
     /** True once CAUSTIQ requests the extended format, before Nvidium initializes its renderer. */
     public static boolean isRequested() { return enabled; }
