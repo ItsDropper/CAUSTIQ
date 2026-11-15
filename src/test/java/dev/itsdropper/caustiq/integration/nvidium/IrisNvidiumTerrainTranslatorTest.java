@@ -58,8 +58,8 @@ class IrisNvidiumTerrainTranslatorTest {
         assertFalse(mesh.contains("gl_TextureMatrix"));
         assertTrue(mesh.contains("caustiqProjection * caustiqModelView"));
         assertTrue(mesh.contains("gl_MeshVerticesNV[id].gl_Position = caustiqIrisClipPosition;"));
-        assertTrue(mesh.contains("caustiqIrisClipPosition = transformVertex(V);"));
-        assertFalse(mesh.contains("caustiqIrisClipPosition = gl_MeshVerticesNV[id].gl_Position;"));
+        assertTrue(mesh.contains("caustiqIrisClipPosition = gl_MeshVerticesNV[id].gl_Position;"));
+        assertFalse(mesh.contains("caustiqIrisClipPosition = transformVertex(V);"));
         assertTrue(mesh.contains("OUT[id].texCoord = caustiqIrisVarying_texCoord;"));
         assertTrue(fragment.contains("void caustiqIrisFragmentMain()"));
         assertTrue(fragment.contains("texture(tex_diffuse, texCoord)"));
