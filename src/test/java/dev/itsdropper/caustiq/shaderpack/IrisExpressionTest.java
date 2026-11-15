@@ -29,6 +29,21 @@ class IrisExpressionTest {
     }
 
     @Test
+    void supportsIrisVariadicIfEqualsMembershipAndBetweenFunctions() {
+        assertEquals(7.0, IrisExpression.evaluate("if(0, 2, 0, 4, 1, 7, 9)", ignored -> null), 1.0e-9);
+        assertEquals(1.0, IrisExpression.evaluate("equals(0.5, 0.505, 0.01)", ignored -> null), 1.0e-9);
+        assertEquals(1.0, IrisExpression.evaluate("in(5, 1, 3, 5, 7)", ignored -> null), 1.0e-9);
+        assertEquals(1.0, IrisExpression.evaluate("between(5, 5, 10)", ignored -> null), 1.0e-9);
+        assertEquals(1.0, IrisExpression.evaluate("and(1, true, !false)", ignored -> null), 1.0e-9);
+        assertEquals(1.0, IrisExpression.evaluate("or(0, false, 1)", ignored -> null), 1.0e-9);
+    }
+
+    @Test
+    void evaluatesSmoothAsAStatefulHalfLifeFilter() {
+        assertEquals(0.75, IrisExpression.evaluate("smooth(0.75, 10, 10)", ignored -> null), 1.0e-9);
+    }
+
+    @Test
     void rejectsUnknownVariablesAndMalformedExpressions() {
         assertThrows(IllegalArgumentException.class, () -> IrisExpression.evaluate("unknown + 1", ignored -> null));
         assertThrows(IllegalArgumentException.class, () -> IrisExpression.evaluate("sin(", ignored -> null));
