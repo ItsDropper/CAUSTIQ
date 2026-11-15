@@ -42,11 +42,11 @@ class ShaderPackProgramCatalogTest {
     }
 
     @Test
-    void classifiesPhotonClrwlGbuffersProgramAsTerrain() {
-        assertEquals(ShaderPackProgramCatalog.Group.GBUFFERS,
+    void keepsColorwheelProgramsOutsideTheIrisProgramGroups() {
+        assertEquals(ShaderPackProgramCatalog.Group.UNKNOWN,
                 ShaderPackProgramCatalog.Group.classify("clrwl_gbuffers"));
-        assertEquals(ShaderPackProgramCatalog.Group.GBUFFERS,
-                ShaderPackProgramCatalog.Group.classify("clrwl_gbuffers_terrain"));
+        assertEquals(ShaderPackProgramCatalog.Group.UNKNOWN,
+                ShaderPackProgramCatalog.Group.classify("clrwl_shadow"));
     }
 
     @Test
