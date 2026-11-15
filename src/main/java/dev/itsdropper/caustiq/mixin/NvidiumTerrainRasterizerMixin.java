@@ -38,7 +38,10 @@ public abstract class NvidiumTerrainRasterizerMixin {
     private void caustiq$restoreTerrainGBuffer(
             @Coerce Object pass, int regionCount, long commandAddress,
             @Coerce Object terrainSampler, CallbackInfo callbackInfo) {
-        if (NvidiumShadowRenderer.isShadowRasterization()) return;
+        if (NvidiumShadowRenderer.isShadowRasterization()) {
+            NvidiumIrisTextureBridge.restoreBindings();
+            return;
+        }
         NvidiumGBufferTargets.end();
         NvidiumIrisTextureBridge.restoreBindings();
     }

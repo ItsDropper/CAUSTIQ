@@ -108,6 +108,8 @@ class IrisNvidiumTerrainTranslatorTest {
             IrisNvidiumTerrainTranslator shadowTranslator = IrisNvidiumTerrainTranslator.from(
                     model, "world0", shadowProgramName,
                     Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false", "TAA", "false"));
+            assertEquals(List.of(0), shadowTranslator.renderTargetIndices(),
+                    "Photon shadow color must map to Iris shadowcolor0, not the G-buffer colortex0");
             Map<String, String> shadowStages = shadowTranslator.adapt(
                     NvidiumTerrainVaryingAdapter.adapt(pinnedNvidiumStages()));
             assertTrue(shadowStages.get("MESH").contains("void caustiqIrisVertexMain()"),

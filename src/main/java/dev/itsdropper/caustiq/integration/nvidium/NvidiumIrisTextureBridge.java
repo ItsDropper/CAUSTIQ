@@ -46,6 +46,32 @@ public final class NvidiumIrisTextureBridge {
         }
     }
 
+    /** Binds shadow depth samplers and deterministic noise for the Iris shadow terrain program. */
+    public static void bindForShadow(int program) {
+        if (bindingState != null || customResources != null) restoreBindings();
+        ensureTextures();
+        int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
+        int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE9, GL13C.GL_TEXTURE10};
+        int depth = NvidiumShadowRenderer.shadowTexture();
+        int[] textures = {noiseTexture, depth, depth};
+        int[] previousBindings = new int[units.length];
+        for (int i = 0; i < units.length; i++) {
+            GL13C.glActiveTexture(units[i]);
+            previousBindings[i] = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, textures[i]);
+        }
+        GL13C.glActiveTexture(previousActive);
+        bindingState = new BindingState(previousActive, units, previousBindings);
+        if (program != 0) {
+            int noise = GL20C.glGetUniformLocation(program, "noisetex");
+            if (noise >= 0) GL20C.glUniform1i(noise, 2);
+            int shadow0 = GL20C.glGetUniformLocation(program, "shadowtex0");
+            if (shadow0 >= 0) GL20C.glUniform1i(shadow0, 9);
+            int shadow1 = GL20C.glGetUniformLocation(program, "shadowtex1");
+            if (shadow1 >= 0) GL20C.glUniform1i(shadow1, 10);
+        }
+    }
+
     /** Returns the managed fallback noise texture for fullscreen sampler bindings. */
     public static int noiseTexture() {
         ensureTextures();

@@ -274,7 +274,7 @@ public final class IrisNvidiumTerrainTranslator {
         return renderTargetIndices;
     }
 
-    private static List<Integer> parseRenderTargetIndices(String source) {
+    private List<Integer> parseRenderTargetIndices(String source) {
         Matcher matcher = RENDERTARGETS.matcher(source);
         String activeDirective = null;
         while (matcher.find()) activeDirective = matcher.group(1);
@@ -283,8 +283,13 @@ public final class IrisNvidiumTerrainTranslator {
         for (String token : activeDirective.split("[,\\s]+")) {
             if (token.isBlank()) continue;
             int target = Integer.parseInt(token);
-            if (target < 1 || target > 7) {
-                throw new IllegalArgumentException("Nvidium reserves colortex0 for its native forward color and supports terrain MRT outputs to colortex1 through colortex7; got colortex" + target + ".");
+            boolean shadowProgram = programName.equalsIgnoreCase("shadow")
+                    || programName.toLowerCase(java.util.Locale.ROOT).startsWith("shadow_");
+            if (target < (shadowProgram ? 0 : 1) || target > 7) {
+                throw new IllegalArgumentException((shadowProgram
+                        ? "Nvidium shadow terrain supports shadowcolor0 through shadowcolor7; got shadowcolor"
+                        : "Nvidium reserves colortex0 for its native forward color and supports terrain MRT outputs to colortex1 through colortex7; got colortex")
+                        + target + ".");
             }
             if (targets.contains(target)) {
                 throw new IllegalArgumentException("Iris RENDERTARGETS contains duplicate colortex" + target + ".");
