@@ -48,7 +48,7 @@ public final class NvidiumCompatibility {
      * RenderSectionManager creates its ChunkBuilder or NvidiumWorldRenderer.
      */
     public static boolean enableExtendedVertexFormat() {
-        extendedVertexFormatCommitted = false;
+        NvidiumVertexAbiState.clear();
         if (!CaustiqConfig.get().enabled() || !NvidiumIrisChunkVertex.isRequested()) {
             NvidiumIrisChunkVertex.disable();
             return false;
