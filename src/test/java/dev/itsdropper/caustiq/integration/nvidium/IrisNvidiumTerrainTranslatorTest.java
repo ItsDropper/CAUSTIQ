@@ -104,7 +104,8 @@ class IrisNvidiumTerrainTranslatorTest {
                 IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
                         model, dimension, "gbuffers_terrain",
                         Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false"));
-                Map<String, String> translated = translator.adapt(pinnedNvidiumStages());
+                Map<String, String> translated = translator.adapt(
+                        NvidiumTerrainVaryingAdapter.adapt(pinnedNvidiumStages()));
                 assertTrue(translated.get("MESH").contains("void caustiqIrisVertexMain()"),
                         dimension + " vertex program was not translated");
                 assertTrue(translated.get("FRAGMENT").contains("void caustiqIrisFragmentMain()"),
@@ -197,7 +198,10 @@ class IrisNvidiumTerrainTranslatorTest {
 
     @Test
     void nativeVertexAbiAdapterAndIrisTranslatorComposeAgainstPinnedNvidiumSources() throws Exception {
-        Map<String, String> extended = NvidiumTerrainVaryingAdapter.adapt(pinnedNvidiumStages());
+        Map<String, String> nativeSources = pinnedNvidiumStages();
+        assertTrue(nativeSources.get("MESH").contains("uint8_t section;"),
+                "Pinned Nvidium mesh imports must be expanded before ABI adaptation");
+        Map<String, String> extended = NvidiumTerrainVaryingAdapter.adapt(nativeSources);
         assertTrue(extended.get("MESH").contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4"));
         assertTrue(extended.get("MESH").contains("OUT[id].v_tbn = caustiqDecodeTbn(V);"));
         assertTrue(extended.get("FRAGMENT").contains("caustiqGBufferLightmap"));
