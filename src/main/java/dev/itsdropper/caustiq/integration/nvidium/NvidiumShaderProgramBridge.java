@@ -1,5 +1,13 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
+import net.fabricmc.loader.api.FabricLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +18,7 @@ import java.util.function.UnaryOperator;
 
 /** Compile-boundary bridge for Nvidium task/mesh/fragment terrain programs. */
 public final class NvidiumShaderProgramBridge {
+    private static final Logger LOGGER = LoggerFactory.getLogger("CAUSTIQ");
     private static final Set<String> TERRAIN_STAGES = Set.of("TASK", "MESH", "FRAGMENT");
     private static final AtomicReference<Snapshot> LAST_TERRAIN_PROGRAM = new AtomicReference<>();
     private static volatile UnaryOperator<Map<String, String>> nativeSourceAdapter;
@@ -106,8 +115,10 @@ public final class NvidiumShaderProgramBridge {
             }
         }
         if (!original.keySet().containsAll(TERRAIN_STAGES)) return;
+        if (!NvidiumIrisChunkVertex.isCommitted()) return;
 
         LAST_TERRAIN_PROGRAM.set(Snapshot.from(original));
+        dumpShaderSources("before-adaptation", original);
         Map<String, String> transformed = original;
         UnaryOperator<Map<String, String>> nativeAdapter = nativeSourceAdapter;
         if (nativeAdapter != null) transformed = applyAdapter(nativeAdapter, transformed, "native Nvidium", false);
@@ -124,6 +135,7 @@ public final class NvidiumShaderProgramBridge {
         }
 
         if (transformed.equals(original)) return;
+        dumpShaderSources("compiled", transformed);
         for (Map.Entry<?, String> entry : shaderSources.entrySet()) {
             if (entry.getKey() instanceof Enum<?> stage) {
                 String replacement = transformed.get(stage.name());
@@ -132,6 +144,30 @@ public final class NvidiumShaderProgramBridge {
                 }
                 ((Map<Object, String>) shaderSources).put(entry.getKey(), replacement);
             }
+        }
+    }
+
+    /**
+     * Opt-in source capture at the exact Shader.Builder.compile boundary.
+     * Set -Dcaustiq.dumpNvidiumShaders=true to preserve both pre-adaptation
+     * and final TASK/MESH/FRAGMENT sources under logs/caustiq-nvidium-shaders.
+     */
+    private static void dumpShaderSources(String label, Map<String, String> sources) {
+        if (!Boolean.getBoolean("caustiq.dumpNvidiumShaders")) return;
+        try {
+            Path directory = FabricLoader.getInstance().getGameDir()
+                    .resolve("logs").resolve("caustiq-nvidium-shaders");
+            Files.createDirectories(directory);
+            for (String stage : TERRAIN_STAGES) {
+                String source = sources.get(stage);
+                if (source != null) {
+                    Files.writeString(directory.resolve(label + "-" + stage.toLowerCase(java.util.Locale.ROOT) + ".glsl"),
+                            source, StandardCharsets.UTF_8);
+                }
+            }
+            LOGGER.info("Captured complete Nvidium shader sources ({}) in {}", label, directory);
+        } catch (IOException | RuntimeException exception) {
+            LOGGER.warn("Could not capture Nvidium shader source diagnostics.", exception);
         }
     }
 
