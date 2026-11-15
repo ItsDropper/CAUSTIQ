@@ -46,6 +46,11 @@ public final class IrisTerrainPassScheduler {
         for (IrisShaderPackModel.Program program : programSet.programs().values()) {
             ShaderPackProgramCatalog.Group group = ShaderPackProgramCatalog.Group.classify(program.name());
             if (group == ShaderPackProgramCatalog.Group.UNKNOWN) {
+                if (program.name().startsWith("dh_")) {
+                    // Distant Horizons invokes these entry points from its own renderer;
+                    // they are not part of the normal Iris/Nvidium world-pass schedule.
+                    continue;
+                }
                 throw new IllegalArgumentException("Unknown Iris program group: " + program.name());
             }
             String enabled = model.conditionalPrograms().get(
