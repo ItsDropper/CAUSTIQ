@@ -143,10 +143,10 @@ jobs:
               "photon-nvidium-shadow.mesh",
               "photon-nvidium-shadow.frag",
           )
-          extension = re.compile(r"(?m)^[ \\t]*#[ \\t]*extension[ \\t]+GL_NV_bindless_texture[ \\t]*:")
+          extension = re.compile(r"(?m)^[ \t]*#[ \t]*extension[ \t]+GL_NV_bindless_texture[ \t]*:")
           bindless_constructor = re.compile(
-              r"\\bsampler(?:1D|2D|3D|Cube|1DArray|2DArray|CubeArray)\\s*"
-              r"\\(\\s*(?:u?int64_t|uint64_t)\\b"
+              r"\bsampler(?:1D|2D|3D|Cube|1DArray|2DArray|CubeArray)\s*"
+              r"\(\s*(?:u?int64_t|uint64_t)\b"
           )
           for name in shaders:
               source = source_dir / name
