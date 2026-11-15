@@ -123,6 +123,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("world_age", "caustiqWorldAge"),
             Map.entry("day_factor", "caustiqDayFactor"),
             Map.entry("worldTime", "caustiqWorldTime"),
+            Map.entry("worldDay", "caustiqWorldDay"),
             Map.entry("time_sunrise", "caustiqTimeSunrise"),
             Map.entry("time_noon", "caustiqTimeNoon"),
             Map.entry("time_sunset", "caustiqTimeSunset"),
@@ -776,6 +777,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform float caustiqWorldAge;
                 uniform float caustiqDayFactor;
                 uniform int caustiqWorldTime;
+                uniform int caustiqWorldDay;
                 uniform vec2 caustiqTaaOffset;
                 uniform float caustiqTimeSunrise;
                 uniform float caustiqTimeNoon;
@@ -819,6 +821,7 @@ public final class IrisNvidiumTerrainTranslator {
                     "dhRenderDistance", "vxRenderDistance" -> "int";
             case "viewSize", "pixelSize", "view_res", "view_pixel_size", "taa_offset" -> "vec2";
             case "worldTime" -> "int";
+            case "worldDay" -> "int";
             case "atlasSize" -> "ivec2";
             case "entityColor", "combined_projection_matrix_0", "combined_projection_matrix_1",
                     "combined_projection_matrix_2", "combined_projection_matrix_3",
