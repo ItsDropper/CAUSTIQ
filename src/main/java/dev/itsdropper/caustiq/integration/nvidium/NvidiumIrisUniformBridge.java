@@ -423,41 +423,152 @@ public final class NvidiumIrisUniformBridge {
     /** Current frame values exposed to Iris custom uniform/variable expressions. */
     public static java.util.Map<String, Double> expressionVariables(int viewWidth, int viewHeight) {
         java.util.Map<String, Double> values = new java.util.HashMap<>();
+        putIrisBuiltInDefaults(values);
+
+        Minecraft client = Minecraft.getInstance();
+        Object player = client.player;
+        Object level = client.level;
         Snapshot snapshot = CURRENT.get();
-        Object level = Minecraft.getInstance().level;
+        Snapshot previous = PREVIOUS.get() == null ? snapshot : PREVIOUS.get();
         long worldAge = invokeLong(level, "getGameTime", 0L);
         long dayTime = invokeLong(level, "getDayTime", 0L);
+        long timeOfDay = Math.floorMod(dayTime - 6_000L, 24_000L);
+        float normalizedSunAngle = timeOfDay / 24_000.0f;
+        float celestialAngle = invokeFloat(level, "getSunAngle", 1.0f,
+                (float) (normalizedSunAngle * Math.PI * 2.0));
         float rain = invokeFloat(level, "getRainLevel", 1.0f, 0.0f);
-        float sunAngle = invokeFloat(level, "getSunAngle", 1.0f, 0.0f);
-        values.put("frameCounter", snapshot == null ? 0.0 : (double) snapshot.frameCounter());
-        values.put("frameTimeCounter", snapshot == null ? 0.0 : (double) snapshot.frameTimeCounter());
-        values.put("worldAge", (double) worldAge);
-        values.put("worldDay", (double) Math.floorDiv(dayTime, 24_000L));
-        values.put("worldTime", (double) Math.floorMod(dayTime, 24_000L));
-        values.put("rainStrength", (double) rain);
-        values.put("wetness", (double) rain);
+        float thunder = invokeFloat(level, "getThunderLevel", 1.0f, 0.0f);
+        float near = snapshot == null ? 0.05f : projectionDistance(snapshot.projection(), false);
+        float far = snapshot == null ? 512.0f : projectionDistance(snapshot.projection(), true);
+
+        putScalar(values, "frameCounter", snapshot == null ? FRAME_COUNTER.get() : snapshot.frameCounter());
+        putScalar(values, "frameTime", 1.0 / 60.0);
+        putScalar(values, "frameTimeCounter", snapshot == null ? 0.0 : snapshot.frameTimeCounter());
+        putScalar(values, "worldAge", worldAge);
+        putScalar(values, "worldDay", Math.floorDiv(dayTime, 24_000L));
+        putScalar(values, "worldTime", Math.floorMod(dayTime, 24_000L));
+        putScalar(values, "sunAngle", normalizedSunAngle);
+        putScalar(values, "shadowAngle", normalizedSunAngle <= 0.5f
+                ? normalizedSunAngle : normalizedSunAngle - 0.5f);
+        putScalar(values, "rainStrength", rain);
+        putScalar(values, "wetness", rain);
+        putScalar(values, "thunderStrength", thunder);
+        putScalar(values, "moonPhase", moonPhase(level));
+        putScalar(values, "near", near);
+        putScalar(values, "far", far);
+        putScalar(values, "dhNearPlane", near);
+        putScalar(values, "dhFarPlane", far);
+        putScalar(values, "dhRenderDistance", far);
+        putScalar(values, "viewWidth", viewWidth);
+        putScalar(values, "viewHeight", viewHeight);
+        putScalar(values, "aspectRatio", viewHeight <= 0 ? 1.0 : (double) viewWidth / viewHeight);
+        putVector2(values, "viewSize", viewWidth, viewHeight);
+        putVector2(values, "iris_ScreenSize", viewWidth, viewHeight);
+        putVector2(values, "iris_ScreenSize", viewWidth, viewHeight);
+        putScalar(values, "eyeAltitude", invokeDouble(player, "getEyeY",
+                snapshot == null ? 0.0 : snapshot.cameraY()));
+        putScalar(values, "screenBrightness", optionDouble(client, "gamma", 0.5));
+        putScalar(values, "isNight", timeOfDay >= 13_000L ? 1.0 : 0.0);
+        putScalar(values, "isDay", timeOfDay < 13_000L ? 1.0 : 0.0);
+        putScalar(values, "isRaining", invokeBoolean(level, "isRaining", false) ? 1.0 : 0.0);
+        putScalar(values, "isThundering", invokeBoolean(level, "isThundering", false) ? 1.0 : 0.0);
+        putScalar(values, "isEyeInWater", isEyeInWater());
+        putScalar(values, "isSpectator", invokeBoolean(player, "isSpectator", false) ? 1.0 : 0.0);
+        putScalar(values, "isRightHanded", isRightHanded(client) ? 1.0 : 0.0);
+        putScalar(values, "firstPersonCamera", isFirstPerson(client) ? 1.0 : 0.0);
+        putScalar(values, "hideGUI", optionBoolean(client, "hideGui", false) ? 1.0 : 0.0);
+        putScalar(values, "is_sneaking", invokeBoolean(player, "isShiftKeyDown", false) ? 1.0 : 0.0);
+        putScalar(values, "is_sprinting", invokeBoolean(player, "isSprinting", false) ? 1.0 : 0.0);
+        putScalar(values, "is_on_ground", invokeBoolean(player, "onGround", false) ? 1.0 : 0.0);
+        putScalar(values, "is_burning", invokeBoolean(player, "isOnFire", false) ? 1.0 : 0.0);
+        putScalar(values, "is_hurt", invokeBoolean(player, "isHurt", false) ? 1.0 : 0.0);
+        putScalar(values, "is_invisible", invokeBoolean(player, "isInvisible", false) ? 1.0 : 0.0);
+        putScalar(values, "isElytraFlying", isElytraFlying() ? 1.0 : 0.0);
+        putScalar(values, "isRiding", invokeBoolean(player, "isPassenger", false) ? 1.0 : 0.0);
+        putScalar(values, "feetInWater", invokeBoolean(player, "isInWater", false) ? 1.0 : 0.0);
+        putScalar(values, "vehicleInWater", vehicleInWater(player) ? 1.0 : 0.0);
+
+        double health = invokeDouble(player, "getHealth", 20.0);
+        double maxHealth = invokeDouble(player, "getMaxHealth", 20.0);
+        double armor = invokeDouble(player, "getArmorValue", 0.0);
+        double hunger = invokeDouble(invokeObject(player, "getFoodData"), "getFoodLevel", 20.0);
+        double air = invokeDouble(player, "getAirSupply", 300.0);
+        double maxAir = invokeDouble(player, "getMaxAirSupply", 300.0);
+        putScalar(values, "currentPlayerHealth", maxHealth <= 0 ? 0 : health / maxHealth);
+        putScalar(values, "maxPlayerHealth", maxHealth);
+        putScalar(values, "currentPlayerArmor", armor / 20.0);
+        putScalar(values, "maxPlayerArmor", 20.0);
+        putScalar(values, "currentPlayerHunger", hunger / 20.0);
+        putScalar(values, "maxPlayerHunger", 20.0);
+        putScalar(values, "currentPlayerAir", maxAir <= 0 ? 0 : air / maxAir);
+        putScalar(values, "maxPlayerAir", maxAir);
+        putScalar(values, "health", health);
+        putScalar(values, "maxHealth", maxHealth);
+        putScalar(values, "isInWater", invokeBoolean(player, "isInWater", false) ? 1.0 : 0.0);
+        putScalar(values, "isInLava", invokeBoolean(player, "isInLava", false) ? 1.0 : 0.0);
+
+        Object biome = currentBiome(level, player);
         putBiomeUniforms(values, biomeFloat(level, "getBaseTemperature"),
                 biomeFloat(level, "getDownfall"));
-        values.put("sunAngle", (double) sunAngle);
-        values.put("viewWidth", (double) viewWidth);
-        values.put("viewHeight", (double) viewHeight);
-        values.put("aspectRatio", viewHeight == 0 ? 1.0 : (double) viewWidth / viewHeight);
-        values.put("viewSize.x", (double) viewWidth);
-        values.put("viewSize.y", (double) viewHeight);
-        values.put("isNight", Math.floorMod(dayTime, 24_000L) >= 13_000L ? 1.0 : 0.0);
-        values.put("isDay", Math.floorMod(dayTime, 24_000L) < 13_000L ? 1.0 : 0.0);
-        values.put("isRaining", invokeBoolean(level, "isRaining", false) ? 1.0 : 0.0);
-        values.put("isThundering", invokeBoolean(level, "isThundering", false) ? 1.0 : 0.0);
-        Object player = Minecraft.getInstance().player;
-        values.put("eyeAltitude", invokeDouble(player, "getEyeY", 0.0));
-        values.put("health", invokeDouble(player, "getHealth", 20.0));
-        values.put("maxHealth", invokeDouble(player, "getMaxHealth", 20.0));
-        values.put("isSneaking", invokeBoolean(player, "isShiftKeyDown", false) ? 1.0 : 0.0);
-        values.put("isOnGround", invokeBoolean(player, "onGround", false) ? 1.0 : 0.0);
-        values.put("isInWater", invokeBoolean(player, "isInWater", false) ? 1.0 : 0.0);
-        values.put("isInLava", invokeBoolean(player, "isInLava", false) ? 1.0 : 0.0);
-        values.put("isSprinting", invokeBoolean(player, "isSprinting", false) ? 1.0 : 0.0);
+        putBiomeIdentity(values, biome);
+        putDimensionUniforms(values, level);
+        putVector2(values, "eyeBrightness", eyeBrightness(level, player, false),
+                eyeBrightness(level, player, true));
+        putVector2(values, "eyeBrightnessSmooth", eyeBrightness(level, player, false),
+                eyeBrightness(level, player, true));
+        putScalar(values, "blindness", effectPresent(player, "blindness") ? 1.0 : 0.0);
+        putScalar(values, "darknessFactor", effectPresent(player, "darkness") ? 1.0 : 0.0);
+        putScalar(values, "darknessLightFactor", effectPresent(player, "darkness") ? 1.0 : 0.0);
+        putScalar(values, "nightVision", effectPresent(player, "night_vision") ? 1.0 : 0.0);
+        putScalar(values, "playerMood", 0.0);
+        putScalar(values, "constantMood", 0.0);
+
+        int[] atlas = blockAtlasSize();
+        putVector2(values, "atlasSize", atlas[0], atlas[1]);
+        putVector2(values, "gtextureSize", atlas[0], atlas[1]);
+        putScalar(values, "heldBlockLightValue", heldBlockLightValue(InteractionHand.MAIN_HAND));
+        putScalar(values, "heldBlockLightValue2", heldBlockLightValue(InteractionHand.OFF_HAND));
+        putScalar(values, "heldItemId", heldItemId(InteractionHand.MAIN_HAND));
+        putScalar(values, "heldItemId2", heldItemId(InteractionHand.OFF_HAND));
+        putScalar(values, "entityId", -1);
+        putScalar(values, "blockEntityId", -1);
+        putScalar(values, "currentRenderedItemId", -1);
+        putScalar(values, "vehicleId", 0);
+        putScalar(values, "currentSelectedBlockId", 0);
+        putScalar(values, "textureReloadCount", 0);
+        putScalar(values, "textureFilteringMode", 0);
+        putScalar(values, "renderStage", 0);
+        putScalar(values, "alphaTestRef", 0.1);
+        putScalar(values, "fogMode", 0);
+        putScalar(values, "fogShape", -1);
+        putScalar(values, "fogDensity", 0.0);
+        putScalar(values, "fogStart", 0.0);
+        putScalar(values, "fogEnd", far);
+        putScalar(values, "centerDepthSmooth", 0.0);
+        putScalar(values, "pi", Math.PI);
+        putScalar(values, "currentColorSpace", 0);
+        putScalar(values, "anisotropicFiltering", 0);
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        putVector3(values, "currentDate", now.getYear(), now.getMonthValue(), now.getDayOfMonth());
+        putVector3(values, "currentTime", now.getHour(), now.getMinute(), now.getSecond());
+        java.time.LocalDateTime yearStart = now.withDayOfYear(1).toLocalDate().atStartOfDay();
+        java.time.LocalDateTime yearEnd = yearStart.plusYears(1);
+        long elapsed = java.time.Duration.between(yearStart, now).getSeconds();
+        long remaining = java.time.Duration.between(now, yearEnd).getSeconds();
+        putVector2(values, "currentYearTime", elapsed, remaining);
+
         if (snapshot != null) {
+            putVector3(values, "cameraPosition", snapshot.cameraX(), snapshot.cameraY(), snapshot.cameraZ());
+            putVector3(values, "cameraPositionInt", Math.floor(snapshot.cameraX()),
+                    Math.floor(snapshot.cameraY()), Math.floor(snapshot.cameraZ()));
+            putVector3(values, "cameraPositionFract", fract(snapshot.cameraX()),
+                    fract(snapshot.cameraY()), fract(snapshot.cameraZ()));
+            putVector3(values, "previousCameraPosition", previous.cameraX(), previous.cameraY(), previous.cameraZ());
+            putVector3(values, "previousCameraPositionInt", Math.floor(previous.cameraX()),
+                    Math.floor(previous.cameraY()), Math.floor(previous.cameraZ()));
+            putVector3(values, "previousCameraPositionFract", fract(previous.cameraX()),
+                    fract(previous.cameraY()), fract(previous.cameraZ()));
             putMatrixComponents(values, "gbufferProjection", snapshot.projection(), 4);
             putMatrixComponents(values, "gbufferModelView", snapshot.modelView(), 4);
             putMatrixComponents(values, "gbufferProjectionInverse", snapshot.projectionInverse(), 4);
@@ -466,22 +577,399 @@ public final class NvidiumIrisUniformBridge {
             putMatrixComponents(values, "gl_ModelViewMatrix", snapshot.modelView(), 4);
             putMatrixComponents(values, "gl_ProjectionMatrixInverse", snapshot.projectionInverse(), 4);
             putMatrixComponents(values, "gl_ModelViewMatrixInverse", snapshot.modelViewInverse(), 4);
-            Snapshot previous = PREVIOUS.get() == null ? snapshot : PREVIOUS.get();
             putMatrixComponents(values, "gbufferPreviousModelView", previous.modelView(), 4);
-            putMatrixComponents(values, "gbufferPreviousModelViewInverse", previous.modelViewInverse(), 4);
             putMatrixComponents(values, "gbufferPreviousProjection", previous.projection(), 4);
+            putMatrixComponents(values, "gbufferPreviousModelViewInverse", previous.modelViewInverse(), 4);
             putMatrixComponents(values, "gbufferPreviousProjectionInverse", previous.projectionInverse(), 4);
-            values.put("cameraPositionX", (double) snapshot.cameraX());
-            values.put("cameraPositionY", (double) snapshot.cameraY());
-            values.put("cameraPositionZ", (double) snapshot.cameraZ());
-            values.put("cameraPosition.x", (double) snapshot.cameraX());
-            values.put("cameraPosition.y", (double) snapshot.cameraY());
-            values.put("cameraPosition.z", (double) snapshot.cameraZ());
-            values.put("near", (double) projectionDistance(snapshot.projection(), false));
-            values.put("far", (double) projectionDistance(snapshot.projection(), true));
-            putSunPositionComponents(values, snapshot.modelView(), sunAngle);
+            org.joml.Matrix4f modelViewProjection = new org.joml.Matrix4f().set(snapshot.projection())
+                    .mul(new org.joml.Matrix4f().set(snapshot.modelView()));
+            putMatrixComponents(values, "gl_ModelViewProjectionMatrix",
+                    modelViewProjection.get(new float[16]), 4);
+            putMatrix3Components(values, "gl_NormalMatrix", snapshot.normalMatrix());
+            org.joml.Vector3f up = new org.joml.Matrix4f().set(snapshot.modelView())
+                    .transformDirection(0.0f, 100.0f, 0.0f, new org.joml.Vector3f());
+            putVector3(values, "upPosition", up.x, up.y, up.z);
+            putSunPositionComponents(values, snapshot.modelView(), celestialAngle);
+            double sx = values.get("sunPosition.x");
+            double sy = values.get("sunPosition.y");
+            double sz = values.get("sunPosition.z");
+            putVector3(values, "moonPosition", -sx, -sy, -sz);
+            boolean sunIsShadowSource = normalizedSunAngle <= 0.5f;
+            putVector3(values, "shadowLightPosition",
+                    sunIsShadowSource ? sx : -sx,
+                    sunIsShadowSource ? sy : -sy,
+                    sunIsShadowSource ? sz : -sz);
+            putVector3(values, "eyePosition", eyePosition(player, snapshot));
+            putVector3(values, "relativeEyePosition",
+                    snapshot.cameraX() - values.get("eyePosition.x"),
+                    snapshot.cameraY() - values.get("eyePosition.y"),
+                    snapshot.cameraZ() - values.get("eyePosition.z"));
+            putVector3(values, "playerLookVector", entityVector(player, "getViewVector", 0.0f, 0.0f, -1.0f));
+            putVector3(values, "playerBodyVector", entityVector(player, "getForward", 0.0f, 0.0f, -1.0f));
+            Object vehicle = invokeObject(player, "getVehicle");
+            putVector3(values, "vehicleLookVector", entityVector(vehicle, "getForward", 0.0f, 0.0f, -1.0f));
+            double[] vehiclePosition = entityPosition(vehicle);
+            putVector3(values, "relativeVehiclePosition",
+                    snapshot.cameraX() - vehiclePosition[0],
+                    snapshot.cameraY() - vehiclePosition[1],
+                    snapshot.cameraZ() - vehiclePosition[2]);
+            putVector3(values, "skyColor", skyColor(level, snapshot));
+            putVector3(values, "fogColor", skyColor(level, snapshot));
+            putVector4(values, "lightningBoltPosition", 0.0, 0.0, 0.0, 0.0);
+            putVector3(values, "endFlashPosition", 0.0, 0.0, 0.0);
+            putVector3(values, "currentSelectedBlockPos", 0.0, 0.0, 0.0);
+            putVector3(values, "chunkOffset", 0.0, 0.0, 0.0);
+            putVector4(values, "entityColor", 0.0, 0.0, 0.0, 0.0);
+            putVector4(values, "blendFunc", 1.0, 0.0, 1.0, 0.0);
+            putMatrixComponents(values, "shadowModelView", NvidiumShadowRenderer.shadowModelView(), 4);
+            putMatrixComponents(values, "shadowProjection", NvidiumShadowRenderer.shadowProjection(), 4);
+            putMatrixComponents(values, "shadowModelViewInverse",
+                    new org.joml.Matrix4f().set(NvidiumShadowRenderer.shadowModelView()).invert().get(new float[16]), 4);
+            putMatrixComponents(values, "shadowProjectionInverse",
+                    new org.joml.Matrix4f().set(NvidiumShadowRenderer.shadowProjection()).invert().get(new float[16]), 4);
         }
         return java.util.Map.copyOf(values);
+    }
+
+    static void putIrisBuiltInDefaults(java.util.Map<String, Double> values) {
+        String[] scalars = {
+                "eyeAltitude", "firstPersonCamera", "isEyeInWater", "isSpectator", "isRightHanded",
+                "blindness", "darknessFactor", "darknessLightFactor", "nightVision", "playerMood",
+                "constantMood", "currentPlayerAir", "maxPlayerAir", "currentPlayerArmor", "maxPlayerArmor",
+                "currentPlayerHealth", "maxPlayerHealth", "currentPlayerHunger", "maxPlayerHunger",
+                "vehicleInWater", "isRiding", "inSwimmingAnimation", "feetInWater", "isElytraFlying",
+                "is_burning", "is_hurt", "is_invisible", "is_on_ground", "is_sneaking", "is_sprinting",
+                "hideGUI", "viewHeight", "viewWidth", "aspectRatio", "screenBrightness", "frameCounter",
+                "frameTime", "frameTimeCounter", "currentColorSpace", "entityId", "blockEntityId",
+                "vehicleId", "currentRenderedItemId", "currentSelectedBlockId", "heldItemId", "heldItemId2",
+                "heldBlockLightValue", "heldBlockLightValue2", "sunAngle", "shadowAngle", "moonPhase",
+                "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay", "endFlashIntensity",
+                "previousEndFlashIntensity", "biome", "biome_category", "biome_precipitation", "rainfall",
+                "temperature", "ambientLight", "bedrockLevel", "cloudHeight", "hasCeiling", "hasSkylight",
+                "heightLimit", "logicalHeightLimit", "near", "far", "alphaTestRef", "renderStage",
+                "fogDensity", "fogStart", "fogEnd", "fogMode", "fogShape", "textureFilteringMode",
+                "centerDepthSmooth", "dhRenderDistance", "dhNearPlane", "dhFarPlane", "textureReloadCount",
+                "gtextureId", "anisotropicFiltering", "pi"
+        };
+        for (String name : scalars) values.putIfAbsent(name, 0.0);
+        values.put("maxPlayerHealth", 20.0);
+        values.put("maxPlayerHunger", 20.0);
+        values.put("maxPlayerArmor", 20.0);
+        values.put("maxPlayerAir", 300.0);
+        values.put("near", 0.05);
+        values.put("far", 512.0);
+        values.put("alphaTestRef", 0.1);
+        values.put("pi", Math.PI);
+        putVector2(values, "eyeBrightness", 0.0, 0.0);
+        putVector2(values, "eyeBrightnessSmooth", 0.0, 0.0);
+        putVector2(values, "atlasSize", 0.0, 0.0);
+        putVector2(values, "gtextureSize", 0.0, 0.0);
+        putVector2(values, "currentYearTime", 0.0, 0.0);
+        putVector2(values, "viewSize", 1.0, 1.0);
+        putVector2(values, "iris_ScreenSize", 1.0, 1.0);
+        putVector3(values, "cameraPosition", 0.0, 0.0, 0.0);
+        putVector3(values, "previousCameraPosition", 0.0, 0.0, 0.0);
+        putVector3(values, "cameraPositionInt", 0.0, 0.0, 0.0);
+        putVector3(values, "cameraPositionFract", 0.0, 0.0, 0.0);
+        putVector3(values, "previousCameraPositionInt", 0.0, 0.0, 0.0);
+        putVector3(values, "previousCameraPositionFract", 0.0, 0.0, 0.0);
+        putVector3(values, "eyePosition", 0.0, 0.0, 0.0);
+        putVector3(values, "relativeEyePosition", 0.0, 0.0, 0.0);
+        putVector3(values, "playerBodyVector", 0.0, 0.0, -1.0);
+        putVector3(values, "playerLookVector", 0.0, 0.0, -1.0);
+        putVector3(values, "vehicleLookVector", 0.0, 0.0, -1.0);
+        putVector3(values, "relativeVehiclePosition", 0.0, 0.0, 0.0);
+        putVector3(values, "upPosition", 0.0, 100.0, 0.0);
+        putVector3(values, "sunPosition", 0.0, 100.0, 0.0);
+        putVector3(values, "moonPosition", 0.0, -100.0, 0.0);
+        putVector3(values, "shadowLightPosition", 0.0, 100.0, 0.0);
+        putVector3(values, "skyColor", 0.0, 0.0, 0.0);
+        putVector3(values, "fogColor", 0.0, 0.0, 0.0);
+        putVector3(values, "endFlashPosition", 0.0, 0.0, 0.0);
+        putVector3(values, "currentSelectedBlockPos", 0.0, 0.0, 0.0);
+        putVector3(values, "chunkOffset", 0.0, 0.0, 0.0);
+        putVector4(values, "lightningBoltPosition", 0.0, 0.0, 0.0, 0.0);
+        putVector4(values, "entityColor", 0.0, 0.0, 0.0, 0.0);
+        putVector4(values, "blendFunc", 1.0, 0.0, 1.0, 0.0);
+        String[] matrices = {
+                "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
+                "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse",
+                "gbufferPreviousModelView", "gbufferPreviousProjection", "gl_ModelViewMatrix",
+                "gl_ModelViewMatrixInverse", "gl_ProjectionMatrix", "gl_ProjectionMatrixInverse",
+                "gl_ModelViewProjectionMatrix"
+        };
+        for (String name : matrices) {
+            float[] identity = new org.joml.Matrix4f().get(new float[16]);
+            putMatrixComponents(values, name, identity, 4);
+        }
+        putMatrix3Components(values, "gl_NormalMatrix", new org.joml.Matrix3f().get(new float[9]));
+        values.put("CAT_NONE", 0.0);
+        String[] categories = {"TAIGA", "EXTREME_HILLS", "JUNGLE", "MESA", "PLAINS", "SAVANNA",
+                "ICY", "THE_END", "BEACH", "FOREST", "OCEAN", "DESERT", "RIVER", "SWAMP",
+                "MUSHROOM", "NETHER", "MOUNTAIN", "UNDERGROUND"};
+        for (int i = 0; i < categories.length; i++) values.put("CAT_" + categories[i], (double) (i + 1));
+        values.put("PPT_NONE", 0.0);
+        values.put("PPT_RAIN", 1.0);
+        values.put("PPT_SNOW", 2.0);
+        values.put("IS_IRIS", 1.0);
+        values.put("MC_VERSION", 12111.0);
+    }
+
+    private static void putDimensionUniforms(java.util.Map<String, Double> values, Object level) {
+        Object dimension = invokeObject(level, "dimensionType");
+        if (dimension != null && invokeObject(dimension, "value") != null) dimension = invokeObject(dimension, "value");
+        putScalar(values, "ambientLight", invokeDouble(dimension, "ambientLight", 0.0));
+        putScalar(values, "hasCeiling", invokeBoolean(dimension, "hasCeiling", false) ? 1.0 : 0.0);
+        putScalar(values, "hasSkylight", invokeBoolean(dimension, "hasSkyLight", false) ? 1.0 : 0.0);
+        putScalar(values, "bedrockLevel", invokeDouble(level, "getMinY", 0.0));
+        double minY = invokeDouble(level, "getMinY", 0.0);
+        double maxY = invokeDouble(level, "getMaxY", minY + 384.0);
+        putScalar(values, "heightLimit", maxY - minY);
+        putScalar(values, "logicalHeightLimit", invokeDouble(dimension, "logicalHeight", maxY - minY));
+        Object effects = invokeObject(level, "effects");
+        putScalar(values, "cloudHeight", invokeDouble(effects, "cloudHeight", 192.0));
+    }
+
+    private static void putBiomeIdentity(java.util.Map<String, Double> values, Object biome) {
+        if (biome == null) return;
+        try {
+            int id = BuiltInRegistries.BIOME.getId((net.minecraft.world.level.biome.Biome) biome);
+            putScalar(values, "biome", id);
+            var key = BuiltInRegistries.BIOME.getKey((net.minecraft.world.level.biome.Biome) biome);
+            String path = key == null ? "" : key.getPath().toLowerCase(java.util.Locale.ROOT);
+            int category = biomeCategory(path);
+            putScalar(values, "biome_category", category);
+            values.put("BIOME_" + path.toUpperCase(java.util.Locale.ROOT), (double) id);
+            if (path.equals("pale_garden")) values.put("BIOME_PALE_GARDEN", (double) id);
+            Object precipitation = precipitationAt(Minecraft.getInstance().level,
+                    Minecraft.getInstance().player);
+            putScalar(values, "biome_precipitation", precipitationCode(precipitation));
+        } catch (RuntimeException ignored) {
+            // Keep the complete, typed default set when registry state is unavailable.
+        }
+    }
+
+    private static int biomeCategory(String path) {
+        if (path.contains("nether")) return 16;
+        if (path.contains("end")) return 8;
+        if (path.contains("mushroom")) return 15;
+        if (path.contains("swamp")) return 14;
+        if (path.contains("river")) return 13;
+        if (path.contains("desert")) return 12;
+        if (path.contains("ocean")) return 11;
+        if (path.contains("beach") || path.contains("shore")) return 9;
+        if (path.contains("forest") || path.contains("grove")) return 10;
+        if (path.contains("snow") || path.contains("ice") || path.contains("frozen")) return 7;
+        if (path.contains("savanna")) return 6;
+        if (path.contains("plains")) return 5;
+        if (path.contains("badlands") || path.contains("mesa")) return 4;
+        if (path.contains("jungle") || path.contains("bamboo")) return 3;
+        if (path.contains("mountain") || path.contains("peak") || path.contains("slope")) return 2;
+        if (path.contains("taiga")) return 1;
+        return 0;
+    }
+
+    private static Object currentBiome(Object level, Object player) {
+        if (level == null || player == null) return null;
+        try {
+            Object position = invokeObject(player, "blockPosition");
+            Object holder = invokeCompatible(level, "getBiome", position);
+            return invokeObject(holder, "value");
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static Object precipitationAt(Object level, Object player) {
+        if (level == null || player == null) return null;
+        try {
+            Object position = invokeObject(player, "blockPosition");
+            return invokeCompatible(level, "getPrecipitationAt", position);
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static int precipitationCode(Object precipitation) {
+        if (!(precipitation instanceof Enum<?> value)) return 0;
+        return switch (value.name()) {
+            case "RAIN" -> 1;
+            case "SNOW" -> 2;
+            default -> 0;
+        };
+    }
+
+    private static int eyeBrightness(Object level, Object player, boolean sky) {
+        if (level == null || player == null) return 0;
+        try {
+            Object position = invokeObject(player, "blockPosition");
+            Class<?> lightLayer = Class.forName("net.minecraft.world.level.LightLayer");
+            Object layer = lightLayer.getField(sky ? "SKY" : "BLOCK").get(null);
+            Object brightness = invokeCompatible(level, "getBrightness", layer, position);
+            return brightness instanceof Number number ? number.intValue() * 16 : 0;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return 0;
+        }
+    }
+
+    private static boolean effectPresent(Object player, String effectPath) {
+        if (player == null) return false;
+        Object effects = invokeObject(player, "getActiveEffects");
+        if (!(effects instanceof Iterable<?> iterable)) return false;
+        for (Object instance : iterable) {
+            Object holder = invokeObject(instance, "getEffect");
+            Object effect = invokeObject(holder, "value");
+            if (effect == null) effect = holder;
+            try {
+                Object key = BuiltInRegistries.MOB_EFFECT.getKey((net.minecraft.world.effect.MobEffect) effect);
+                if (key != null && key.getPath().equals(effectPath)) return true;
+            } catch (RuntimeException ignored) { }
+        }
+        return false;
+    }
+
+    private static boolean vehicleInWater(Object player) {
+        Object vehicle = invokeObject(player, "getVehicle");
+        return invokeBoolean(vehicle, "isInWater", false);
+    }
+
+    private static boolean isRightHanded(Minecraft client) {
+        Object mainHand = invokeObject(client.options, "mainHand");
+        Object value = invokeObject(mainHand, "get");
+        return value instanceof Enum<?> arm && arm.name().equals("RIGHT");
+    }
+
+    private static boolean isFirstPerson(Minecraft client) {
+        Object cameraType = invokeObject(client.options, "getCameraType");
+        return cameraType == null || !(cameraType instanceof Enum<?> type)
+                || type.name().equals("FIRST_PERSON");
+    }
+
+    private static boolean optionBoolean(Minecraft client, String option, boolean fallback) {
+        Object value = invokeObject(client.options, option);
+        Object selected = invokeObject(value, "get");
+        return selected instanceof Boolean result ? result : fallback;
+    }
+
+    private static double optionDouble(Minecraft client, String option, double fallback) {
+        Object value = invokeObject(client.options, option);
+        Object selected = invokeObject(value, "get");
+        return selected instanceof Number number ? number.doubleValue() : fallback;
+    }
+
+    private static Object invokeObject(Object target, String name) {
+        if (target == null) return null;
+        try { return target.getClass().getMethod(name).invoke(target); }
+        catch (ReflectiveOperationException | RuntimeException ignored) { return null; }
+    }
+
+    private static Object invokeCompatible(Object target, String name, Object... arguments)
+            throws ReflectiveOperationException {
+        if (target == null) return null;
+        for (Method method : target.getClass().getMethods()) {
+            if (!method.getName().equals(name) || method.getParameterCount() != arguments.length) continue;
+            boolean compatible = true;
+            for (int i = 0; i < arguments.length; i++) {
+                if (arguments[i] != null && !method.getParameterTypes()[i].isInstance(arguments[i])) {
+                    compatible = false;
+                    break;
+                }
+            }
+            if (compatible) return method.invoke(target, arguments);
+        }
+        throw new NoSuchMethodException(name);
+    }
+
+    private static double[] eyePosition(Object player, Snapshot snapshot) {
+        if (player != null) {
+            for (Method method : player.getClass().getMethods()) {
+                if (method.getName().equals("getEyePosition") && method.getParameterCount() == 1
+                        && method.getParameterTypes()[0] == float.class) {
+                    try { return vector3Array(method.invoke(player, 1.0f)); }
+                    catch (ReflectiveOperationException | RuntimeException ignored) { break; }
+                }
+            }
+        }
+        return new double[]{snapshot.cameraX(), snapshot.cameraY(), snapshot.cameraZ()};
+    }
+
+    private static double[] entityVector(Object entity, String method, double x, double y, double z) {
+        if (entity != null) {
+            for (Method candidate : entity.getClass().getMethods()) {
+                if (candidate.getName().equals(method) && candidate.getParameterCount() <= 1) {
+                    try {
+                        Object value = candidate.getParameterCount() == 0
+                                ? candidate.invoke(entity) : candidate.invoke(entity, 1.0f);
+                        return vector3Array(value);
+                    } catch (ReflectiveOperationException | RuntimeException ignored) { }
+                }
+            }
+        }
+        return new double[]{x, y, z};
+    }
+
+    private static double[] entityPosition(Object entity) {
+        if (entity == null) return new double[]{0.0, 0.0, 0.0};
+        return new double[]{invokeDouble(entity, "getX", 0.0),
+                invokeDouble(entity, "getY", 0.0), invokeDouble(entity, "getZ", 0.0)};
+    }
+
+    private static double[] skyColor(Object level, Snapshot snapshot) {
+        if (level != null && snapshot != null) {
+            try {
+                Class<?> vec3Type = Class.forName("net.minecraft.world.phys.Vec3");
+                Object position = vec3Type.getConstructor(double.class, double.class, double.class)
+                        .newInstance((double) snapshot.cameraX(), (double) snapshot.cameraY(), (double) snapshot.cameraZ());
+                Object color = invokeCompatible(level, "getSkyColor", position, 1.0f);
+                return vector3Array(color);
+            } catch (ReflectiveOperationException | RuntimeException ignored) { }
+        }
+        return new double[]{0.0, 0.0, 0.0};
+    }
+
+    private static double[] vector3Array(Object vector) {
+        if (vector == null) return new double[]{0.0, 0.0, 0.0};
+        return new double[]{component(vector, "x"), component(vector, "y"), component(vector, "z")};
+    }
+
+    private static double component(Object object, String name) {
+        if (object == null) return 0.0;
+        try {
+            Object value = object.getClass().getMethod(name).invoke(object);
+            if (value instanceof Number number) return number.doubleValue();
+        } catch (ReflectiveOperationException | RuntimeException ignored) { }
+        try {
+            Field field = object.getClass().getField(name);
+            Object value = field.get(object);
+            if (value instanceof Number number) return number.doubleValue();
+        } catch (ReflectiveOperationException | RuntimeException ignored) { }
+        return 0.0;
+    }
+
+    private static double fract(double value) { return value - Math.floor(value); }
+
+    private static void putScalar(java.util.Map<String, Double> values, String name, double value) {
+        values.put(name, Double.isFinite(value) ? value : 0.0);
+    }
+
+    private static void putVector2(java.util.Map<String, Double> values, String name, double x, double y) {
+        values.put(name + ".x", x); values.put(name + ".y", y);
+        values.put(name + ".r", x); values.put(name + ".g", y);
+    }
+
+    private static void putVector3(java.util.Map<String, Double> values, String name, double x, double y, double z) {
+        values.put(name + ".x", x); values.put(name + ".y", y); values.put(name + ".z", z);
+        values.put(name + ".r", x); values.put(name + ".g", y); values.put(name + ".b", z);
+    }
+
+    private static void putVector4(java.util.Map<String, Double> values, String name,
+                                   double x, double y, double z, double w) {
+        putVector3(values, name, x, y, z);
+        values.put(name + ".w", w); values.put(name + ".a", w);
+    }
+
+    private static void putMatrix3Components(java.util.Map<String, Double> values, String name, float[] matrix) {
+        putMatrixComponents(values, name, matrix, 3);
     }
 
     static void putBiomeUniforms(java.util.Map<String, Double> values,
