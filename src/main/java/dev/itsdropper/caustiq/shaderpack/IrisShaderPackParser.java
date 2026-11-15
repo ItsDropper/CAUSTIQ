@@ -142,8 +142,6 @@ public final class IrisShaderPackParser {
                 terrainDefines.put("IS_IRIS", "1");
                 terrainDefines.put("MC_VERSION", "12111");
                 terrainDefines.put("MC_HAND_DEPTH", "1.0");
-                terrainDefines.put("vsh", "1");
-                terrainDefines.put("fsh", "1");
                 if (inventory.getKey().equals("world0")) {
                     terrainDefines.put("WORLD_OVERWORLD", "1");
                     terrainDefines.put("OVERWORLD", "1");
@@ -154,8 +152,12 @@ public final class IrisShaderPackParser {
                     terrainDefines.put("WORLD_END", "1");
                     terrainDefines.put("END", "1");
                 }
-                String activeVertex = conditionalPreprocessor.preprocess(preprocessed.get(vertexPath), terrainDefines);
-                String activeFragment = conditionalPreprocessor.preprocess(preprocessed.get(fragmentPath), terrainDefines);
+                Map<String, String> vertexDefines = new LinkedHashMap<>(terrainDefines);
+                vertexDefines.put("vsh", "1");
+                Map<String, String> fragmentDefines = new LinkedHashMap<>(terrainDefines);
+                fragmentDefines.put("fsh", "1");
+                String activeVertex = conditionalPreprocessor.preprocess(preprocessed.get(vertexPath), vertexDefines);
+                String activeFragment = conditionalPreprocessor.preprocess(preprocessed.get(fragmentPath), fragmentDefines);
                 IrisTerrainCompatibilityAnalyzer.Result terrainCompatibility = terrainAnalyzer.analyze(
                         activeVertex, activeFragment);
                 terrainCompatibility.issues().forEach(issue ->
