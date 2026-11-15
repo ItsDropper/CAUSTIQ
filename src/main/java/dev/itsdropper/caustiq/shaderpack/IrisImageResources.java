@@ -107,7 +107,6 @@ final class IrisImageResources implements AutoCloseable {
         Image image = images.get(name);
         if (image != null) {
             clearTexture(image.texture, image.internalFormat, image.externalFormat);
-            GL42C.glMemoryBarrier(GL42C.GL_TEXTURE_UPDATE_BARRIER_BIT | GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         }
     }
 
@@ -123,6 +122,7 @@ final class IrisImageResources implements AutoCloseable {
             FloatBuffer zero = stack.callocFloat(components);
             GL44C.glClearTexImage(texture, 0, externalFormat, GL11C.GL_FLOAT, zero);
         }
+        GL42C.glMemoryBarrier(GL42C.GL_TEXTURE_UPDATE_BARRIER_BIT | GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
 
     int[] dispatchGroups(Set<String> outputs, int localX, int localY, int localZ,
