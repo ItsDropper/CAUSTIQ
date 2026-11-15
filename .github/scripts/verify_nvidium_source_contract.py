@@ -128,7 +128,7 @@ assert "caustiqDecodeMidUv(Vertex vertex)" in adapter, "Packed quad midpoint UV 
 assert "caustiqDecodeMidBlock(Vertex vertex)" in adapter, "Packed midpoint block decoder is missing"
 assert "caustiqDecodeBlockEntity(uint packedBlockEntityId)" in adapter, "Packed mc_Entity decoder is missing"
 assert "packedNormal" in adapter and "packedTangentAngle" in adapter and "diamondCoordinate" in adapter
-assert "flat mat3 v_tbn;" in adapter and "OUT[id].v_tbn = caustiqDecodeTbn(V);" in adapter
+assert "flat mat3 v_tbn;" not in adapter and "OUT[id].v_tbn =" not in adapter, "Unused TBN varying must stay out of the constrained mesh/fragment interface"
 assert "uint nvidiumMaterial;" in adapter and "V.nvidiumMaterial" in adapter
 assert "OUT[id].v_renderPosition = (transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)).xyz;" in adapter
 assert "OUT[id].v_quadMidPosition = (transformMat * vec4(decodeVertexPosition(V) + origin + OUT[id].v_midBlock, 1.0)).xyz;" in adapter
