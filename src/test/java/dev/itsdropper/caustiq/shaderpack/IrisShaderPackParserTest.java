@@ -79,6 +79,7 @@ class IrisShaderPackParserTest {
             assertTrue(model.diagnostics().stream().anyMatch(issue ->
                     issue.contains("colortex0-colortex7") && issue.contains("8Format=RGBA16F")),
                     model.diagnostics().toString());
+            assertEquals(1, model.diagnostics().size(), model.diagnostics().toString());
             IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
             assertEquals(java.util.Set.of(1), plan.passes().get(0).pass().writes());
             assertEquals("RGBA16F", plan.targets().get(1).format());
