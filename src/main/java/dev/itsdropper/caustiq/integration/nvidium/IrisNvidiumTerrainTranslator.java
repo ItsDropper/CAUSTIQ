@@ -184,8 +184,21 @@ public final class IrisNvidiumTerrainTranslator {
         defines.put("IS_IRIS", "1");
         defines.put("MC_VERSION", "12111");
         defines.put(vertex ? "vsh" : "fsh", "1");
+        String optionAdjustedSource = removePackOptionDefinitions(source, optionDefines);
         return new dev.itsdropper.caustiq.shaderpack.IrisGlslConditionalPreprocessor()
-                .preprocess(source, defines);
+                .preprocess(optionAdjustedSource, defines);
+    }
+
+    private static String removePackOptionDefinitions(
+            String source, Map<String, String> optionDefines) {
+        if (optionDefines == null || optionDefines.isEmpty()) return source;
+        String adjusted = source;
+        for (String name : optionDefines.keySet()) {
+            String definition = "(?m)^[\\t ]*#[\\t ]*(?:define|undef)[\\t ]+"
+                    + Pattern.quote(name) + "(?:[\\t ]+[^\\r\\n]*)?[\\t ]*(?:\\R|$)";
+            adjusted = adjusted.replaceAll(definition, "");
+        }
+        return adjusted;
     }
 
     public static IrisNvidiumTerrainTranslator from(IrisShaderPackModel model) {
