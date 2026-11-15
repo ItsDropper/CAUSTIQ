@@ -32,6 +32,7 @@ public final class NvidiumIrisUniformBridge {
     private static final AtomicReference<Snapshot> PREVIOUS = new AtomicReference<>();
     private static final AtomicInteger FRAME_COUNTER = new AtomicInteger();
     private static volatile long worldStartNanos;
+    private static volatile long lastCaptureNanos;
     private static volatile boolean warnedUploadFailure;
 
     private NvidiumIrisUniformBridge() { }
@@ -47,6 +48,9 @@ public final class NvidiumIrisUniformBridge {
             Matrix3f normalMatrix = new Matrix3f(modelView).invert().transpose();
             long now = System.nanoTime();
             if (worldStartNanos == 0L) worldStartNanos = now;
+            float frameTime = lastCaptureNanos == 0L ? 1.0f / 60.0f
+                    : Math.max(0.0f, (now - lastCaptureNanos) / 1_000_000_000.0f);
+            lastCaptureNanos = now;
 
             Snapshot next = new Snapshot(
                     matrix(projection),
@@ -57,6 +61,7 @@ public final class NvidiumIrisUniformBridge {
                     (float) cameraX,
                     (float) cameraY,
                     (float) cameraZ,
+                    frameTime,
                     (now - worldStartNanos) / 1_000_000_000.0f,
                     FRAME_COUNTER.incrementAndGet());
             Snapshot previous = CURRENT.getAndSet(next);
@@ -443,7 +448,7 @@ public final class NvidiumIrisUniformBridge {
         float far = snapshot == null ? 512.0f : projectionDistance(snapshot.projection(), true);
 
         putScalar(values, "frameCounter", snapshot == null ? FRAME_COUNTER.get() : snapshot.frameCounter());
-        putScalar(values, "frameTime", 1.0 / 60.0);
+        putScalar(values, "frameTime", snapshot == null ? 1.0 / 60.0 : snapshot.frameTime());
         putScalar(values, "frameTimeCounter", snapshot == null ? 0.0 : snapshot.frameTimeCounter());
         putScalar(values, "worldAge", worldAge);
         putScalar(values, "worldDay", Math.floorDiv(dayTime, 24_000L));
@@ -1072,6 +1077,7 @@ public final class NvidiumIrisUniformBridge {
         PREVIOUS.set(null);
         FRAME_COUNTER.set(0);
         worldStartNanos = 0L;
+        lastCaptureNanos = 0L;
         warnedUploadFailure = false;
     }
 
@@ -1111,6 +1117,7 @@ public final class NvidiumIrisUniformBridge {
             float cameraX,
             float cameraY,
             float cameraZ,
+            float frameTime,
             float frameTimeCounter,
             int frameCounter) {
         Snapshot {
