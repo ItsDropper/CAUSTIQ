@@ -8,6 +8,7 @@ import dev.itsdropper.caustiq.shaderpack.ShaderPackLayout;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackSourceType;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackSources;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -19,6 +20,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NvidiumIrisUniformBridgeTest {
@@ -163,6 +165,45 @@ class NvidiumIrisUniformBridgeTest {
                 assertEquals(1.0, evaluated.get("moving")[0], 1.0e-9);
                 assertEquals(1.0, evaluated.get("inNetherWastes")[0], 1.0e-9);
                 assertEquals(0.0, evaluated.get("maxBlindnessDarkness")[0], 1.0e-9);
+            }
+        }
+    }
+
+    @Test
+    void evaluatesEveryPinnedPhotonCustomUniformExpressionWithTheIrisSymbolTable() throws IOException {
+        String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
+        Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),
+                "CI supplies the pinned Photon shader-pack source tree.");
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("photon-expression-audit", "Photon",
+                Path.of(photonDirectory), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        Map<String, String> defines = Map.of(
+                "MC_VERSION", "12111",
+                "MC_HAND_DEPTH", "0.125",
+                "COLORED_LIGHTS", "1",
+                "VOXEL_VOLUME_SIZE", "64");
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            try (IrisShaderResources resources = IrisShaderResources.load(model.properties(), sources, defines)) {
+                Map<String, Double> base = new HashMap<>();
+                NvidiumIrisUniformBridge.putIrisBuiltInDefaults(base);
+                base.put("viewWidth", 1920.0);
+                base.put("viewHeight", 1080.0);
+                base.put("temperature", 0.8);
+                base.put("rainfall", 0.4);
+                base.put("eyeBrightness.x", 120.0);
+                base.put("eyeBrightness.y", 160.0);
+                base.put("sunPosition.x", 0.0);
+                base.put("sunPosition.y", 100.0);
+                base.put("sunPosition.z", 0.0);
+                base.put("moonPosition.x", 0.0);
+                base.put("moonPosition.y", -100.0);
+                base.put("moonPosition.z", 0.0);
+                base.put("skyColor.r", 0.5);
+                base.put("skyColor.g", 0.5);
+                base.put("skyColor.b", 0.7);
+                Map<String, double[]> evaluated = resources.evaluateUniformValues(base);
+                assertFalse(evaluated.isEmpty(), "Pinned Photon must expose custom uniforms for expression evaluation.");
             }
         }
     }
