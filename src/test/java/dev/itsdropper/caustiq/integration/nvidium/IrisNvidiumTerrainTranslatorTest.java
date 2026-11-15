@@ -258,6 +258,7 @@ class IrisNvidiumTerrainTranslatorTest {
         String prepared = source
                 .replace("#extension GL_ARB_shading_language_include : enable", "")
                 .replace("#extension GL_NV_bindless_texture : require", "")
+                .replace("#extension GL_NV_shader_buffer_load : require", "")
                 .replaceAll("(?m)^\\s*#pragma optionNV[^\\r\\n]*\\R?", "")
                 .replaceAll("(?m)^\\s*#import <sodium:[^>]+>\\s*\\R?", "");
         return prepared.replaceFirst("(?m)^(#version[^\\r\\n]*\\R)",
