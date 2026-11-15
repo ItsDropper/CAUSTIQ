@@ -140,6 +140,8 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("v_irisTexCoord6", "vec4"),
             Map.entry("v_irisTexCoord7", "vec4"));
 
+    private final String vertexSource;
+    private final String fragmentSource;
     private final List<Varying> varyings;
     private final List<FragmentOutput> outputs;
     private final boolean usesFragData;
