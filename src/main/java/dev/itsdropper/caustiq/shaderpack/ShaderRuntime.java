@@ -406,14 +406,14 @@ public final class ShaderRuntime {
         for (int compiledThisFrame = 0; compiledThisFrame < budget && nextProgram < pending.size(); compiledThisFrame++) {
             ShaderPackProgramCatalog.Program program = pending.get(nextProgram++);
             try {
-                if (program.group() == ShaderPackProgramCatalog.Group.FINAL) {
-                    COMPILED.add(new ShaderProgramCompiler().compile(program, sources, selectedDefines));
-                }
                 if (program.group() == ShaderPackProgramCatalog.Group.SETUP
+                        || program.group() == ShaderPackProgramCatalog.Group.BEGIN
+                        || program.group() == ShaderPackProgramCatalog.Group.PREPARE
                         || program.group() == ShaderPackProgramCatalog.Group.DEFERRED
                         || program.group() == ShaderPackProgramCatalog.Group.COMPOSITE
                         || program.group() == ShaderPackProgramCatalog.Group.FINAL
-                        || program.group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE) {
+                        || program.group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE
+                        || program.group() == ShaderPackProgramCatalog.Group.FINAL) {
                     Set<String> defines = selectedDefines.entrySet().stream()
                             .map(entry -> entry.getKey() + "=" + entry.getValue())
                             .collect(java.util.stream.Collectors.toUnmodifiableSet());
@@ -436,6 +436,8 @@ public final class ShaderRuntime {
                 || activePassPlan == null || IRIS_GL_PROGRAMS.isEmpty()) return;
         boolean hasWorldPasses = activePassPlan.passes().stream().anyMatch(scheduled ->
                 scheduled.pass().group() == ShaderPackProgramCatalog.Group.SETUP
+                        || scheduled.pass().group() == ShaderPackProgramCatalog.Group.BEGIN
+                        || scheduled.pass().group() == ShaderPackProgramCatalog.Group.PREPARE
                         || scheduled.pass().group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE
                         || scheduled.pass().group() == ShaderPackProgramCatalog.Group.DEFERRED
                         || scheduled.pass().group() == ShaderPackProgramCatalog.Group.COMPOSITE);
@@ -459,6 +461,8 @@ public final class ShaderRuntime {
         if (FabricLoader.getInstance().isModLoaded("nvidium") && activePassPlan != null
                 && activePassPlan.passes().stream().anyMatch(scheduled ->
                         scheduled.pass().group() == ShaderPackProgramCatalog.Group.SETUP
+                                || scheduled.pass().group() == ShaderPackProgramCatalog.Group.BEGIN
+                                || scheduled.pass().group() == ShaderPackProgramCatalog.Group.PREPARE
                                 || scheduled.pass().group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE
                                 || scheduled.pass().group() == ShaderPackProgramCatalog.Group.DEFERRED
                                 || scheduled.pass().group() == ShaderPackProgramCatalog.Group.COMPOSITE)) return;
@@ -614,6 +618,8 @@ public final class ShaderRuntime {
             }
             Set<ShaderPackProgramCatalog.Group> supportedGroups = Set.of(
                     ShaderPackProgramCatalog.Group.SETUP,
+                    ShaderPackProgramCatalog.Group.BEGIN,
+                    ShaderPackProgramCatalog.Group.PREPARE,
                     ShaderPackProgramCatalog.Group.GBUFFERS,
                     ShaderPackProgramCatalog.Group.SHADOW,
                     ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE,
@@ -626,6 +632,8 @@ public final class ShaderRuntime {
                                 && (!program.stages().containsKey(ShaderPackProgramCatalog.Stage.VERTEX)
                                     || !program.stages().containsKey(ShaderPackProgramCatalog.Stage.FRAGMENT)))
                             || ((program.group() == ShaderPackProgramCatalog.Group.SETUP
+                                    || program.group() == ShaderPackProgramCatalog.Group.BEGIN
+                                    || program.group() == ShaderPackProgramCatalog.Group.PREPARE
                                     || program.group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE)
                                 && !(program.stages().size() == 1
                                     && program.stages().containsKey(ShaderPackProgramCatalog.Stage.COMPUTE)
@@ -691,6 +699,7 @@ public final class ShaderRuntime {
         if (lower.equals("final")) return ShaderPackProgramCatalog.Group.FINAL;
         if (lower.startsWith("composite")) return ShaderPackProgramCatalog.Group.COMPOSITE;
         if (lower.startsWith("deferred")) return ShaderPackProgramCatalog.Group.DEFERRED;
+        if (lower.startsWith("clrwl_")) lower = lower.substring("clrwl_".length());
         if (lower.startsWith("gbuffers_")) return ShaderPackProgramCatalog.Group.GBUFFERS;
         if (lower.startsWith("shadowcomp")) return ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE;
         if (lower.startsWith("shadow")) return ShaderPackProgramCatalog.Group.SHADOW;
