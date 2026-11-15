@@ -104,8 +104,10 @@ class NvidiumTerrainVaryingAdapterTest {
         String sodiumFormat = Files.readString(shaderRoot.resolve("vertex_format/sodium_vertex_format.glsl"));
         Map<String, String> sources = Map.of(
                 "TASK", Files.readString(shaderRoot.resolve("task.glsl")),
-                "MESH", scene + "\\n" + sodiumFormat + "\\n" + vertexFormat + "\\n" + Files.readString(shaderRoot.resolve("mesh.glsl")),
-                "FRAGMENT", scene + "\\n" + sodiumFormat + "\\n" + vertexFormat + "\\n" + Files.readString(shaderRoot.resolve("frag.frag")));
+                "MESH", (scene + "\\n" + sodiumFormat + "\\n" + vertexFormat + "\\n" + Files.readString(shaderRoot.resolve("mesh.glsl")))
+                        .replace("#version 460", "#version 460\\n#define USE_SODIUM_VERTEX_FORMAT"),
+                "FRAGMENT", (scene + "\\n" + sodiumFormat + "\\n" + vertexFormat + "\\n" + Files.readString(shaderRoot.resolve("frag.frag")))
+                        .replace("#version 460", "#version 460\\n#define USE_SODIUM_VERTEX_FORMAT"));
 
         Map<String, String> adapted = NvidiumTerrainVaryingAdapter.adapt(sources);
         assertTrue(adapted.get("MESH").contains("caustiqDecodeTangent(V)"));
@@ -158,6 +160,7 @@ class NvidiumTerrainVaryingAdapterTest {
     private static Map<String, String> sourceStages() {
         String mesh = """
                 #version 460
+                #define USE_SODIUM_VERTEX_FORMAT
                 #extension GL_ARB_gpu_shader5 : require
                 layout(triangles, max_vertices=64, max_primitives=32) out;
                 struct Vertex {
@@ -201,6 +204,7 @@ class NvidiumTerrainVaryingAdapterTest {
                 """;
         String fragment = """
                 #version 460
+                #define USE_SODIUM_VERTEX_FORMAT
                 #extension GL_ARB_gpu_shader5 : require
                 struct Vertex {
                     uint hi;
