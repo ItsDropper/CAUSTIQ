@@ -75,6 +75,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("heavyFog", "caustiqHeavyFog"),
             Map.entry("isElytraFlying", "caustiqIsElytraFlying"),
             Map.entry("isEyeInWater", "caustiqIsEyeInWater"),
+            Map.entry("moonPhase", "caustiqMoonPhase"),
             Map.entry("heldBlockLightValue", "caustiqHeldBlockLightValue"),
             Map.entry("heldBlockLightValue2", "caustiqHeldBlockLightValue2"),
             Map.entry("heldItemId", "caustiqHeldItemId"),
@@ -767,6 +768,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform bool caustiqHeavyFog;
                 uniform bool caustiqIsElytraFlying;
                 uniform int caustiqIsEyeInWater;
+                uniform int caustiqMoonPhase;
                 uniform int caustiqHeldBlockLightValue;
                 uniform int caustiqHeldBlockLightValue2;
                 uniform int caustiqHeldItemId;
@@ -785,7 +787,7 @@ public final class IrisNvidiumTerrainTranslator {
                     "dhModelViewInverse", "vxProj", "vxProjInv", "vxProjPrev" -> "mat4";
             case "cameraPosition", "fogColor", "light_dir", "eyePosition" -> "vec3";
             case "heavyFog", "isElytraFlying" -> "bool";
-            case "isEyeInWater", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2" -> "int";
+            case "isEyeInWater", "moonPhase", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2" -> "int";
             case "frameTimeCounter", "viewWidth", "viewHeight", "near", "far", "rainStrength",
                     "wetness", "world_age", "day_factor", "worldTime", "time_sunrise", "time_noon", "time_sunset",
                     "time_midnight", "biome_temperature", "biome_humidity", "alphaTestRef",
