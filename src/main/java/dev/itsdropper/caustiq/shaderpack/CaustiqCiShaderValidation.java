@@ -158,7 +158,13 @@ public final class CaustiqCiShaderValidation {
                             ShaderPackProgramCatalog.Group.classify(sourceProgram.name());
                     ShaderPackProgramCatalog.Program program = new ShaderPackProgramCatalog.Program(
                             sourceProgram.name(), group, 0, sourceProgram.stages());
-                    if (!program.isExecutableShape()) {
+                    boolean computeOnly = program.hasCompute() && program.stages().size() == 1;
+                    boolean fragmentPass = program.fragmentSource() != null
+                            && !program.hasCompute()
+                            && !program.stages().containsKey(ShaderPackProgramCatalog.Stage.GEOMETRY)
+                            && !program.stages().containsKey(ShaderPackProgramCatalog.Stage.TESSELLATION_CONTROL)
+                            && !program.stages().containsKey(ShaderPackProgramCatalog.Stage.TESSELLATION_EVALUATION);
+                    if (!computeOnly && !fragmentPass) {
                         failures.add(set.directory() + "/" + program.name()
                                 + ": incomplete or unsupported shader-stage set " + program.stages().keySet());
                         continue;
