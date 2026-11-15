@@ -195,6 +195,7 @@ public final class IrisTerrainCompatibilityAnalyzer {
             }
             if (UNAVAILABLE_TRANSFORMS.contains(name)
                     || (stage.equals("vertex") && AVAILABLE_VERTEX_UNIFORMS.contains(name))
+                    || AVAILABLE_PHOTON_UNIFORMS.contains(name)
                     || (stage.equals("fragment") && NvidiumIrisTerrainAbi.fragmentSemantic(name).isPresent())) {
                 continue;
             }
