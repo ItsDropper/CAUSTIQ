@@ -419,6 +419,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                         + "' exceeds the fragment-stage texture-unit limit.");
             }
             if (resources.bindTexture(sampler, program.name(), unit, location)) {
+                GL33C.glBindSampler(unit, 0);
                 unit++;
                 continue;
             }
