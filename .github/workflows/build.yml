@@ -130,19 +130,43 @@ jobs:
           compat_dir="build/nvidium-compat"
           validation_dir="$RUNNER_TEMP/nvidium-glsl-validation"
           mkdir -p "$validation_dir"
+          python3 - "$compat_dir" "$validation_dir" <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          source_dir, output_dir = map(pathlib.Path, sys.argv[1:])
+          output_dir.mkdir(parents=True, exist_ok=True)
+          shaders = (
+              "photon-nvidium-terrain.mesh",
+              "photon-nvidium-terrain.frag",
+              "photon-nvidium-shadow.mesh",
+              "photon-nvidium-shadow.frag",
+          )
+          extension = re.compile(r"(?m)^[ \\t]*#[ \\t]*extension[ \\t]+GL_NV_bindless_texture[ \\t]*:")
+          bindless_constructor = re.compile(
+              r"\\bsampler(?:1D|2D|3D|Cube|1DArray|2DArray|CubeArray)\\s*"
+              r"\\(\\s*(?:u?int64_t|uint64_t)\\b"
+          )
+          for name in shaders:
+              source = source_dir / name
+              if not source.is_file() or source.stat().st_size == 0:
+                  raise SystemExit(f"Missing generated shader: {source}")
+              content = source.read_text()
+              if extension.search(content) and bindless_constructor.search(content):
+                  raise SystemExit(
+                      f"Bindless sampler construction is used by {name}; glslang cannot validate that stage."
+                  )
+              sanitized = re.sub(
+                  r"(?m)^[ \\t]*#[ \\t]*extension[ \\t]+GL_NV_bindless_texture[ \\t]*:[ \\t]*(?:require|enable)[ \\t]*$\\n?",
+                  "",
+                  content,
+              )
+              (output_dir / name).write_text(sanitized)
+          PY
           for shader in photon-nvidium-terrain.mesh photon-nvidium-terrain.frag photon-nvidium-shadow.mesh photon-nvidium-shadow.frag; do
-            source="$compat_dir/$shader"
-            test -s "$source"
-            # glslang does not implement NV_bindless_texture. These terrain stages
-            # use ordinary sampler uniforms; remove only the unsupported capability
-            # declaration in a validation copy, then compile the remaining source.
-            if grep -Eq '^[[:space:]]*#[[:space:]]*extension[[:space:]]+GL_NV_bindless_texture[[:space:]]*:' "$source"; then
-              if grep -Eq '\\bsampler(1D|2D|3D|Cube|1DArray|2DArray|CubeArray)\\s*\\([[:space:]]*(u?int64_t|uint64_t)' "$source"; then
-                echo "Bindless sampler construction is used by $shader and cannot be validated by glslang." >&2
-                exit 1
-              fi
-            fi
-            sed -E '/^[[:space:]]*#[[:space:]]*extension[[:space:]]+GL_NV_bindless_texture[[:space:]]*:[[:space:]]*(require|enable)[[:space:]]*$/d' "$source" > "$validation_dir/$shader"
+            echo "===== $shader (generated source, lines 100-120) ====="
+            nl -ba "$validation_dir/$shader" | sed -n '100,120p'
           done
           glslangValidator -S mesh "$validation_dir/photon-nvidium-terrain.mesh"
           glslangValidator -S frag "$validation_dir/photon-nvidium-terrain.frag"
