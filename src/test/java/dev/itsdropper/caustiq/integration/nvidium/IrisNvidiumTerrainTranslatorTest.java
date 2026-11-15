@@ -105,9 +105,13 @@ class IrisNvidiumTerrainTranslatorTest {
                             || name.toLowerCase(java.util.Locale.ROOT).startsWith("shadow_"))
                     .findFirst().orElseThrow(() -> new AssertionError(
                             "Photon source fixture must expose an Iris shadow terrain program"));
+            Map<String, String> shadowOptions = new LinkedHashMap<>();
+            model.options().options().forEach(option -> shadowOptions.put(option.name(), option.defaultValue()));
+            shadowOptions.put("NORMAL_MAPPING", "false");
+            shadowOptions.put("SPECULAR_MAPPING", "false");
+            shadowOptions.put("TAA", "false");
             IrisNvidiumTerrainTranslator shadowTranslator = IrisNvidiumTerrainTranslator.from(
-                    model, "world0", shadowProgramName,
-                    Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false", "TAA", "false"));
+                    model, "world0", shadowProgramName, shadowOptions);
             assertEquals(List.of(0), shadowTranslator.renderTargetIndices(),
                     "Photon shadow color must map to Iris shadowcolor0, not the G-buffer colortex0");
             Map<String, String> shadowStages = shadowTranslator.adapt(
@@ -116,6 +120,18 @@ class IrisNvidiumTerrainTranslatorTest {
                     "Photon shadow vertex stage was not translated into Nvidium's mesh stage");
             assertTrue(shadowStages.get("MESH").contains("caustiqShadowProjection"),
                     "Photon shadow vertex stage did not use the light-space projection");
+            assertTrue(shadowStages.get("MESH").contains("uniform mat4 caustiqProjectionInverse;"),
+                    "The Nvidium shader compiler must receive the Iris projection uniform binding");
+            assertTrue(shadowStages.get("MESH").contains("uniform float caustiqFrameTimeCounter;"),
+                    "The Nvidium shader compiler must receive the Iris frame-time uniform binding");
+            assertTrue(shadowStages.get("MESH").contains("#define MC_HAND_DEPTH 1.0"),
+                    "Nvidium terrain translation must define Iris hand-depth compatibility");
+            assertTrue(shadowStages.get("MESH").contains("#define WATER_WAVE_ITERATIONS 3"),
+                    "Shader-pack option values must survive conditional preprocessing");
+            assertFalse(shadowStages.get("FRAGMENT").contains("caustiqGBufferPosition"),
+                    "Pack MRT translation must remove native-only G-buffer output writes");
+            assertFalse(shadowStages.get("FRAGMENT").contains("caustiqGBufferLightmap"),
+                    "Pack MRT translation must remove native-only G-buffer output writes");
             assertTrue(shadowStages.get("FRAGMENT").contains("void caustiqIrisFragmentMain()"),
                     "Photon shadow fragment stage was not translated into Nvidium's fragment stage");
             String shadowOutputDirectory = System.getenv("CAUSTIQ_COMPAT_OUTPUT_DIR");

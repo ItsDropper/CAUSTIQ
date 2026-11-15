@@ -153,6 +153,10 @@ translator = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/n
 uniform_bridge = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisUniformBridge.java").read_text(encoding="utf-8")
 texture_bridge = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisTextureBridge.java").read_text(encoding="utf-8")
 assert "photonUniformDeclarations()" in translator
+assert "MC_HAND_DEPTH" in translator
+assert "append(System.lineSeparator())" in translator
+assert "injectedDefines.append(\"#define \" )" not in translator
+assert "CAUSTIQ_NVIDIUM_UNIFORM_ABI" in translator
 assert 'Map.entry("noisetex", "caustiqNoiseTexture")' in translator
 assert "layout(binding = 2) uniform sampler2D caustiqNoiseTexture;" in translator
 assert "NvidiumIrisTextureBridge.bindForTerrain()" in uniform_bridge

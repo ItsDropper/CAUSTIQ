@@ -125,6 +125,8 @@ public final class NvidiumIrisTerrainAbi {
      */
     public static String vertexAliasDeclarations() {
         return String.join("\n",
+                "#ifndef CAUSTIQ_NVIDIUM_UNIFORM_ABI",
+                "#define CAUSTIQ_NVIDIUM_UNIFORM_ABI",
                 "uniform mat4 caustiqProjection;",
                 "uniform mat4 caustiqModelView;",
                 "uniform mat4 caustiqProjectionInverse;",
@@ -133,6 +135,7 @@ public final class NvidiumIrisTerrainAbi {
                 "uniform vec3 caustiqCameraPosition;",
                 "uniform float caustiqFrameTimeCounter;",
                 "uniform int caustiqFrameCounter;",
+                "#endif",
                 "#define gl_ModelViewMatrix caustiqModelView",
                 "#define gl_ModelViewMatrixInverse caustiqModelViewInverse",
                 "#define gl_ProjectionMatrix caustiqProjection",
@@ -147,6 +150,8 @@ public final class NvidiumIrisTerrainAbi {
     public static String fragmentAliasDeclarations() {
         return String.join("\n",
                 "// CAUSTIQ mappings to values Nvidium actually binds for this terrain pass.",
+                "#ifndef CAUSTIQ_NVIDIUM_UNIFORM_ABI",
+                "#define CAUSTIQ_NVIDIUM_UNIFORM_ABI",
                 "uniform mat4 caustiqProjection;",
                 "uniform mat4 caustiqModelView;",
                 "uniform mat4 caustiqProjectionInverse;",
@@ -155,6 +160,7 @@ public final class NvidiumIrisTerrainAbi {
                 "uniform vec3 caustiqCameraPosition;",
                 "uniform float caustiqFrameTimeCounter;",
                 "uniform int caustiqFrameCounter;",
+                "#endif",
                 "#define CAUSTIQ_IRIS_VIEW_WIDTH (screenSize.x * 2.0)",
                 "#define CAUSTIQ_IRIS_VIEW_HEIGHT (screenSize.y * 2.0)",
                 "#define CAUSTIQ_IRIS_FOG_COLOR fogColour",

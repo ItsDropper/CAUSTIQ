@@ -203,11 +203,23 @@ public final class IrisNvidiumTerrainTranslator {
         defines.put("WORLD_OVERWORLD", "1");
         defines.put("OVERWORLD", "1");
         defines.put("IS_IRIS", "1");
+        // Nvidium terrain passes never render the first-person hand depth layer.
+        defines.put("MC_HAND_DEPTH", "1.0");
         defines.put("MC_VERSION", "12111");
         defines.put(vertex ? "vsh" : "fsh", "1");
         String optionAdjustedSource = removePackOptionDefinitions(source, optionDefines);
-        return new dev.itsdropper.caustiq.shaderpack.IrisGlslConditionalPreprocessor()
+        String processed = new dev.itsdropper.caustiq.shaderpack.IrisGlslConditionalPreprocessor()
                 .preprocess(optionAdjustedSource, defines);
+        StringBuilder injectedDefines = new StringBuilder();
+        for (Map.Entry<String, String> define : defines.entrySet()) {
+            Pattern activeDefinition = Pattern.compile("(?m)^\\s*#\\s*define\\s+"
+                    + Pattern.quote(define.getKey()) + "(?:\\s|$)");
+            if (!activeDefinition.matcher(processed).find()) {
+                injectedDefines.append("#define ").append(define.getKey()).append(' ')
+                        .append(define.getValue()).append(System.lineSeparator());
+            }
+        }
+        return injectedDefines.append(processed).toString();
     }
 
     private static String removePackOptionDefinitions(
@@ -734,6 +746,17 @@ public final class IrisNvidiumTerrainTranslator {
 
     private static String photonUniformDeclarations() {
         return """
+                #ifndef CAUSTIQ_NVIDIUM_UNIFORM_ABI
+                #define CAUSTIQ_NVIDIUM_UNIFORM_ABI
+                uniform mat4 caustiqProjection;
+                uniform mat4 caustiqModelView;
+                uniform mat4 caustiqProjectionInverse;
+                uniform mat4 caustiqModelViewInverse;
+                uniform mat3 caustiqNormalMatrix;
+                uniform vec3 caustiqCameraPosition;
+                uniform float caustiqFrameTimeCounter;
+                uniform int caustiqFrameCounter;
+                #endif
                 layout(binding = 2) uniform sampler2D caustiqNoiseTexture;
                 layout(binding = 9) uniform sampler2D caustiqShadowtex0;
                 layout(binding = 10) uniform sampler2D caustiqShadowtex1;
