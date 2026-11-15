@@ -456,10 +456,19 @@ public final class NvidiumIrisUniformBridge {
         if (level == null || Minecraft.getInstance().player == null) return Float.NaN;
         try {
             Object player = Minecraft.getInstance().player;
-            Object position = player.getClass().getMethod("blockPosition").invoke(player);
-            Object holder = level.getClass().getMethod("getBiome", position.getClass()).invoke(level, position);
-            Object biome = holder.getClass().getMethod("value").invoke(holder);
-            Object value = biome.getClass().getMethod(methodName).invoke(biome);
+            Object position = invokeObject(player, "blockPosition");
+            Object holder = invokeCompatible(level, "getBiome", position);
+            Object biome = invokeObject(holder, "value");
+            Object value = invokeObject(biome, methodName);
+            if (value instanceof Number number) return number.floatValue();
+
+            // Vanilla keeps downfall in Biome.ClimateSettings; Iris exposes it through an
+            // ExtendedBiome mixin. Read the record directly when Iris is not installed.
+            Object climate = readField(biome, "climateSettings");
+            if (climate == null) climate = readField(biome, "modifiedClimateSettings");
+            String component = methodName.equals("getDownfall") ? "downfall" : "temperature";
+            value = invokeObject(climate, component);
+            if (!(value instanceof Number)) value = readField(climate, component);
             return value instanceof Number number ? number.floatValue() : Float.NaN;
         } catch (ReflectiveOperationException | RuntimeException ignored) {
             return Float.NaN;
@@ -617,7 +626,7 @@ public final class NvidiumIrisUniformBridge {
         putScalar(values, "sunAngle", normalizedSunAngle);
         putScalar(values, "shadowAngle", isDay ? normalizedSunAngle : moonAngleDegrees / 360.0);
         putScalar(values, "rainStrength", rain);
-        putScalar(values, "wetness", rain);
+        putScalar(values, "wetness", smoothUniform("wetness", rain, 600.0, 200.0));
         putScalar(values, "thunderStrength", thunder);
         putScalar(values, "moonPhase", moonPhase(client, level));
         putScalar(values, "near", near);
@@ -682,8 +691,9 @@ public final class NvidiumIrisUniformBridge {
         putDimensionUniforms(values, level, client);
         putVector2(values, "eyeBrightness", eyeBrightness(level, cameraEntity, false),
                 eyeBrightness(level, cameraEntity, true));
-        putVector2(values, "eyeBrightnessSmooth", eyeBrightness(level, cameraEntity, false),
-                eyeBrightness(level, cameraEntity, true));
+        putVector2(values, "eyeBrightnessSmooth",
+                smoothUniform("eyeBrightnessSmooth.x", eyeBrightness(level, cameraEntity, false), 10.0, 10.0),
+                smoothUniform("eyeBrightnessSmooth.y", eyeBrightness(level, cameraEntity, true), 10.0, 10.0));
         putScalar(values, "blindness", blindnessFactor(cameraEntity));
         putScalar(values, "darknessFactor", darknessFactor(cameraEntity));
         putScalar(values, "darknessLightFactor", irisCapturedFloat("getDarknessLightFactor", 0.0));
@@ -1223,6 +1233,27 @@ public final class NvidiumIrisUniformBridge {
 
     private static float clamp01(float value) {
         return Math.max(0.0f, Math.min(1.0f, value));
+    }
+
+    private record SmoothedUniform(double value, long timestampNanos) { }
+    private static final java.util.concurrent.ConcurrentMap<String, SmoothedUniform> SMOOTHED_UNIFORMS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static double smoothUniform(String key, double target,
+                                        double riseHalfLifeTicks, double fallHalfLifeTicks) {
+        long now = System.nanoTime();
+        SmoothedUniform previous = SMOOTHED_UNIFORMS.get(key);
+        if (previous == null || !Double.isFinite(previous.value())) {
+            SMOOTHED_UNIFORMS.put(key, new SmoothedUniform(target, now));
+            return target;
+        }
+        double elapsedTicks = Math.max(0.0, (now - previous.timestampNanos()) / 50_000_000.0);
+        double halfLife = target >= previous.value() ? riseHalfLifeTicks : fallHalfLifeTicks;
+        double alpha = halfLife <= 0.0 ? 1.0
+                : 1.0 - Math.exp(-Math.log(2.0) * elapsedTicks / halfLife);
+        double result = previous.value() + (target - previous.value()) * alpha;
+        SMOOTHED_UNIFORMS.put(key, new SmoothedUniform(result, now));
+        return result;
     }
 
     private static double clamp01(double value) {
