@@ -407,9 +407,17 @@ public final class ShaderRuntime {
         String directory = dimensionId == null || dimensionId.isBlank()
                 ? "" : builtInDimensionDirectory(dimensionId);
         IrisShaderPackModel.ProgramSet dimensionSet = model.dimensionOverrides().get(directory);
+        // Prefer any matching variant in the active dimension before falling
+        // back to the base pack or another dimension's program inventory.
+        if (dimensionSet != null) {
+            for (String candidate : candidates) {
+                if (dimensionSet.programs().containsKey(candidate)) return candidate;
+            }
+        }
         for (String candidate : candidates) {
-            if (dimensionSet != null && dimensionSet.programs().containsKey(candidate)) return candidate;
             if (model.base().programs().containsKey(candidate)) return candidate;
+        }
+        for (String candidate : candidates) {
             if (model.dimensionOverrides().values().stream()
                     .anyMatch(programSet -> programSet.programs().containsKey(candidate))) return candidate;
         }
