@@ -1,5 +1,6 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
+import dev.itsdropper.caustiq.CaustiqConfig;
 import dev.itsdropper.caustiq.integration.RendererEnvironment;
 import java.lang.reflect.Field;
 import java.util.Objects;
@@ -15,8 +16,13 @@ public final class NvidiumCompatibility {
      * builder; CAUSTIQ then supplies a stride-extended ChunkVertexType.
      */
     public static boolean enableExtendedVertexFormat() {
+        if (!CaustiqConfig.get().enabled()) return false;
         try {
             Class<?> nvidium = Class.forName("me.cortex.nvidium.Nvidium");
+            if (!nvidium.getField("IS_COMPATIBLE").getBoolean(null)
+                    || nvidium.getField("FORCE_DISABLE").getBoolean(null)) {
+                return false;
+            }
             Field configField = nvidium.getField("config");
             Object config = configField.get(null);
             Field formatField = config.getClass().getField("use_sodium_vertex_format");

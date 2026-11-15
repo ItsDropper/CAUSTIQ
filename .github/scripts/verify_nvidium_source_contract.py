@@ -209,6 +209,9 @@ format_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/Nvidi
 stride_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumRepackagedStrideMixin.java").read_text(encoding="utf-8")
 assert "NvidiumIrisChunkVertex.INSTANCE" in format_mixin
 assert "NvidiumIrisChunkVertex.isRequested()" in format_mixin
+compatibility = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumCompatibility.java").read_text(encoding="utf-8")
+assert "CaustiqConfig.get().enabled()" in compatibility
+assert "IS_COMPATIBLE" in compatibility and "FORCE_DISABLE" in compatibility
 assert "NvidiumIrisChunkVertex.STRIDE" in stride_mixin
 assert "NvidiumIrisChunkVertex.isRequested()" in stride_mixin
 assert "@ModifyConstant(" in stride_mixin, "copyQuad stride constants must be modified after javac inlines the static final fields"
