@@ -98,6 +98,7 @@ public final class NvidiumShadowRenderer {
                 return;
             }
             boolean clear = NvidiumTerrainPassBridge.shouldClearAttachments(terrainPass) || !state.depthValid;
+            activeState = state;
             renderShadowPass(state, terrainPass, terrainSampler, regionCount, clear);
             state.depthValid = true;
             activeState = state;
@@ -124,7 +125,7 @@ public final class NvidiumShadowRenderer {
     /** Shadow depth texture exposed to Iris shadowtex samplers. */
     public static int shadowTexture() {
         State state = activeState;
-        return state == null ? 0 : state.depthTexture;
+        return state == null || !state.depthValid ? 0 : state.depthTexture;
     }
 
     public static int shadowResolution() {

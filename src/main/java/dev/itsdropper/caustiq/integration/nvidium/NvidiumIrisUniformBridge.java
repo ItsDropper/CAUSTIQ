@@ -72,6 +72,14 @@ public final class NvidiumIrisUniformBridge {
             matrix(program, "caustiqProjectionInverse", snapshot.projectionInverse());
             matrix(program, "caustiqModelViewInverse", snapshot.modelViewInverse());
             matrix3(program, "caustiqNormalMatrix", snapshot.normalMatrix());
+            if (NvidiumShadowRenderer.isShadowRasterization()) {
+                float[] shadowView = NvidiumShadowRenderer.shadowModelView();
+                float[] shadowProjection = NvidiumShadowRenderer.shadowProjection();
+                matrix(program, "caustiqShadowModelView", shadowView);
+                matrix(program, "caustiqShadowProjection", shadowProjection);
+                matrix(program, "caustiqShadowModelViewInverse", new org.joml.Matrix4f().set(shadowView).invert().get(new float[16]));
+                matrix(program, "caustiqShadowProjectionInverse", new org.joml.Matrix4f().set(shadowProjection).invert().get(new float[16]));
+            }
             vector3(program, "caustiqCameraPosition",
                     snapshot.cameraX(), snapshot.cameraY(), snapshot.cameraZ());
             int timeLocation = GL20C.glGetUniformLocation(program, "caustiqFrameTimeCounter");

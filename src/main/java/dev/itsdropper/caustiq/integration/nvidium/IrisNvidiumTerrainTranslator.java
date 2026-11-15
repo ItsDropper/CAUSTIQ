@@ -53,6 +53,13 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("lightmap", "tex_light"),
             Map.entry("gbufferModelView", "caustiqModelView"),
             Map.entry("gbufferModelViewInverse", "caustiqModelViewInverse"),
+            Map.entry("shadowModelView", "caustiqShadowModelView"),
+            Map.entry("shadowModelViewInverse", "caustiqShadowModelViewInverse"),
+            Map.entry("shadowProjection", "caustiqShadowProjection"),
+            Map.entry("shadowProjectionInverse", "caustiqShadowProjectionInverse"),
+            Map.entry("shadowtex0", "caustiqShadowtex0"),
+            Map.entry("shadowtex1", "caustiqShadowtex1"),
+            Map.entry("shadow", "caustiqShadowtex0"),
             Map.entry("gbufferProjection", "caustiqProjection"),
             Map.entry("gbufferProjectionInverse", "caustiqProjectionInverse"),
             Map.entry("cameraPosition", "caustiqCameraPosition"),
@@ -144,6 +151,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("v_irisTexCoord6", "vec4"),
             Map.entry("v_irisTexCoord7", "vec4"));
 
+    private final String programName;
     private final String vertexSource;
     private final String fragmentSource;
     private final List<Varying> varyings;
@@ -153,11 +161,12 @@ public final class IrisNvidiumTerrainTranslator {
     private final List<Integer> renderTargetIndices;
 
     private IrisNvidiumTerrainTranslator(
-            String vertexSource, String fragmentSource, Map<String, String> optionDefines) {
+            String programName, String vertexSource, String fragmentSource, Map<String, String> optionDefines) {
+        this.programName = Objects.requireNonNull(programName, "programName");
         String activeVertex = preprocessTerrainStage(
-                Objects.requireNonNull(vertexSource, "vertexSource"), true, optionDefines);
+                Objects.requireNonNull(vertexSource, "vertexSource"), true, optionDefines, programName);
         String activeFragment = preprocessTerrainStage(
-                Objects.requireNonNull(fragmentSource, "fragmentSource"), false, optionDefines);
+                Objects.requireNonNull(fragmentSource, "fragmentSource"), false, optionDefines, programName);
         StageSource vertex = prepareVertex(activeVertex);
         StageSource fragment = prepareFragment(activeFragment);
         this.vertexSource = vertex.source();
@@ -170,7 +179,7 @@ public final class IrisNvidiumTerrainTranslator {
     }
 
     private static String preprocessTerrainStage(
-            String source, boolean vertex, Map<String, String> optionDefines) {
+            String source, boolean vertex, Map<String, String> optionDefines, String programName) {
         Map<String, String> defines = new LinkedHashMap<>();
         if (optionDefines != null) {
             optionDefines.forEach((name, rawValue) -> {
@@ -182,7 +191,7 @@ public final class IrisNvidiumTerrainTranslator {
                 if (!value.isEmpty()) defines.put(name, value);
             });
         }
-        defines.put("PROGRAM_GBUFFERS_TERRAIN", "1");
+        defines.put("PROGRAM_" + programName.toUpperCase(java.util.Locale.ROOT), "1");
         defines.put("WORLD_OVERWORLD", "1");
         defines.put("OVERWORLD", "1");
         defines.put("IS_IRIS", "1");
@@ -257,7 +266,7 @@ public final class IrisNvidiumTerrainTranslator {
         if (vertex == null || fragment == null) {
             throw new IllegalArgumentException(programName + " references a missing preprocessed shader stage.");
         }
-        return new IrisNvidiumTerrainTranslator(vertex, fragment, optionDefines);
+        return new IrisNvidiumTerrainTranslator(programName, vertex, fragment, optionDefines);
     }
 
     public List<Integer> renderTargetIndices() {
@@ -710,6 +719,12 @@ public final class IrisNvidiumTerrainTranslator {
     private static String photonUniformDeclarations() {
         return """
                 layout(binding = 2) uniform sampler2D caustiqNoiseTexture;
+                layout(binding = 9) uniform sampler2D caustiqShadowtex0;
+                layout(binding = 10) uniform sampler2D caustiqShadowtex1;
+                uniform mat4 caustiqShadowModelView;
+                uniform mat4 caustiqShadowModelViewInverse;
+                uniform mat4 caustiqShadowProjection;
+                uniform mat4 caustiqShadowProjectionInverse;
                 layout(binding = 5) uniform sampler2D caustiqColortex1;
                 layout(binding = 6) uniform sampler2D caustiqColortex2;
                 layout(binding = 7) uniform sampler2D caustiqColortex4;
@@ -738,10 +753,11 @@ public final class IrisNvidiumTerrainTranslator {
 
     private static String expectedUniformType(String name) {
         return switch (name) {
-            case "gtexture", "lightmap", "noisetex", "normals", "specular",
+            case "gtexture", "lightmap", "noisetex", "normals", "specular", "shadowtex0", "shadowtex1", "shadow",
                     "colortex1", "colortex2", "colortex4", "depthtex1", "colortex15",
                     "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans" -> "sampler2D";
             case "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
+                    "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse",
                     "dhProjection", "dhProjectionInverse", "dhPreviousProjection", "dhModelView",
                     "dhModelViewInverse", "vxProj", "vxProjInv", "vxProjPrev" -> "mat4";
             case "cameraPosition", "fogColor", "light_dir", "eyePosition" -> "vec3";
@@ -761,7 +777,7 @@ public final class IrisNvidiumTerrainTranslator {
         };
     }
 
-    private static String translateVertexBuiltins(String source) {
+    private String translateVertexBuiltins(String source) {
         String translated = source;
         translated = replaceIdentifier(translated, "gl_VertexID", "int(caustiqCurrentVertexId)");
         translated = replaceIdentifier(translated, "gl_Vertex",
@@ -792,12 +808,14 @@ public final class IrisNvidiumTerrainTranslator {
         translated = replaceIdentifier(translated, "UV2", "decodeLightUV(caustiqCurrentVertex) * 256.0");
         translated = replaceIdentifier(translated, "Color", "caustiqDecodeIrisColor(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "Normal", "caustiqDecodeNormal(caustiqCurrentVertex)");
+        String transformProjection = programName.equalsIgnoreCase("shadow") || programName.startsWith("shadow_")
+                ? "caustiqShadowProjection * caustiqShadowModelView" : "caustiqProjection * caustiqModelView";
         translated = translated.replaceAll("\\bftransform\\s*\\(\\s*\\)",
-                "(caustiqProjection * caustiqModelView * (caustiqCurrentTransform * vec4(decodeVertexPosition(caustiqCurrentVertex) + caustiqCurrentOrigin, 1.0)))");
+                "(" + transformProjection + " * (caustiqCurrentTransform * vec4(decodeVertexPosition(caustiqCurrentVertex) + caustiqCurrentOrigin, 1.0)))");
         return translateUniformAliases(translated);
     }
 
-    private static String translateFragmentBuiltins(String source) {
+    private String translateFragmentBuiltins(String source) {
         String translated = source;
         translated = replaceIdentifier(translated, "gl_TexCoord", "caustiqIrisTexCoord");
         translated = replaceIdentifier(translated, "gl_FragColor", "colour");
@@ -805,17 +823,22 @@ public final class IrisNvidiumTerrainTranslator {
         return translateUniformAliases(translateLegacyTextureFunctions(translated));
     }
 
-    private static String translateUniformAliases(String source) {
+    private String translateUniformAliases(String source) {
         String translated = source;
         for (Map.Entry<String, String> alias : UNIFORM_ALIASES.entrySet()) {
             translated = replaceIdentifier(translated, alias.getKey(), alias.getValue());
         }
+        boolean shadowProgram = programName.equalsIgnoreCase("shadow") || programName.startsWith("shadow_");
+        String modelView = shadowProgram ? "caustiqShadowModelView" : "caustiqModelView";
+        String modelViewInverse = shadowProgram ? "caustiqShadowModelViewInverse" : "caustiqModelViewInverse";
+        String projection = shadowProgram ? "caustiqShadowProjection" : "caustiqProjection";
+        String projectionInverse = shadowProgram ? "caustiqShadowProjectionInverse" : "caustiqProjectionInverse";
         translated = replaceIdentifier(translated, "gl_ModelViewProjectionMatrix",
-                "(caustiqProjection * caustiqModelView)");
-        translated = replaceIdentifier(translated, "gl_ModelViewMatrixInverse", "caustiqModelViewInverse");
-        translated = replaceIdentifier(translated, "gl_ModelViewMatrix", "caustiqModelView");
-        translated = replaceIdentifier(translated, "gl_ProjectionMatrixInverse", "caustiqProjectionInverse");
-        translated = replaceIdentifier(translated, "gl_ProjectionMatrix", "caustiqProjection");
+                "(" + projection + " * " + modelView + ")");
+        translated = replaceIdentifier(translated, "gl_ModelViewMatrixInverse", modelViewInverse);
+        translated = replaceIdentifier(translated, "gl_ModelViewMatrix", modelView);
+        translated = replaceIdentifier(translated, "gl_ProjectionMatrixInverse", projectionInverse);
+        translated = replaceIdentifier(translated, "gl_ProjectionMatrix", projection);
         translated = replaceIdentifier(translated, "gl_NormalMatrix", "caustiqNormalMatrix");
         return translated;
     }

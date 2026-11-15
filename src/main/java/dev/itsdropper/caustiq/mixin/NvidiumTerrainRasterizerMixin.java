@@ -31,7 +31,6 @@ public abstract class NvidiumTerrainRasterizerMixin {
     private void caustiq$uploadIrisTerrainUniforms(
             @Coerce Object pass, int regionCount, long commandAddress,
             @Coerce Object terrainSampler, CallbackInfo callbackInfo) {
-        if (NvidiumShadowRenderer.isShadowRasterization()) return;
         NvidiumIrisUniformBridge.upload(this);
     }
 

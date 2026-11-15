@@ -15,6 +15,7 @@ public final class NvidiumShaderProgramBridge {
     private static volatile UnaryOperator<Map<String, String>> nativeSourceAdapter = NvidiumTerrainVaryingAdapter::adapt;
     private static volatile UnaryOperator<Map<String, String>> primaryTerrainAdapter;
     private static volatile UnaryOperator<Map<String, String>> translucentTerrainAdapter;
+    private static volatile UnaryOperator<Map<String, String>> shadowTerrainAdapter;
     private static volatile List<Integer> primaryOutputRouting = List.of(0, 1, 2, 3, 4, 5, 6, 7);
     private static volatile List<Integer> translucentOutputRouting = List.of(0, 1, 2, 3, 4, 5, 6, 7);
     private static final ThreadLocal<PipelineKind> ACTIVE_PIPELINE =
@@ -50,9 +51,14 @@ public final class NvidiumShaderProgramBridge {
         translucentOutputRouting = List.copyOf(outputRouting);
     }
 
+    public static void registerShadowTerrainAdapter(UnaryOperator<Map<String, String>> adapter) {
+        shadowTerrainAdapter = Objects.requireNonNull(adapter, "adapter");
+    }
+
     public static void unregisterTerrainAdapter() {
         primaryTerrainAdapter = null;
         translucentTerrainAdapter = null;
+        shadowTerrainAdapter = null;
         primaryOutputRouting = List.of(0, 1, 2, 3, 4, 5, 6, 7);
         translucentOutputRouting = List.of(0, 1, 2, 3, 4, 5, 6, 7);
         ACTIVE_PIPELINE.remove();
@@ -65,7 +71,7 @@ public final class NvidiumShaderProgramBridge {
 
     /** True only when an Iris terrain program translator is installed. */
     public static boolean hasTerrainAdapter() {
-        return primaryTerrainAdapter != null || translucentTerrainAdapter != null;
+        return primaryTerrainAdapter != null || translucentTerrainAdapter != null || shadowTerrainAdapter != null;
     }
 
     public static List<Integer> outputRoutingFor(PipelineKind pipeline) {
@@ -109,11 +115,12 @@ public final class NvidiumShaderProgramBridge {
         UnaryOperator<Map<String, String>> irisAdapter = switch (pipeline) {
             case PRIMARY -> primaryTerrainAdapter;
             case TRANSLUCENT -> translucentTerrainAdapter;
-            case SHADOW -> null;
+            case SHADOW -> shadowTerrainAdapter;
         };
         if (irisAdapter != null) {
             transformed = applyAdapter(irisAdapter, transformed,
-                    pipeline == PipelineKind.TRANSLUCENT ? "Iris translucent terrain" : "Iris terrain", true);
+                    pipeline == PipelineKind.TRANSLUCENT ? "Iris translucent terrain"
+                            : pipeline == PipelineKind.SHADOW ? "Iris shadow terrain" : "Iris terrain", true);
         }
 
         if (transformed.equals(original)) return;

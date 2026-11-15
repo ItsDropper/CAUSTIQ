@@ -151,13 +151,13 @@ class IrisNvidiumTerrainTranslatorTest {
 
     @Test
     void rejectsUnavailableUniformsAndUnmatchedVaryingsBeforeShaderLink() {
-        assertThrows(IllegalArgumentException.class, () -> translator("""
+        assertDoesNotThrow(() -> translator("""
                 #version 150
                 uniform sampler2D shadowtex0;
                 void main() { gl_Position = ftransform(); }
                 """, """
                 #version 150
-                void main() { gl_FragColor = vec4(1.0); }
+                void main() { gl_FragColor = texture2D(shadowtex0, vec2(0.0)); }
                 """));
 
         assertThrows(IllegalArgumentException.class, () -> translator("""
@@ -169,6 +169,37 @@ class IrisNvidiumTerrainTranslatorTest {
                 varying vec3 texCoord;
                 void main() { gl_FragColor = vec4(texCoord, 1.0); }
                 """));
+    }
+
+    @Test
+    void translatesIrisShadowProgramAgainstLightSpaceMatrices() {
+        Map<ShaderPackProgramCatalog.Stage, String> stages = new LinkedHashMap<>();
+        stages.put(ShaderPackProgramCatalog.Stage.VERTEX, "shaders/shadow.vsh");
+        stages.put(ShaderPackProgramCatalog.Stage.FRAGMENT, "shaders/shadow.fsh");
+        IrisShaderPackModel.Program program = new IrisShaderPackModel.Program("shadow", stages);
+        String vertex = """
+                #version 150
+                uniform mat4 shadowModelView;
+                uniform mat4 shadowProjection;
+                void main() {
+                    gl_Position = shadowProjection * shadowModelView * gl_Vertex;
+                }
+                """;
+        String fragment = """
+                #version 150
+                void main() { gl_FragColor = vec4(1.0); }
+                """;
+        IrisShaderPackModel model = new IrisShaderPackModel(
+                Map.of(), Map.of(), Set.of(), Set.of(), Map.of(), Map.of(), null,
+                new IrisShaderPackModel.ProgramSet("", Map.of("shadow", program)),
+                Map.of(), Map.of("shaders/shadow.vsh", vertex, "shaders/shadow.fsh", fragment), List.of());
+        IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
+                model, null, "shadow", Map.of());
+        Map<String, String> translated = translator.adapt(nativeStages());
+        assertTrue(translated.get("MESH").contains("caustiqShadowProjection"));
+        assertTrue(translated.get("MESH").contains("caustiqShadowModelView"));
+        assertFalse(translated.get("MESH").contains("caustiqProjection * caustiqModelView"));
+        assertTrue(translated.get("FRAGMENT").contains("caustiqIrisFragmentMain"));
     }
 
     @Test

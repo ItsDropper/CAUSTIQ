@@ -111,6 +111,25 @@ class NvidiumShaderProgramBridgeTest {
         assertTrue(NvidiumShaderProgramBridge.hasTerrainAdapter());
     }
 
+    @Test void appliesDedicatedAdapterOnlyInsideShadowCompileScope() {
+        NvidiumShaderProgramBridge.registerShadowTerrainAdapter(sources -> Map.of(
+                "TASK", sources.get("TASK"),
+                "MESH", sources.get("MESH") + "\n// iris shadow",
+                "FRAGMENT", sources.get("FRAGMENT") + "\n// iris shadow"));
+        NvidiumShaderProgramBridge.beginPipelineCompile(NvidiumShaderProgramBridge.PipelineKind.SHADOW);
+        try {
+            Map<Object, String> sources = terrainSources();
+            NvidiumShaderProgramBridge.transformBeforeCompile(sources);
+            assertTrue(sources.get(Stage.MESH).endsWith("// iris shadow"));
+            assertTrue(sources.get(Stage.FRAGMENT).endsWith("// iris shadow"));
+        } finally {
+            NvidiumShaderProgramBridge.endPipelineCompile();
+        }
+        Map<Object, String> primary = terrainSources();
+        NvidiumShaderProgramBridge.transformBeforeCompile(primary);
+        assertFalse(primary.get(Stage.MESH).contains("iris shadow"));
+    }
+
     @Test void ignoresNonTerrainPrograms() {
         Map<Object, String> sources = new LinkedHashMap<>();
         sources.put(Stage.COMPUTE, "compute source");

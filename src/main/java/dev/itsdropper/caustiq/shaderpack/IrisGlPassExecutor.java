@@ -87,9 +87,11 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             }
             for (IrisTerrainPassScheduler.ScheduledPass scheduled : plan.passes()) {
                 IrisTerrainPassScheduler.Pass pass = scheduled.pass();
-                if (pass.group() == ShaderPackProgramCatalog.Group.GBUFFERS) continue;
+                if (pass.group() == ShaderPackProgramCatalog.Group.GBUFFERS
+                        || pass.group() == ShaderPackProgramCatalog.Group.SHADOW) continue;
                 if (pass.group() != ShaderPackProgramCatalog.Group.DEFERRED
                         && pass.group() != ShaderPackProgramCatalog.Group.COMPOSITE
+                        && pass.group() != ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE
                         && pass.group() != ShaderPackProgramCatalog.Group.FINAL) {
                     throw new IllegalStateException("Iris pass group '" + pass.group()
                             + "' is not supported by the full-screen executor.");
@@ -305,7 +307,13 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 continue;
             }
             int texture;
-            if (sampler.equals("noisetex")) {
+            if (sampler.equals("shadowtex0") || sampler.equals("shadowtex1") || sampler.equals("shadow")) {
+                texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowTexture();
+                if (texture == 0) {
+                    throw new IllegalStateException("Iris pass '" + program.name()
+                            + "' samples " + sampler + " before a valid shadow depth map has been rendered.");
+                }
+            } else if (sampler.equals("noisetex")) {
                 texture = NvidiumIrisTextureBridge.noiseTexture();
             } else if (sampler.equals("gcolor") || sampler.equals("DiffuseSampler")
                     || sampler.equals("texture") || sampler.equals("tex")

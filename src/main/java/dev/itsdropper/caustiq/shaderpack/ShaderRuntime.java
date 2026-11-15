@@ -306,24 +306,44 @@ public final class ShaderRuntime {
     }
 
     private static void configureShadowRenderer(IrisShaderPackModel model) {
-        boolean hasShadowTerrain = model.base().programs().values().stream()
-                .anyMatch(program -> ShaderPackProgramCatalog.Group.classify(program.name())
+        NvidiumShaderProgramBridge.registerShadowTerrainAdapter(Map::copyOf);
+        String shadowProgramName = model.base().programs().keySet().stream()
+                .filter(name -> ShaderPackProgramCatalog.Group.classify(name)
                         == ShaderPackProgramCatalog.Group.SHADOW)
-                || model.dimensionOverrides().values().stream()
-                .flatMap(programSet -> programSet.programs().values().stream())
-                .anyMatch(program -> ShaderPackProgramCatalog.Group.classify(program.name())
-                        == ShaderPackProgramCatalog.Group.SHADOW);
+                .sorted(java.util.Comparator.comparingInt(name -> name.equalsIgnoreCase("shadow") ? 0 : 1))
+                .findFirst().orElseGet(() -> model.dimensionOverrides().values().stream()
+                        .flatMap(programSet -> programSet.programs().keySet().stream())
+                        .filter(name -> ShaderPackProgramCatalog.Group.classify(name)
+                                == ShaderPackProgramCatalog.Group.SHADOW)
+                        .findFirst().orElse(null));
+        if (shadowProgramName == null) {
+            NvidiumShadowRenderer.configure(false, 2048, 128.0f);
+            return;
+        }
+        Map<String, String> optionDefines = new LinkedHashMap<>();
+        for (ShaderPackMetadata.Option option : model.options().options()) {
+            optionDefines.put(option.name(), CaustiqConfig.get().option(
+                    CaustiqConfig.get().selectedPackId(), option.name(), option.defaultValue()));
+        }
+        try {
+            IrisNvidiumTerrainTranslator shadowTranslator = IrisNvidiumTerrainTranslator.from(
+                    model, null, shadowProgramName, optionDefines);
+            NvidiumShaderProgramBridge.registerShadowTerrainAdapter(shadowTranslator::adapt);
+        } catch (RuntimeException exception) {
+            NvidiumShadowRenderer.configure(false, 2048, 128.0f);
+            CaustiqClient.LOGGER.warn("Shader pack shadow program '{}' cannot be translated for Nvidium: {}",
+                    shadowProgramName, exception.getMessage());
+            return;
+        }
         int resolution = parseIntegerProperty(model.properties().get("shadowMapResolution"), 2048);
         float distance = parseFloatProperty(model.properties().get("shadowDistance"), 128.0f);
         float distanceMultiplier = parseFloatProperty(
                 model.properties().get("shadowDistanceRenderMul"), 1.0f);
-        NvidiumShadowRenderer.configure(hasShadowTerrain, resolution, distance * distanceMultiplier);
-        if (hasShadowTerrain) {
-            CaustiqClient.LOGGER.info("Prepared isolated Nvidium shadow terrain pipeline ({}px, {:.1f}-block light-space radius).",
-                    Integer.highestOneBit(Math.max(256, Math.min(8192, resolution))), distance * distanceMultiplier);
-        }
+        NvidiumShadowRenderer.configure(true, resolution, distance * distanceMultiplier);
+        CaustiqClient.LOGGER.info("Prepared Iris shadow program '{}' for the isolated Nvidium pipeline ({}px, {:.1f}-block light-space radius).",
+                shadowProgramName, Integer.highestOneBit(Math.max(256, Math.min(8192, resolution))),
+                distance * distanceMultiplier);
     }
-
     private static int parseIntegerProperty(String value, int fallback) {
         if (value == null) return fallback;
         try { return Integer.parseInt(value.trim()); }
@@ -381,7 +401,8 @@ public final class ShaderRuntime {
                 }
                 if (program.group() == ShaderPackProgramCatalog.Group.DEFERRED
                         || program.group() == ShaderPackProgramCatalog.Group.COMPOSITE
-                        || program.group() == ShaderPackProgramCatalog.Group.FINAL) {
+                        || program.group() == ShaderPackProgramCatalog.Group.FINAL
+                        || program.group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE) {
                     Set<String> defines = selectedDefines.entrySet().stream()
                             .map(entry -> entry.getKey() + "=" + entry.getValue())
                             .collect(java.util.stream.Collectors.toUnmodifiableSet());
@@ -403,7 +424,8 @@ public final class ShaderRuntime {
         if (!discoveryFinished || !FabricLoader.getInstance().isModLoaded("nvidium")
                 || activePassPlan == null || IRIS_GL_PROGRAMS.isEmpty()) return;
         boolean hasWorldPasses = activePassPlan.passes().stream().anyMatch(scheduled ->
-                scheduled.pass().group() == ShaderPackProgramCatalog.Group.DEFERRED
+                scheduled.pass().group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE
+                        || scheduled.pass().group() == ShaderPackProgramCatalog.Group.DEFERRED
                         || scheduled.pass().group() == ShaderPackProgramCatalog.Group.COMPOSITE);
         if (!hasWorldPasses || irisPassFailureLogged) return;
         try {
@@ -424,7 +446,8 @@ public final class ShaderRuntime {
     private static void executeFinalPass() {
         if (FabricLoader.getInstance().isModLoaded("nvidium") && activePassPlan != null
                 && activePassPlan.passes().stream().anyMatch(scheduled ->
-                        scheduled.pass().group() == ShaderPackProgramCatalog.Group.DEFERRED
+                        scheduled.pass().group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE
+                                || scheduled.pass().group() == ShaderPackProgramCatalog.Group.DEFERRED
                                 || scheduled.pass().group() == ShaderPackProgramCatalog.Group.COMPOSITE)) return;
         if (postProcessFailureLogged) return;
         CompiledShaderProgram finalProgram = COMPILED.stream()
@@ -567,12 +590,20 @@ public final class ShaderRuntime {
             }
             Set<ShaderPackProgramCatalog.Group> supportedGroups = Set.of(
                     ShaderPackProgramCatalog.Group.GBUFFERS,
+                    ShaderPackProgramCatalog.Group.SHADOW,
+                    ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE,
                     ShaderPackProgramCatalog.Group.DEFERRED,
                     ShaderPackProgramCatalog.Group.COMPOSITE,
                     ShaderPackProgramCatalog.Group.FINAL);
             List<String> unsupportedGroups = catalog.programs().stream()
-                    .filter(program -> !supportedGroups.contains(program.group()))
-                    .map(program -> program.name() + " (" + program.group() + ")").toList();
+                    .filter(program -> !supportedGroups.contains(program.group())
+                            || ((program.group() == ShaderPackProgramCatalog.Group.SHADOW
+                                    || program.group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE)
+                                && (program.stages().size() != 2
+                                    || !program.stages().containsKey(ShaderPackProgramCatalog.Stage.VERTEX)
+                                    || !program.stages().containsKey(ShaderPackProgramCatalog.Stage.FRAGMENT))))
+                    .map(program -> program.name() + " (" + program.group() + ", unsupported stage shape)")
+                    .toList();
             if (!unsupportedGroups.isEmpty()) {
                 CaustiqClient.LOGGER.warn("Shader pack '{}' requires unimplemented Iris pass groups {}; refusing partial execution.",
                         selected.displayName(), unsupportedGroups);
