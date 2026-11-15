@@ -277,7 +277,9 @@ public final class IrisExpression {
             int start = cursor;
             if (!end() && (Character.isLetter(source.charAt(cursor)) || source.charAt(cursor) == '_')) {
                 cursor++;
-                while (!end() && (Character.isLetterOrDigit(source.charAt(cursor)) || source.charAt(cursor) == '_' || source.charAt(cursor) == '.')) cursor++;
+                while (!end() && (Character.isLetterOrDigit(source.charAt(cursor))
+                        || source.charAt(cursor) == '_' || source.charAt(cursor) == '.'
+                        || source.charAt(cursor) == '[' || source.charAt(cursor) == ']')) cursor++;
             }
             return source.substring(start, cursor);
         }
