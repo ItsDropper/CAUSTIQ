@@ -199,7 +199,13 @@ public final class IrisTerrainPassScheduler {
         directives.forEach((key, value) -> {
             Matcher matcher = TARGET_KEY.matcher(key);
             if (!matcher.matches()) return;
-            int index = Integer.parseInt(matcher.group(1));
+            int index;
+            try {
+                index = Integer.parseInt(matcher.group(1));
+            } catch (NumberFormatException ignored) {
+                return; // The parser reports malformed/out-of-range directives.
+            }
+            if (index > 31) return; // Keep unsupported targets diagnostic-only, not fatal to the remaining plan.
             MutableTarget target = mutable.computeIfAbsent(index, MutableTarget::new);
             switch (matcher.group(2).toLowerCase(Locale.ROOT)) {
                 case "format" -> target.format = value;
