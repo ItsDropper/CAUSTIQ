@@ -254,7 +254,7 @@ class IrisTerrainCompatibilityAnalyzerTest {
     }
 
     @Test
-    void doesNotTreatFragmentBindingsAsAvailableInTheVertexStage() {
+    void acceptsNvidiumTextureUnitsAcrossVertexAndFragmentStages() {
         String vertex = """
                 #version 400
                 uniform float viewWidth;
@@ -269,8 +269,9 @@ class IrisTerrainCompatibilityAnalyzerTest {
         var result = analyzer.analyze(vertex, fragment);
         assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNBOUND_UNIFORM")
                 && i.symbol().equals("viewWidth")));
-        assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("UNBOUND_SAMPLER")
-                && i.symbol().equals("gtexture")));
+        assertFalse(result.issues().stream().anyMatch(i -> i.code().equals("UNBOUND_SAMPLER")
+                && i.symbol().equals("gtexture")),
+                "The diffuse atlas is bound to a program texture unit shared by both shader stages.");
     }
 
     @Test
