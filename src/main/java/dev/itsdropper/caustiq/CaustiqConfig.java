@@ -22,6 +22,7 @@ public final class CaustiqConfig {
     private boolean enabled;
     private int compileBudget = 1;
     private String selectedPackId = "";
+    private String selectedOptionName = "";
     private final Map<String, String> options = new LinkedHashMap<>();
 
     private CaustiqConfig() { }
@@ -30,6 +31,7 @@ public final class CaustiqConfig {
     public synchronized boolean enabled() { return enabled; }
     public synchronized int compileBudget() { return compileBudget; }
     public synchronized String selectedPackId() { return selectedPackId; }
+    public synchronized String selectedOptionName() { return selectedOptionName; }
 
     public synchronized String option(String packId, String name, String fallback) {
         return options.getOrDefault(optionKey(packId, name), fallback);
@@ -56,6 +58,13 @@ public final class CaustiqConfig {
 
     public synchronized void selectPack(String packId) {
         selectedPackId = packId == null ? "" : packId;
+        selectedOptionName = "";
+        save();
+    }
+
+    public synchronized void selectOption(String optionName) {
+        selectedOptionName = optionName != null
+                && optionName.matches("[A-Za-z_][A-Za-z0-9_]{0,127}") ? optionName : "";
         save();
     }
 
@@ -87,6 +96,10 @@ public final class CaustiqConfig {
                     MIN_COMPILE_BUDGET, MAX_COMPILE_BUDGET);
             config.selectedPackId = properties.getProperty("selectedPack", "");
             if (config.selectedPackId.length() > 256) config.selectedPackId = "";
+            config.selectedOptionName = properties.getProperty("selectedOption", "");
+            if (!config.selectedOptionName.matches("[A-Za-z_][A-Za-z0-9_]{0,127}")) {
+                config.selectedOptionName = "";
+            }
             for (String key : properties.stringPropertyNames()) {
                 if (key.startsWith("option.") && key.length() <= 300) {
                     String value = properties.getProperty(key, "");
@@ -97,6 +110,7 @@ public final class CaustiqConfig {
             config.enabled = false;
             config.compileBudget = 1;
             config.selectedPackId = "";
+            config.selectedOptionName = "";
             config.options.clear();
         }
         return config;
@@ -107,6 +121,7 @@ public final class CaustiqConfig {
         properties.setProperty("enabled", Boolean.toString(enabled));
         properties.setProperty("compileBudget", Integer.toString(compileBudget));
         properties.setProperty("selectedPack", selectedPackId);
+        properties.setProperty("selectedOption", selectedOptionName);
         new TreeMap<>(options).forEach(properties::setProperty);
         try {
             Files.createDirectories(FILE.getParent());

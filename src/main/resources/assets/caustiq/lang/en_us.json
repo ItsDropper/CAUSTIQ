@@ -13,10 +13,15 @@
   "caustiq.settings.pack_settings_tooltip": "Choose an installed shader pack, rescan the shaderpacks folder, and edit pack-defined options.",
   "caustiq.settings.refresh": "Rescan Shader Packs",
   "caustiq.settings.no_selection": "Select a shader pack above to view its options.",
-  "caustiq.settings.no_options": "This pack does not declare configurable options.",
+  "caustiq.settings.no_options": "No shader options",
   "caustiq.settings.selected_pack": "Selected shader pack",
   "caustiq.settings.selected_pack_tooltip": "Choose the shader pack used by CAUSTIQ. Available packs are discovered in the shaderpacks folder.",
   "caustiq.settings.refresh_tooltip": "Rescan the shaderpacks folder. Reopen Sodium's settings page after the scan completes to refresh the available choices.",
   "caustiq.settings.no_packs": "No shader packs found",
-  "caustiq.settings.select_pack": "Select shader pack"
+  "caustiq.settings.select_pack": "Select shader pack",
+  "caustiq.settings.shader_option": "Shader option",
+  "caustiq.settings.shader_option_tooltip": "Select a setting from the active shader pack.",
+  "caustiq.settings.shader_option_value": "Option value",
+  "caustiq.settings.shader_option_value_tooltip": "Change the selected shader-pack setting.",
+  "caustiq.settings.no_option_values": "No values available"
 }
