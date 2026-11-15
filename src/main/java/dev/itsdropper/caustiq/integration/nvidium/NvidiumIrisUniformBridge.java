@@ -63,6 +63,9 @@ public final class NvidiumIrisUniformBridge {
     public static void upload(Object rasterizer) {
         Snapshot snapshot = CURRENT.get();
         if (snapshot == null || rasterizer == null) return;
+        if (NvidiumShadowRenderer.isShadowRasterization()) {
+            ShaderRuntime.prepareShadowVoxelImage(snapshot.frameCounter());
+        }
         try {
             Field shaderField = rasterizer.getClass().getDeclaredField("shader");
             shaderField.setAccessible(true);
@@ -262,9 +265,6 @@ public final class NvidiumIrisUniformBridge {
         matrix(program, "gbufferPreviousModelView", previous.modelView());
         vector3(program, "previousCameraPosition",
                 previous.cameraX(), previous.cameraY(), previous.cameraZ());
-        if (NvidiumShadowRenderer.isShadowRasterization()) {
-            ShaderRuntime.prepareShadowVoxelImage(snapshot.frameCounter());
-        }
         int timeLocation = GL20C.glGetUniformLocation(program, "frameTimeCounter");
         if (timeLocation >= 0) GL20C.glUniform1f(timeLocation, snapshot.frameTimeCounter());
         int frameLocation = GL20C.glGetUniformLocation(program, "frameCounter");

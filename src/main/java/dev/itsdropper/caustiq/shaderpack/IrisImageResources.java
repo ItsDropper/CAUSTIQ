@@ -106,6 +106,7 @@ final class IrisImageResources implements AutoCloseable {
         if (image != null) {
             GL44C.glClearTexImage(image.texture, 0, image.externalFormat,
                     GL11C.GL_UNSIGNED_BYTE, ByteBuffer.allocateDirect(16));
+        GL42C.glMemoryBarrier(GL42C.GL_TEXTURE_UPDATE_BARRIER_BIT | GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         }
     }
 
@@ -207,26 +208,64 @@ final class IrisImageResources implements AutoCloseable {
     }
 
     private static boolean evaluate(String expression, Map<String, String> defines) throws java.io.IOException {
-        String value = expression.strip();
-        if (value.startsWith("defined(") && value.endsWith(")")) {
-            return enabled(defines, value.substring(8, value.length() - 1).strip());
+        String value = stripOuterParentheses(expression.strip());
+        int split = topLevelOperator(value, "||");
+        if (split >= 0) return evaluate(value.substring(0, split), defines)
+                || evaluate(value.substring(split + 2), defines);
+        split = topLevelOperator(value, "&&");
+        if (split >= 0) return evaluate(value.substring(0, split), defines)
+                && evaluate(value.substring(split + 2), defines);
+        Matcher defined = Pattern.compile("^(!)?\\s*defined\\s*\\(?\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\)?$").matcher(value);
+        if (defined.matches()) {
+            boolean present = enabled(defines, defined.group(2));
+            return defined.group(1) == null ? present : !present;
         }
-        if (value.startsWith("!defined(") && value.endsWith(")")) {
-            return !enabled(defines, value.substring(9, value.length() - 1).strip());
-        }
-        Matcher equality = Pattern.compile("^([A-Za-z_][A-Za-z0-9_]*)\\s*(==|!=)\\s*(-?\\d+)$").matcher(value);
-        if (equality.matches()) {
+        Matcher comparison = Pattern.compile("^([A-Za-z_][A-Za-z0-9_]*)\\s*(==|!=|<=|>=|<|>)\\s*(-?\\d+)$").matcher(value);
+        if (comparison.matches()) {
             int actual;
-            try { actual = Integer.parseInt(defines.getOrDefault(equality.group(1), "0")); }
-            catch (NumberFormatException ex) { throw new java.io.IOException("Non-numeric image conditional macro: " + equality.group(1), ex); }
-            boolean equal = actual == Integer.parseInt(equality.group(3));
-            return equality.group(2).equals("==") == equal;
+            try { actual = Integer.parseInt(defines.getOrDefault(comparison.group(1), "0")); }
+            catch (NumberFormatException ex) { throw new java.io.IOException("Non-numeric image conditional macro: " + comparison.group(1), ex); }
+            int expected = Integer.parseInt(comparison.group(3));
+            return switch (comparison.group(2)) {
+                case "==" -> actual == expected;
+                case "!=" -> actual != expected;
+                case "<" -> actual < expected;
+                case "<=" -> actual <= expected;
+                case ">" -> actual > expected;
+                case ">=" -> actual >= expected;
+                default -> false;
+            };
         }
-        if (value.startsWith("!")) return !enabled(defines, value.substring(1).strip());
+        if (value.startsWith("!")) return !evaluate(value.substring(1), defines);
         if (value.equals("0") || value.equalsIgnoreCase("false")) return false;
         if (value.equals("1") || value.equalsIgnoreCase("true")) return true;
         if (value.matches("[A-Za-z_][A-Za-z0-9_]*")) return enabled(defines, value);
-        throw new java.io.IOException("Unsupported shaders.properties image conditional: " + expression);
+        return false; // Unrelated platform/version conditions are inactive unless explicitly defined.
+    }
+
+    private static String stripOuterParentheses(String value) {
+        while (value.startsWith("(") && value.endsWith(")")) {
+            int depth = 0;
+            boolean wrapsAll = true;
+            for (int i = 0; i < value.length(); i++) {
+                if (value.charAt(i) == '(') depth++;
+                else if (value.charAt(i) == ')') depth--;
+                if (depth == 0 && i < value.length() - 1) { wrapsAll = false; break; }
+            }
+            if (!wrapsAll) break;
+            value = value.substring(1, value.length() - 1).trim();
+        }
+        return value;
+    }
+
+    private static int topLevelOperator(String value, String operator) {
+        int depth = 0;
+        for (int i = 0; i <= value.length() - operator.length(); i++) {
+            if (value.charAt(i) == '(') depth++;
+            else if (value.charAt(i) == ')') depth--;
+            if (depth == 0 && value.startsWith(operator, i)) return i;
+        }
+        return -1;
     }
 
     private static boolean enabled(Map<String, String> defines, String name) {
@@ -331,7 +370,7 @@ final class IrisImageResources implements AutoCloseable {
 
     private record Image(String name, String sampler, int texture, int target, int internalFormat,
                          int externalFormat, int width, int height, int depth) { }
-    private record ImageSpec(String sampler, int externalFormat, int internalFormat, int dataType,
+    record ImageSpec(String sampler, int externalFormat, int internalFormat, int dataType,
                              boolean clear, boolean nearest, int width, int height, int depth) { }
     private record ImageBinding(int unit, int texture, int level, boolean layered, int layer, int access, int format) { }
     private static final class Conditional {

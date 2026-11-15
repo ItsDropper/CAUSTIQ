@@ -260,7 +260,8 @@ public final class NvidiumShadowRenderer {
             } finally {
                 SHADOW_RASTERIZATION.remove();
             }
-            GL42C.glMemoryBarrier(GL42C.GL_FRAMEBUFFER_BARRIER_BIT | GL42C.GL_TEXTURE_FETCH_BARRIER_BIT);
+            GL42C.glMemoryBarrier(GL42C.GL_FRAMEBUFFER_BARRIER_BIT | GL42C.GL_TEXTURE_FETCH_BARRIER_BIT
+                    | GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
             // Iris shadowtex1 is a distinct translucent depth map. Nvidium's
             // command builder emits translucent commands into its own buffer;
