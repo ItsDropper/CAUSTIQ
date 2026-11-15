@@ -57,7 +57,8 @@ assert 'method = "checkIrisShouldDisable"' in iris_mixin
 assert "callbackInfo.setReturnValue(true)" in iris_mixin
 assert "if (NvidiumShaderProgramBridge.hasTerrainAdapter())" in iris_mixin
 assert "nativeSourceAdapter = NvidiumTerrainVaryingAdapter::adapt" in bridge
-assert "hasTerrainAdapter() { return irisTerrainAdapter != null; }" in bridge
+assert "public static boolean hasTerrainAdapter()" in bridge
+assert "primaryTerrainAdapter != null || translucentTerrainAdapter != null" in bridge
 
 # The active Nvidium terrain pipeline is TASK + MESH + FRAGMENT, with mesh
 # outputs consumed by the fragment shader. Keep this check tied to its source.
