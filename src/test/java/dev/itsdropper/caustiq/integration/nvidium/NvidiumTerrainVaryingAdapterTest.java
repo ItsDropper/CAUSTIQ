@@ -64,6 +64,8 @@ class NvidiumTerrainVaryingAdapterTest {
         assertTrue(mesh.contains("vec4 caustiqDecodeTangent(Vertex vertex)"));
         assertTrue(mesh.contains("vec2 caustiqDecodeMidUv(Vertex vertex)"));
         assertTrue(mesh.contains("vec3 caustiqDecodeMidBlock(Vertex vertex)"));
+        assertFalse(java.util.regex.Pattern.compile("\\bpacked\\b").matcher(mesh).find(),
+                "Generated GLSL must not use the reserved layout qualifier token as an identifier");
         assertTrue(mesh.contains("OUT[id].v_tbn = caustiqDecodeTbn(V);"));
         assertEquals("task source", adapted.get("TASK"));
     }

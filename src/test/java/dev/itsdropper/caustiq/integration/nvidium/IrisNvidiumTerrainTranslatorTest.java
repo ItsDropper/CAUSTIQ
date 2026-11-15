@@ -191,6 +191,28 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesMainAndOffHandHeldBlockLightUniformsToSeparateRuntimeValues() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform int heldBlockLightValue;
+                uniform int heldBlockLightValue2;
+                void main() {
+                    gl_FragColor = vec4(float(heldBlockLightValue + heldBlockLightValue2) / 30.0);
+                }
+                """);
+
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform int caustiqHeldBlockLightValue;"));
+        assertTrue(fragment.contains("uniform int caustiqHeldBlockLightValue2;"));
+        assertTrue(fragment.contains("caustiqHeldBlockLightValue + caustiqHeldBlockLightValue2"));
+        assertFalse(fragment.contains("uniform int heldBlockLightValue;"));
+        assertFalse(fragment.contains("uniform int heldBlockLightValue2;"));
+    }
+
+    @Test
     void rejectsIrisHeavyFogWithAnIncorrectUniformType() {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                 translator("""

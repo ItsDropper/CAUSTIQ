@@ -151,6 +151,7 @@ public final class NvidiumIrisUniformBridge {
         integer(program, "caustiqHeavyFog", isHeavyFog() ? 1 : 0);
         integer(program, "caustiqIsElytraFlying", isElytraFlying() ? 1 : 0);
         integer(program, "caustiqHeldBlockLightValue", heldBlockLightValue());
+        integer(program, "caustiqHeldBlockLightValue2", heldBlockLightValue(InteractionHand.OFF_HAND));
         integer(program, "caustiqColortex1", 5);
         integer(program, "caustiqColortex2", 6);
         integer(program, "caustiqColortex4", 7);
@@ -166,13 +167,13 @@ public final class NvidiumIrisUniformBridge {
      * Iris adds getLightEmission(Player, ItemStack) to items through its item-light
      * provider interface; reflection keeps CAUSTIQ independent of an Iris runtime dependency.
      */
-    private static int heldBlockLightValue() {
+    private static int heldBlockLightValue(InteractionHand hand) {
         Object player = Minecraft.getInstance().player;
         if (player == null) return 0;
         try {
             Object stack = player.getClass()
                     .getMethod("getItemInHand", InteractionHand.class)
-                    .invoke(player, InteractionHand.MAIN_HAND);
+                    .invoke(player, hand);
             if (!(stack instanceof ItemStack itemStack)) return 0;
             Object item = itemStack.getItem();
             if (item == null) return 0;

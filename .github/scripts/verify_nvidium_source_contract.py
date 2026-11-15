@@ -171,6 +171,11 @@ assert 'integer(program, "caustiqHeldBlockLightValue", heldBlockLightValue())' i
 assert '"getLightEmission"' in uniform_bridge and "InteractionHand.MAIN_HAND" in uniform_bridge
 assert "BlockItemStateProperties properties" in uniform_bridge
 assert "properties.apply(state)" in uniform_bridge and "state.getLightEmission()" in uniform_bridge
+assert 'Map.entry("heldBlockLightValue2", "caustiqHeldBlockLightValue2")' in translator
+assert "uniform int caustiqHeldBlockLightValue2;" in translator
+assert 'integer(program, "caustiqHeldBlockLightValue2", heldBlockLightValue(InteractionHand.OFF_HAND))' in uniform_bridge
+assert "private static int heldBlockLightValue(InteractionHand hand)" in uniform_bridge
+assert "packedBlockEntityId" in adapter and "packedTangentAngle" in adapter
 for field in ("blockId", "normalTangent", "midpointUv", "midBlock", "nvidiumMaterial"):
     assert field in vertex_encoder
 format_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumExtendedVertexFormatMixin.java").read_text(encoding="utf-8")
