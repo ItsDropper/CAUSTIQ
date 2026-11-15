@@ -38,7 +38,7 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 in vec4 tint;
                 uniform sampler2D gtexture;
                 layout(location = 0) out vec4 gbuffer0;
-                layout(location = 1) out vec4 gbuffer1;
+                layout(location = 8) out vec4 gbuffer1;
                 void main() {
                     gbuffer0 = texture(gtexture, gl_TexCoord[0].xy) * tint;
                     gbuffer1 = vec4(normalize(scene_pos), 1.0);
@@ -185,7 +185,7 @@ class IrisTerrainCompatibilityAnalyzerTest {
         String fragment = """
                 #version 400
                 in vec2 sharedValue;
-                layout(location = 1) out highp vec4 normalTarget;
+                layout(location = 8) out highp vec4 normalTarget;
                 void main() { normalTarget = vec4(sharedValue, 0.0, 1.0); }
                 """;
         var result = analyzer.analyze(vertex, fragment);
@@ -309,12 +309,12 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 #version 400
                 void main() {
                     gl_FragData[0] = vec4(1.0);
-                    gl_FragData[1] = vec4(0.0);
+                    gl_FragData[8] = vec4(0.0);
                 }
                 """;
         var result = analyzer.analyze(vertex, multiple);
         assertTrue(result.issues().stream().anyMatch(i ->
-                i.code().equals("MULTIPLE_RENDER_TARGETS") && i.symbol().equals("gl_FragData[1]")));
+                i.code().equals("MULTIPLE_RENDER_TARGETS") && i.symbol().equals("gl_FragData[8]")));
     }
 
     @Test
