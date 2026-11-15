@@ -14,6 +14,9 @@ class IrisBlockPropertiesParserTest {
                 block.1=minecraft:stone minecraft:granite
                 block.7=minecraft:oak_log:axis=y
                 block.9=minecraft:oak_log[axis=x]
+                block.11=oak_sign
+                block.12=oak_log:axis=z
+                block.13=oak_sign[rotation=4]
                 """);
 
         assertEquals(1, result.get("minecraft:stone"));
@@ -21,6 +24,9 @@ class IrisBlockPropertiesParserTest {
         assertEquals(7, result.get("minecraft:oak_log[axis=y]"));
         assertEquals(9, result.get("minecraft:oak_log[axis=x]"));
         assertFalse(result.containsKey("minecraft:oak_log"));
+        assertEquals(11, result.get("minecraft:oak_sign"));
+        assertEquals(12, result.get("minecraft:oak_log[axis=z]"));
+        assertEquals(13, result.get("minecraft:oak_sign[rotation=4]"));
     }
 
     @Test
