@@ -109,6 +109,11 @@ public final class IrisShaderPackParser {
         Map<String, String> renderTargets = select(properties, "colortex", null);
 
         List<String> diagnostics = new ArrayList<>();
+        Map<String, String> defaultDefines = new LinkedHashMap<>();
+        for (ShaderPackMetadata.Option option : metadata.options()) {
+            defaultDefines.put(option.name(), option.defaultValue());
+        }
+        IrisGlslConditionalPreprocessor conditionalPreprocessor = new IrisGlslConditionalPreprocessor();
         IrisTerrainCompatibilityAnalyzer terrainAnalyzer = new IrisTerrainCompatibilityAnalyzer();
         for (Map.Entry<String, Map<String, Map<ShaderPackProgramCatalog.Stage, String>>> inventory
                 : inventories.entrySet()) {
@@ -132,8 +137,27 @@ public final class IrisShaderPackParser {
 
                 String vertexPath = terrainStages.get(ShaderPackProgramCatalog.Stage.VERTEX);
                 String fragmentPath = terrainStages.get(ShaderPackProgramCatalog.Stage.FRAGMENT);
+                Map<String, String> terrainDefines = new LinkedHashMap<>(defaultDefines);
+                terrainDefines.put("PROGRAM_" + programName.toUpperCase(Locale.ROOT), "1");
+                terrainDefines.put("IS_IRIS", "1");
+                terrainDefines.put("MC_VERSION", "12111");
+                terrainDefines.put("MC_HAND_DEPTH", "1.0");
+                terrainDefines.put("vsh", "1");
+                terrainDefines.put("fsh", "1");
+                if (inventory.getKey().equals("world0")) {
+                    terrainDefines.put("WORLD_OVERWORLD", "1");
+                    terrainDefines.put("OVERWORLD", "1");
+                } else if (inventory.getKey().equals("world-1")) {
+                    terrainDefines.put("WORLD_NETHER", "1");
+                    terrainDefines.put("NETHER", "1");
+                } else if (inventory.getKey().equals("world1")) {
+                    terrainDefines.put("WORLD_END", "1");
+                    terrainDefines.put("END", "1");
+                }
+                String activeVertex = conditionalPreprocessor.preprocess(preprocessed.get(vertexPath), terrainDefines);
+                String activeFragment = conditionalPreprocessor.preprocess(preprocessed.get(fragmentPath), terrainDefines);
                 IrisTerrainCompatibilityAnalyzer.Result terrainCompatibility = terrainAnalyzer.analyze(
-                        preprocessed.get(vertexPath), preprocessed.get(fragmentPath));
+                        activeVertex, activeFragment);
                 terrainCompatibility.issues().forEach(issue ->
                         diagnostics.add("Nvidium " + scope + programName + " ABI: " + issue));
             }
