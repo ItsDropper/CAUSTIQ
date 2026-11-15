@@ -56,10 +56,12 @@ public final class IrisBlockPropertiesParser {
             int namespaceSeparator = value.indexOf(':');
             int selectorSeparator = namespaceSeparator < 0
                     ? -1 : value.indexOf(':', namespaceSeparator + 1);
-            if (namespaceSeparator < 0) {
-                // OptiFine/Iris block.properties accepts vanilla shorthand such as
-                // oak_sign and oak_log:axis=y; treat its first colon as a state selector.
-                selectorSeparator = value.indexOf(':');
+            if (selectorSeparator < 0 && namespaceSeparator >= 0
+                    && value.substring(namespaceSeparator + 1).contains("=")) {
+                // OptiFine/Iris also accepts vanilla shorthand selectors such as
+                // oak_log:axis=y. A single colon followed by a property assignment
+                // is a selector, not a namespace separator.
+                selectorSeparator = namespaceSeparator;
             }
             if (selectorSeparator >= 0) {
                 propertyText = value.substring(selectorSeparator + 1);
