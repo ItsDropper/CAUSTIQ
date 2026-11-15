@@ -314,10 +314,10 @@ public final class IrisTerrainPassScheduler {
     }
 
     private static int numericSuffix(String name) {
-        Matcher matcher = NUMBERED_PROGRAM.matcher(name);
-        if (!matcher.matches()) return 0;
-        try { return Integer.parseInt(matcher.group(2)); }
-        catch (NumberFormatException ignored) { return 0; }
+        Matcher matcher = Pattern.compile("^(?:deferred|composite|setup|begin|prepare|shadowcomp)(\\d+)").matcher(name);
+        if (!matcher.find()) return 0;
+        try { return Integer.parseInt(matcher.group(1)); }
+        catch (NumberFormatException ignored) { return Integer.MAX_VALUE; }
     }
 
     private static final class MutableTarget {
