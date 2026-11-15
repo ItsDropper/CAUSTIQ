@@ -711,11 +711,17 @@ public final class NvidiumShadowRenderer {
 
         private float readSunAngle() {
             Minecraft minecraft = Minecraft.getInstance();
-            return minecraft.level == null ? 0.0f : minecraft.level.getSunAngle(1.0f);
+            if (minecraft.level == null) return 0.0f;
+            float time = (minecraft.level.getDayTime() % 24_000L) / 24_000.0f - 0.25f;
+            if (time < 0.0f) time += 1.0f;
+            if (time > 1.0f) time -= 1.0f;
+            float eased = 1.0f - (float) ((Math.cos(time * Math.PI) + 1.0) * 0.5);
+            return (time + (eased - time) / 3.0f) * ((float) Math.PI * 2.0f);
         }
 
         private int[] atlasSize() {
-            var atlas = Minecraft.getInstance().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
+            TextureAtlas atlas = (TextureAtlas) Minecraft.getInstance().getTextureManager()
+                    .getTexture(TextureAtlas.LOCATION_BLOCKS);
             return new int[]{atlas.getWidth(), atlas.getHeight()};
         }
 
