@@ -95,7 +95,11 @@ class IrisTerrainPassSchedulerTest {
             IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
 
             assertEquals(java.util.Set.of(0, 3, 7), plan.passes().get(0).pass().writes());
+            assertEquals(java.util.Map.of(0, 0, 1, 3, 2, 7),
+                    plan.passes().get(0).pass().outputTargets());
             assertEquals(java.util.Set.of(3, 5), plan.passes().get(1).pass().writes());
+            assertEquals(java.util.Map.of(0, 3, 1, 5),
+                    plan.passes().get(1).pass().outputTargets());
         }
     }
 
