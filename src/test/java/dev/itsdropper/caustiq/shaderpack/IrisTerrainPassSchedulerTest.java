@@ -137,7 +137,7 @@ class IrisTerrainPassSchedulerTest {
                 void main() {
                     first = vec4(1.0);
                     #ifdef EXTRA_OUTPUT
-                    second = vec4(0.5);
+                    second.xy = vec2(0.5);
                     #endif
                 }
                 """);

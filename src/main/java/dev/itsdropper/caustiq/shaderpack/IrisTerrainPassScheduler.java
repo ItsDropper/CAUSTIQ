@@ -192,7 +192,7 @@ public final class IrisTerrainPassScheduler {
 
     private static boolean isAssigned(String source, String variable) {
         Pattern assignment = Pattern.compile("\\b" + Pattern.quote(variable)
-                + "\\s*(?:\\[[^]]+])?\\s*(?:[+*/-]?=|\\+\\+|--)");
+                + "\\s*(?:\\[[^]]+])?(?:\\.[xyzwrgba]{1,4})?\\s*(?:[+*/-]?=|\\+\\+|--)");
         return assignment.matcher(source).find();
     }
 
