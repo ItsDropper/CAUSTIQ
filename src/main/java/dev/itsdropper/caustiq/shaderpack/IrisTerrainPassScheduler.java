@@ -46,6 +46,10 @@ public final class IrisTerrainPassScheduler {
         List<Pass> passes = new ArrayList<>();
 
         for (IrisShaderPackModel.Program program : programSet.programs().values()) {
+            // Colorwheel owns clrwl_* entry points and invokes them for Flywheel's
+            // instanced geometry. They are not Iris world passes; executing them
+            // through Nvidium's terrain pipeline would be incorrect.
+            if (program.name().toLowerCase(Locale.ROOT).startsWith("clrwl_")) continue;
             ShaderPackProgramCatalog.Group group = ShaderPackProgramCatalog.Group.classify(program.name());
             if (group == ShaderPackProgramCatalog.Group.UNKNOWN) {
                 if (program.name().startsWith("dh_")) {
