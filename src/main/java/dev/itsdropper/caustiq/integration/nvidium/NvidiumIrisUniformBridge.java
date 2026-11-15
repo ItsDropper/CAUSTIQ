@@ -731,27 +731,41 @@ public final class NvidiumIrisUniformBridge {
         putScalar(values, "cloudHeight", invokeDouble(effects, "cloudHeight", 192.0));
     }
 
-    private static void putBiomeIdentity(java.util.Map<String, Double> values, Object biome) {
-        if (biome == null) return;
+    private static void putBiomeIdentity(java.util.Map<String, Double> values, Object biomeHolder) {
+        if (biomeHolder == null) return;
         try {
-            int id = BuiltInRegistries.BIOME.getId((net.minecraft.world.level.biome.Biome) biome);
-            putScalar(values, "biome", id);
-            var key = BuiltInRegistries.BIOME.getKey((net.minecraft.world.level.biome.Biome) biome);
-            String path = key == null ? "" : key.getPath().toLowerCase(java.util.Locale.ROOT);
-            int category = biomeCategory(path);
-            putScalar(values, "biome_category", category);
-            for (net.minecraft.world.level.biome.Biome registered : BuiltInRegistries.BIOME) {
-                var registeredKey = BuiltInRegistries.BIOME.getKey(registered);
-                if (registeredKey != null) {
-                    values.put("BIOME_" + registeredKey.getPath().toUpperCase(java.util.Locale.ROOT),
-                            (double) BuiltInRegistries.BIOME.getId(registered));
+            Object keyOptional = invokeObject(biomeHolder, "unwrapKey");
+            Object resourceKey = keyOptional instanceof java.util.Optional<?> optional ? optional.orElse(null) : null;
+            Object location = invokeObject(resourceKey, "location");
+            String path = String.valueOf(invokeObject(location, "getPath"))
+                    .toLowerCase(java.util.Locale.ROOT);
+            // Iris uses a pack-specific biome ID map. CAUSTIQ currently supplies a stable
+            // equality ID for the active biome and resolves all registered BIOME_* symbols.
+            Object registryAccess = invokeObject(Minecraft.getInstance().level, "registryAccess");
+            Class<?> registries = Class.forName("net.minecraft.core.registries.Registries");
+            Object biomeRegistryKey = registries.getField("BIOME").get(null);
+            Object registry = invokeCompatible(registryAccess, "registryOrThrow", biomeRegistryKey);
+            if (registry instanceof Iterable<?> entries) {
+                for (Object registered : entries) {
+                    Object registeredKey = invokeCompatible(registry, "getKey", registered);
+                    String registeredPath = String.valueOf(invokeObject(registeredKey, "getPath"));
+                    Object idValue = invokeCompatible(registry, "getId", registered);
+                    if (idValue instanceof Number id) {
+                        values.put("BIOME_" + registeredPath.toUpperCase(java.util.Locale.ROOT),
+                                (double) id.intValue());
+                    }
                 }
             }
+            Object currentBiome = invokeObject(biomeHolder, "value");
+            Object currentId = invokeCompatible(registry, "getId", currentBiome);
+            int id = currentId instanceof Number number ? number.intValue() : 0;
+            putScalar(values, "biome", id);
+            putScalar(values, "biome_category", biomeCategory(path));
             if (path.equals("pale_garden")) values.put("BIOME_PALE_GARDEN", (double) id);
             Object precipitation = precipitationAt(Minecraft.getInstance().level,
                     Minecraft.getInstance().player);
             putScalar(values, "biome_precipitation", precipitationCode(precipitation));
-        } catch (RuntimeException ignored) {
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
             // Keep the complete, typed default set when registry state is unavailable.
         }
     }
@@ -780,8 +794,7 @@ public final class NvidiumIrisUniformBridge {
         if (level == null || player == null) return null;
         try {
             Object position = invokeObject(player, "blockPosition");
-            Object holder = invokeCompatible(level, "getBiome", position);
-            return invokeObject(holder, "value");
+            return invokeCompatible(level, "getBiome", position);
         } catch (ReflectiveOperationException | RuntimeException ignored) {
             return null;
         }
@@ -971,6 +984,13 @@ public final class NvidiumIrisUniformBridge {
 
     private static void putScalar(java.util.Map<String, Double> values, String name, double value) {
         values.put(name, Double.isFinite(value) ? value : 0.0);
+    }
+
+    private static void putVector3(java.util.Map<String, Double> values, String name, double[] components) {
+        putVector3(values, name,
+                components.length > 0 ? components[0] : 0.0,
+                components.length > 1 ? components[1] : 0.0,
+                components.length > 2 ? components[2] : 0.0);
     }
 
     private static void putVector2(java.util.Map<String, Double> values, String name, double x, double y) {
