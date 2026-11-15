@@ -150,8 +150,8 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         NvidiumIrisUniformBridge.uploadProgram(program.programId());
         resources.uploadUniforms(program.programId(),
                 NvidiumIrisUniformBridge.expressionVariables(width, height));
-        resources.bindProgramImages(program.programId(), program.images());
         try {
+            resources.bindProgramImages(program.programId(), program.images());
             int[] groups = resources.computeDispatchGroups(program);
             for (int axis = 0; axis < 3; axis++) {
                 int maximum = GL30C.glGetIntegeri(GL43C.GL_MAX_COMPUTE_WORK_GROUP_COUNT, axis);
