@@ -157,6 +157,10 @@ assert 'Map.entry("noisetex", "caustiqNoiseTexture")' in translator
 assert "layout(binding = 2) uniform sampler2D caustiqNoiseTexture;" in translator
 assert "NvidiumIrisTextureBridge.bindForTerrain()" in uniform_bridge
 assert 'Map.entry("isElytraFlying", "caustiqIsElytraFlying")' in translator
+assert 'Map.entry("isEyeInWater", "caustiqIsEyeInWater")' in translator
+assert "uniform int caustiqIsEyeInWater;" in translator
+assert 'integer(program, "caustiqIsEyeInWater", isEyeInWater())' in uniform_bridge
+assert 'case "WATER" -> 1;' in uniform_bridge and 'case "LAVA" -> 2;' in uniform_bridge and 'case "POWDER_SNOW" -> 3;' in uniform_bridge
 assert 'uniform bool caustiqIsElytraFlying;' in translator
 assert 'integer(program, "caustiqIsElytraFlying", isElytraFlying() ? 1 : 0)' in uniform_bridge
 assert 'invokeBoolean(Minecraft.getInstance().player, "isFallFlying", false)' in uniform_bridge
@@ -191,8 +195,10 @@ format_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/Nvidi
 stride_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumRepackagedStrideMixin.java").read_text(encoding="utf-8")
 assert "NvidiumIrisChunkVertex.INSTANCE" in format_mixin
 assert "NvidiumIrisChunkVertex.STRIDE" in stride_mixin
-assert "@Redirect(" in stride_mixin and "CompactChunkVertex;STRIDE:I" in stride_mixin
-assert "NvidiumIrisChunkVertex.STRIDE" in stride_mixin, "copyQuad must multiply the extended 40-byte vertex stride by four vertices"
+assert "@ModifyConstant(" in stride_mixin, "copyQuad stride constants must be modified after javac inlines the static final fields"
+assert "@Constant(intValue = 80)" in stride_mixin and "@Constant(intValue = 64)" in stride_mixin
+assert "NvidiumIrisChunkVertex.STRIDE * 4" in stride_mixin, "copyQuad must copy four extended 40-byte vertices"
+assert "@Redirect(" not in stride_mixin, "Compile-time STRIDE constants cannot be redirected as field reads"
 world_renderer = source("src/main/java/me/cortex/nvidium/NvidiumWorldRenderer.java")
 world_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumWorldRendererMixin.java").read_text(encoding="utf-8")
 assert "new SectionManager(device, max_geometry_memory*1024*1024, uploadStream" in world_renderer
@@ -214,4 +220,6 @@ assert "decodeVertexUV" in sodium_vertex_format and "decodeLightUV" in sodium_ve
 assert "mat4 MVP;" in scene and "vec4 fogColour;" in scene and "vec2 screenSize;" in scene
 assert "NvidiumTerrainVaryingAdapter.class" in (caustiq_root / ".github/workflows/build.yml").read_text(encoding="utf-8")
 
+block_parser = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/IrisBlockPropertiesParser.java").read_text(encoding="utf-8")
+assert 'if (!value.contains(":")) value = "minecraft:" + value;' in block_parser
 print("Nvidium source contract verified: compile hook, Iris gate, packed vertex format, scene uniforms, sampler bindings, and varying ABI.")
