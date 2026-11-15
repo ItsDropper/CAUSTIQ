@@ -172,6 +172,25 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesIrisEyeInWaterIntegerToTheRuntimeCameraFluidUniform() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform int isEyeInWater;
+                void main() {
+                    gl_FragColor = vec4(float(isEyeInWater));
+                }
+                """);
+
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform int caustiqIsEyeInWater;"));
+        assertTrue(fragment.contains("float(caustiqIsEyeInWater)"));
+        assertFalse(fragment.contains("uniform int isEyeInWater;"));
+    }
+
+    @Test
     void translatesHeldBlockLightValueToTheIrisItemLightRuntimeUniform() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150
