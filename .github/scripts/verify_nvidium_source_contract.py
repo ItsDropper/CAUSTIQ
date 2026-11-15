@@ -129,7 +129,11 @@ assert "photonUniformDeclarations()" in translator
 assert 'Map.entry("noisetex", "caustiqNoiseTexture")' in translator
 assert "layout(binding = 2) uniform sampler2D caustiqNoiseTexture;" in translator
 assert "NvidiumIrisTextureBridge.bindForTerrain()" in uniform_bridge
-assert "GL_TEXTURE2" in texture_bridge and "GL_TEXTURE3" in texture_bridge and "GL_TEXTURE4" in texture_bridge
+assert "GL_TEXTURE2" in texture_bridge and "GL_TEXTURE5" in texture_bridge
+assert "NvidiumGBufferTargets.texture(1)" in texture_bridge
+assert "NvidiumGBufferTargets.texture(2)" in texture_bridge
+assert "NvidiumGBufferTargets.texture(4)" in texture_bridge
+assert "noiseTexture, noiseTexture" not in texture_bridge, "Unavailable Iris samplers must not receive dummy noise textures"
 vertex_encoder = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
 assert "STRIDE = 40" in vertex_encoder
 assert "ColorARGB.mulRGB(color, brightness)" in vertex_encoder
