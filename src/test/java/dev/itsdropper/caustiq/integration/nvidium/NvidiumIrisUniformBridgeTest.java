@@ -56,7 +56,18 @@ class NvidiumIrisUniformBridgeTest {
                 "gl_ProjectionMatrixInverse.0.0", "gl_ModelViewProjectionMatrix.0.0",
                 "gl_NormalMatrix.0.0", "CAT_DESERT", "CAT_MESA", "CAT_SAVANNA",
                 "CAT_ICY", "CAT_TAIGA", "CAT_JUNGLE", "CAT_SWAMP", "PPT_NONE",
-                "PPT_RAIN", "PPT_SNOW", "BIOME_PALE_GARDEN"
+                "PPT_RAIN", "PPT_SNOW", "BIOME_PALE_GARDEN", "chunkFadeTimeInv",
+                "seaLevel", "cloudTime", "heavyFog", "inSwimmingAnimation",
+                "heldBlockLightColor.x", "heldBlockLightColor2.z", "dhProjection.0.0",
+                "dhProjectionInverse.0.0", "dhPreviousProjection.0.0",
+                "dhPreviousProjectionInverse.0.0", "iris_ModelViewMatrix.0.0",
+                "iris_ProjectionMatrix.0.0", "iris_NormalMatrix.0.0",
+                "u_ModelViewProjectionMatrix.0.0", "iris_TextureMat.0.0",
+                "iris_ModelViewMat.0.0", "iris_ProjMat.0.0", "iris_NormalMat.0.0",
+                "iris_FogStart", "iris_FogEnd", "iris_FogDensity", "iris_FogColor.r",
+                "iris_ColorModulator.a", "iris_TextureScale", "iris_GlintAlpha",
+                "iris_ModelScale.x", "iris_ModelOffset.x", "iris_CameraTranslation.x",
+                "u_RegionOffset.z"
         };
         for (String name : required) {
             assertTrue(values.containsKey(name), "Missing Iris expression symbol: " + name);
