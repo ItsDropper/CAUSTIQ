@@ -319,6 +319,8 @@ public final class IrisNvidiumTerrainTranslator {
         source.append(photonUniformDeclarations())
                 .append("Vertex caustiqCurrentVertex;\n")
                 .append("uint caustiqCurrentVertexId;\n")
+                .append("vec3 caustiqCurrentOrigin;\n")
+                .append("mat4 caustiqCurrentTransform;\n")
                 .append("vec4 caustiqIrisClipPosition;\n")
                 .append("vec4 caustiqIrisTexCoord[8];\n");
         for (Varying varying : varyings) {
@@ -342,6 +344,8 @@ public final class IrisNvidiumTerrainTranslator {
         StringBuilder invocation = new StringBuilder();
         invocation.append("    caustiqCurrentVertex = V;\n")
                 .append("    caustiqCurrentVertexId = id;\n")
+                .append("    caustiqCurrentOrigin = origin;\n")
+                .append("    caustiqCurrentTransform = transformMat;\n")
                 .append("    caustiqIrisTexCoord[0] = vec4(decodeVertexUV(V), 0.0, 1.0);\n")
                 .append("    caustiqIrisTexCoord[1] = vec4(decodeLightUV(V), 0.0, 1.0);\n")
                 .append("    caustiqIrisClipPosition = gl_MeshVerticesNV[id].gl_Position;\n");
