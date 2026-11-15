@@ -17,6 +17,7 @@ import org.lwjgl.opengl.GL30C;
 import org.lwjgl.opengl.GL33C;
 import org.lwjgl.opengl.GL42C;
 import org.lwjgl.opengl.GL43C;
+import org.lwjgl.opengl.GL40C;
 import org.lwjgl.opengl.GL45C;
 import org.lwjgl.opengl.NVRepresentativeFragmentTest;
 import org.lwjgl.opengl.NVUniformBufferUnifiedMemory;
@@ -258,6 +259,7 @@ public final class NvidiumShadowRenderer {
             GL11C.glDepthMask(true);
             SHADOW_RASTERIZATION.set(Boolean.TRUE);
             try {
+                bindIndirectBuffer(state.terrainCommands);
                 invoke(state.shadowRasterizer, "raster",
                         terrainPass, regionCount, address(state.terrainCommands), terrainSampler);
             } finally {
@@ -278,6 +280,7 @@ public final class NvidiumShadowRenderer {
             GL11C.glColorMask(false, false, false, false);
             SHADOW_RASTERIZATION.set(Boolean.TRUE);
             try {
+                bindIndirectBuffer(state.translucencyCommands);
                 invoke(state.translucentShadowRasterizer, "raster",
                         terrainPass, regionCount, address(state.translucencyCommands), terrainSampler);
             } finally {
@@ -295,6 +298,19 @@ public final class NvidiumShadowRenderer {
             disableUnifiedBuffers();
             previous.restore();
         }
+    }
+
+    /**
+     * Nvidium's rasterizers issue indirect draws through the core draw-indirect
+     * target as well as using NV unified addresses. Each isolated shadow pass
+     * owns a different command buffer, so bind that buffer explicitly.
+     */
+    private static void bindIndirectBuffer(Object buffer) throws ReflectiveOperationException {
+        int bufferId = ((Number) invoke(buffer, "getId")).intValue();
+        if (bufferId == 0) {
+            throw new IllegalStateException("Nvidium shadow command buffer has no GL object.");
+        }
+        GL40C.glBindBuffer(GL40C.GL_DRAW_INDIRECT_BUFFER, bufferId);
     }
 
     private static void enableUnifiedBuffers() {
@@ -947,7 +963,7 @@ public final class NvidiumShadowRenderer {
             boolean depthTest, boolean blend, boolean cull, boolean scissor,
             boolean representative, int depthFunction, boolean depthMask,
             boolean[] colorMask, int activeTexture, int[] textureBindings, int[] samplerBindings,
-            int program, int vertexArray, float clearDepth) {
+            int program, int vertexArray, int drawIndirectBuffer, float clearDepth) {
         private static GlState capture() {
             int[] viewport = new int[4];
             try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -985,6 +1001,7 @@ public final class NvidiumShadowRenderer {
                     active, textureBindings, samplerBindings,
                     GL11C.glGetInteger(GL20C.GL_CURRENT_PROGRAM),
                     GL11C.glGetInteger(GL30C.GL_VERTEX_ARRAY_BINDING),
+                    GL11C.glGetInteger(GL40C.GL_DRAW_INDIRECT_BUFFER_BINDING),
                     GL11C.glGetFloat(GL11C.GL_DEPTH_CLEAR_VALUE));
         }
 
@@ -1002,6 +1019,7 @@ public final class NvidiumShadowRenderer {
             GL11C.glClearDepth(clearDepth);
             GL20C.glUseProgram(program);
             GL30C.glBindVertexArray(vertexArray);
+            GL40C.glBindBuffer(GL40C.GL_DRAW_INDIRECT_BUFFER, drawIndirectBuffer);
             GL11C.glColorMask(colorMask[0], colorMask[1], colorMask[2], colorMask[3]);
             for (int i = 0; i < 2; i++) {
                 GlStateManager._activeTexture(GL13C.GL_TEXTURE0 + i);
