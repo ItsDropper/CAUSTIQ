@@ -2,8 +2,12 @@ package dev.itsdropper.caustiq.shaderpack;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import java.io.IOException;
 import java.util.Map;
@@ -11,6 +15,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class IrisImageResourcesTest {
+    @TempDir Path temporaryDirectory;
     @Test
     void selectsConditionalPhotonLpvImageSizesFromShaderOptions() throws IOException {
         String properties = """
@@ -67,6 +72,10 @@ class IrisImageResourcesTest {
             assertTrue(plan.passes().stream().filter(pass ->
                     pass.pass().name().equals("setup") || pass.pass().name().equals("shadowcomp"))
                     .allMatch(pass -> pass.pass().compute()));
+            assertTrue(plan.orderedProgramNames().indexOf("setup")
+                    < plan.orderedProgramNames().indexOf("shadow"), plan.orderedProgramNames().toString());
+            assertTrue(plan.orderedProgramNames().indexOf("shadow")
+                    < plan.orderedProgramNames().indexOf("shadowcomp"), plan.orderedProgramNames().toString());
 
             Map<String, IrisImageResources.ImageSpec> images =
                     IrisImageResources.parse(sources.read("shaders.properties"), defines);
@@ -83,8 +92,55 @@ class IrisImageResourcesTest {
             assertTrue(setup.contains("light_data_img"));
             assertTrue(shadowcomp.contains("voxel_sampler"));
             assertTrue(shadowcomp.contains("light_img_a"));
-            assertTrue(shadowcomp.contains("gl_GlobalInvocationID"));
+            assertTrue(shadowcomp.contains("gl_GlobalInvocationID.x"));
+            assertTrue(shadowcomp.contains("gl_GlobalInvocationID.y"));
+            assertTrue(shadowcomp.contains("gl_GlobalInvocationID.z"));
+
+            assertArrayEquals(new int[]{1, 1, 1},
+                    IrisImageResources.calculateDispatchGroups(images, Set.of("light_data_img"),
+                            48, 1, 1, false, false));
+            assertArrayEquals(new int[]{4, 128, 128},
+                    IrisImageResources.calculateDispatchGroups(images,
+                            Set.of("voxel_img", "light_img_a", "light_img_b"),
+                            32, 1, 1, true, true));
+
+            String voxelFragment = preprocessor.preprocess(
+                    "world0/shadow_voxels.fsh", sources::read).source();
+            assertTrue(voxelFragment.contains("voxel_img"), "Photon shadow voxel pass must write voxel_img");
+            assertTrue(voxelFragment.contains("imageStore"), "Photon shadow voxel pass must write its voxel image");
+
+            compilePhotonCompute("setup", setup, defines);
+            compilePhotonCompute("shadowcomp", shadowcomp, defines);
         }
+    }
+
+    private void compilePhotonCompute(String name, String source, Map<String, String> defines)
+            throws IOException {
+        String validator = System.getenv("GLSLANG_VALIDATOR");
+        Assumptions.assumeTrue(validator != null && !validator.isBlank(),
+                "CI supplies GLSLANG_VALIDATOR to compile the pinned Photon compute stages.");
+        int versionEnd = source.indexOf('\n', source.indexOf("#version"));
+        assertTrue(versionEnd >= 0, name + " compute shader must declare its GLSL version.");
+        StringBuilder defineBlock = new StringBuilder();
+        defines.forEach((key, value) -> defineBlock.append("#define ").append(key).append(' ')
+                .append(value).append('\n'));
+        Path shader = temporaryDirectory.resolve("photon-" + name + ".comp");
+        Files.writeString(shader, source.substring(0, versionEnd + 1) + defineBlock
+                + source.substring(versionEnd + 1));
+        Process process = new ProcessBuilder(validator, "-S", "comp", shader.toString())
+                .redirectErrorStream(true).start();
+        String output;
+        try {
+            if (!process.waitFor(45, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                fail("glslangValidator timed out compiling Photon " + name + ".");
+            }
+            output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while compiling Photon " + name + ".", exception);
+        }
+        assertEquals(0, process.exitValue(), "Photon " + name + " compute shader failed GLSL validation:\n" + output);
     }
 
     @Test

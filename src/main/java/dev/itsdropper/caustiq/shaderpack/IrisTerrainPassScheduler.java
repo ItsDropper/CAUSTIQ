@@ -53,15 +53,21 @@ public final class IrisTerrainPassScheduler {
             if (enabled == null) enabled = model.conditionalPrograms().get(program.name());
             if (enabled != null && !evaluateEnabled(enabled, defines)) continue;
 
-            String vertex = source(model, program, ShaderPackProgramCatalog.Stage.VERTEX);
-            String fragment = source(model, program, ShaderPackProgramCatalog.Stage.FRAGMENT);
-            String compute = source(model, program, ShaderPackProgramCatalog.Stage.COMPUTE);
+            String vertex = source(model, program, ShaderPackProgramCatalog.Stage.VERTEX, defines);
+            String fragment = source(model, program, ShaderPackProgramCatalog.Stage.FRAGMENT, defines);
+            String compute = source(model, program, ShaderPackProgramCatalog.Stage.COMPUTE, defines);
             Set<Integer> reads = new LinkedHashSet<>();
             Set<Integer> writes = new LinkedHashSet<>();
             collectTargets(vertex, reads);
             collectTargets(fragment, reads);
             collectTargets(compute, reads);
-            Map<Integer, Integer> outputTargets = collectOutputs(fragment);
+            Map<Integer, Integer> outputTargets;
+            try {
+                outputTargets = collectOutputs(fragment);
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Iris program '" + program.name()
+                        + "' has an invalid fragment-output mapping: " + exception.getMessage(), exception);
+            }
             writes.addAll(outputTargets.values());
 
             for (int target : reads) {
@@ -122,9 +128,15 @@ public final class IrisTerrainPassScheduler {
 
     private static String source(
             IrisShaderPackModel model, IrisShaderPackModel.Program program,
-            ShaderPackProgramCatalog.Stage stage) {
+            ShaderPackProgramCatalog.Stage stage, Map<String, String> defines) {
         String path = program.stages().get(stage);
-        return path == null ? "" : model.preprocessedSources().getOrDefault(path, "");
+        if (path == null) return "";
+        String expanded = model.preprocessedSources().getOrDefault(path, "");
+        if (expanded.isBlank()) return "";
+        // Include expansion alone leaves inactive GLSL branches visible to the
+        // scheduler. Resolve the same option-controlled branches before
+        // collecting sampler reads and fragment output locations.
+        return new IrisGlslConditionalPreprocessor().preprocess(expanded, defines);
     }
 
     private static void collectTargets(String source, Set<Integer> targets) {

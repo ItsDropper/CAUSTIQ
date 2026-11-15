@@ -127,13 +127,26 @@ final class IrisImageResources implements AutoCloseable {
 
     int[] dispatchGroups(Set<String> outputs, int localX, int localY, int localZ,
                          boolean usesGlobalY, boolean usesGlobalZ) {
+        Map<String, ImageSpec> specs = new LinkedHashMap<>();
+        images.forEach((name, image) -> specs.put(name, new ImageSpec(image.sampler, image.externalFormat,
+                image.internalFormat, GL11C.GL_FLOAT, false, false,
+                image.width, image.height, image.depth)));
+        return calculateDispatchGroups(specs, outputs, localX, localY, localZ, usesGlobalY, usesGlobalZ);
+    }
+
+    static int[] calculateDispatchGroups(Map<String, ImageSpec> images, Set<String> outputs,
+                                         int localX, int localY, int localZ,
+                                         boolean usesGlobalY, boolean usesGlobalZ) {
+        if (localX < 1 || localY < 1 || localZ < 1) {
+            throw new IllegalArgumentException("Compute local workgroup dimensions must be positive.");
+        }
         int width = 1, height = 1, depth = 1;
         for (String name : outputs) {
-            Image image = images.get(name);
+            ImageSpec image = images.get(name);
             if (image == null) continue;
-            width = Math.max(width, image.width);
-            if (usesGlobalY) height = Math.max(height, image.height);
-            if (usesGlobalZ) depth = Math.max(depth, image.depth);
+            width = Math.max(width, image.width());
+            if (usesGlobalY) height = Math.max(height, image.height());
+            if (usesGlobalZ) depth = Math.max(depth, image.depth());
         }
         return new int[]{ceilDiv(width, localX), ceilDiv(height, localY), ceilDiv(depth, localZ)};
     }
@@ -375,7 +388,7 @@ final class IrisImageResources implements AutoCloseable {
         }
         GL11C.glBindTexture(target, previousBinding);
         GL13C.glActiveTexture(previousActive);
-        clearTexture(texture, spec.internalFormat, spec.externalFormat);
+        if (spec.clear) clearTexture(texture, spec.internalFormat, spec.externalFormat);
         return new Image(name, spec.sampler, texture, target, spec.internalFormat, spec.externalFormat,
                 spec.width, spec.height, spec.depth);
     }

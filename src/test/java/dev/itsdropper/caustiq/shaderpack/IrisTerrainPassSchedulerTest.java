@@ -104,6 +104,27 @@ class IrisTerrainPassSchedulerTest {
     }
 
     @Test
+    void ignoresFragmentOutputsInInactiveConditionalBranches() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("ConditionalOutputs/shaders"));
+        writeProgram(shaders, "composite", """
+                /* RENDERTARGETS: 0 */
+                layout(location = 0) out vec4 scene;
+                #ifdef OPTIONAL_SECOND_OUTPUT
+                layout(location = 1) out vec4 auxiliary;
+                #endif
+                void main() { scene = vec4(1.0); }
+                """);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor("ConditionalOutputs", 3))) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisTerrainPassScheduler scheduler = new IrisTerrainPassScheduler();
+            IrisTerrainPassScheduler.Plan inactive = scheduler.schedule(model, null, java.util.Map.of());
+            assertEquals(java.util.Map.of(0, 0), inactive.passes().getFirst().pass().outputTargets());
+            assertThrows(IllegalArgumentException.class, () -> scheduler.schedule(
+                    model, null, java.util.Map.of("OPTIONAL_SECOND_OUTPUT", "1")));
+        }
+    }
+
+    @Test
     void distinguishesScaledFullscreenTargetsFromScaledTerrainAttachments() throws IOException {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("ScaledPack/shaders"));
         Files.writeString(shaders.resolve("shaders.properties"), "colortex1Scale=0.5\n");
