@@ -52,9 +52,9 @@ public final class IrisGlProgramCompiler {
             if (program.stages().size() != 1) {
                 throw new IOException("Compute program '" + program.name() + "' must contain only a .csh stage.");
             }
-            String compute = injectDefines(
-                    preprocessor.preprocess(program.stages().get(ShaderPackProgramCatalog.Stage.COMPUTE), sourceProvider).source(),
-                    defines);
+            String compute = preprocessor.preprocess(
+                    program.stages().get(ShaderPackProgramCatalog.Stage.COMPUTE), sourceProvider).source();
+            compute = injectDefines(removePackOptionDefinitions(compute, defines), defines);
             int shader = compileShader(GL43C.GL_COMPUTE_SHADER, compute, program.name() + " compute");
             int linked = 0;
             try {
@@ -92,8 +92,8 @@ public final class IrisGlProgramCompiler {
             vertex = translateVertex(vertexSource, texCoordIndices(fragment));
         }
         fragment = translateFragment(fragment);
-        vertex = injectDefines(vertex, defines);
-        fragment = injectDefines(fragment, defines);
+        vertex = injectDefines(removePackOptionDefinitions(vertex, defines), defines);
+        fragment = injectDefines(removePackOptionDefinitions(fragment, defines), defines);
 
         int vertexShader = compileShader(GL20C.GL_VERTEX_SHADER, vertex, program.name() + " vertex");
         int fragmentShader = 0;
@@ -290,6 +290,19 @@ public final class IrisGlProgramCompiler {
         return indices;
     }
 
+    private static String removePackOptionDefinitions(String source, Set<String> defines) {
+        if (defines == null || defines.isEmpty()) return source;
+        String adjusted = source;
+        for (String define : defines) {
+            if (define == null || define.isBlank()) continue;
+            String name = define.split("=", 2)[0].trim();
+            String pattern = "(?m)^[\\t ]*#[\\t ]*(?:define|undef)[\\t ]+"
+                    + Pattern.quote(name) + "(?:[\\t ]+[^\\r\\n]*)?[\\t ]*(?:\\R|$)";
+            adjusted = adjusted.replaceAll(pattern, "");
+        }
+        return adjusted;
+    }
+
     private static String injectDefines(String source, Set<String> defines) {
         if (defines == null || defines.isEmpty()) return source;
         int newline = source.indexOf('\n');
@@ -299,7 +312,7 @@ public final class IrisGlProgramCompiler {
             String[] parts = define.split("=", 2);
             String name = parts[0].trim();
             String value = parts.length == 2 ? parts[1].trim() : "1";
-            if (value.equalsIgnoreCase("false") || value.equals("0")) continue;
+            if (value.equalsIgnoreCase("false") || value.equalsIgnoreCase("off") || value.equalsIgnoreCase("no")) continue;
             if (value.equalsIgnoreCase("true")) value = "1";
             block.append("#define ").append(name).append(' ').append(value).append('\n');
         }
