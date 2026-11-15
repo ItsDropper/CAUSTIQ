@@ -208,6 +208,23 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesPhotonTemperateBiomeUniformToItsExpressionBackedRuntimeBinding() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform float biome_temperate;
+                void main() { gl_FragColor = vec4(biome_temperate); }
+                """);
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform float caustiqBiomeTemperate;"));
+        assertTrue(fragment.contains("caustiqBiomeTemperate"));
+        assertEquals("caustiqBiomeTemperate",
+                IrisNvidiumTerrainTranslator.uniformAliases().get("biome_temperate"));
+    }
+
+    @Test
     void translatesPhotonSunDirectionToTheRuntimeViewSpaceUniform() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150

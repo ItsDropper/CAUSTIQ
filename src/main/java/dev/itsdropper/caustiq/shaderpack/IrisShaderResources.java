@@ -306,9 +306,22 @@ public final class IrisShaderResources implements AutoCloseable {
     }
 
     public void uploadUniforms(int program, Map<String, Double> baseVariables) {
+        uploadUniforms(program, baseVariables, Map.of());
+    }
+
+    /**
+     * Uploads custom Iris uniforms after shader translation. The source name
+     * remains the expression key, while the target name may be a CAUSTIQ ABI
+     * alias introduced by the terrain translator.
+     */
+    public void uploadUniforms(int program, Map<String, Double> baseVariables,
+                               Map<String, String> uniformAliases) {
         if (uniforms.isEmpty()) return;
-        evaluateUniformValues(baseVariables, name -> GL20C.glGetUniformLocation(program, name) >= 0)
-                .forEach((name, values) -> upload(program, name, uniforms.get(name).type(), values));
+        Map<String, String> aliases = uniformAliases == null ? Map.of() : uniformAliases;
+        evaluateUniformValues(baseVariables, name -> GL20C.glGetUniformLocation(
+                program, aliases.getOrDefault(name, name)) >= 0)
+                .forEach((name, values) -> upload(program, aliases.getOrDefault(name, name),
+                        uniforms.get(name).type(), values));
     }
 
     private void validateExpressionSymbols(Map<String, Double> context,

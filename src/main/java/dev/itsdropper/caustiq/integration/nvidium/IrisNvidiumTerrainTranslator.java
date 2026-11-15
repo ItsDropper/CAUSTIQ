@@ -138,6 +138,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("time_noon", "caustiqTimeNoon"),
             Map.entry("time_sunset", "caustiqTimeSunset"),
             Map.entry("time_midnight", "caustiqTimeMidnight"),
+            Map.entry("biome_temperate", "caustiqBiomeTemperate"),
             Map.entry("biome_temperature", "caustiqBiomeTemperature"),
             Map.entry("biome_humidity", "caustiqBiomeHumidity"),
             Map.entry("alphaTestRef", "caustiqAlphaTestRef"),
@@ -316,6 +317,11 @@ public final class IrisNvidiumTerrainTranslator {
 
     public List<Integer> renderTargetIndices() {
         return renderTargetIndices;
+    }
+
+    /** Uniform-name aliases required when uploading Iris custom expressions after translation. */
+    public static Map<String, String> uniformAliases() {
+        return UNIFORM_ALIASES;
     }
 
     /**
@@ -973,6 +979,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform float caustiqTimeNoon;
                 uniform float caustiqTimeSunset;
                 uniform float caustiqTimeMidnight;
+                uniform float caustiqBiomeTemperate;
                 uniform float caustiqBiomeTemperature;
                 uniform float caustiqBiomeHumidity;
                 uniform float caustiqAlphaTestRef;
@@ -1006,7 +1013,7 @@ public final class IrisNvidiumTerrainTranslator {
             case "isEyeInWater", "moonPhase", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2" -> "int";
             case "frameTimeCounter", "viewWidth", "viewHeight", "near", "far", "rainStrength",
                     "wetness", "world_age", "day_factor", "aspectRatio", "time_sunrise", "time_noon", "time_sunset",
-                    "time_midnight", "biome_temperature", "biome_humidity", "alphaTestRef",
+                    "time_midnight", "biome_temperate", "biome_temperature", "biome_humidity", "alphaTestRef",
                     "dhNearPlane", "dhFarPlane", "combined_near", "combined_far" -> "float";
             case "frameCounter", "blockEntityId", "entityId", "currentRenderedItemId",
                     "dhRenderDistance", "vxRenderDistance" -> "int";
