@@ -123,7 +123,7 @@ vertex_encoder = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integrati
 assert "STRIDE = 40" in vertex_encoder
 assert "ColorARGB.mulRGB(color, brightness)" in vertex_encoder
 assert "MemoryUtil.memPutInt(ptr + 36L, nvidiumMaterial)" in vertex_encoder
-assert "float((uint(v.color) >> 24u) & 0xFFu) * COLOR_SCALE" in adapter
+assert "color.a = float((vertex.nvidiumMaterial >> 8u) & 0xFFu) * COLOR_SCALE;" in adapter
 for field in ("blockId", "normalTangent", "midpointUv", "midBlock", "nvidiumMaterial"):
     assert field in vertex_encoder
 format_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumExtendedVertexFormatMixin.java").read_text(encoding="utf-8")
