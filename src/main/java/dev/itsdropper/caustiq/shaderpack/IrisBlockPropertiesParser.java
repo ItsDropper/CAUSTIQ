@@ -59,8 +59,12 @@ public final class IrisBlockPropertiesParser {
         // Iris exposes block tag selectors only when its tag support API is available.
         // CAUSTIQ currently resolves concrete block identifiers, so select the non-tag
         // branch and deliberately ignore tag aliases instead of treating them as blocks.
+        // block.properties also uses hash-prefixed prose comments. A sentence beginning
+        // "#if you want..." is documentation, not a conditional expression.
+        String normalized = source.replaceAll(
+                "(?im)^[\\t ]*#[\\t ]*if[\\t ]+you\\b[^\\r\\n]*", "# comment");
         String preprocessed = new IrisGlslConditionalPreprocessor().preprocess(
-                source, Map.of("MC_VERSION", Integer.toString(mcVersion), "IRIS_TAG_SUPPORT", "0"));
+                normalized, Map.of("MC_VERSION", Integer.toString(mcVersion), "IRIS_TAG_SUPPORT", "0"));
         return new ArrayList<>(List.of(preprocessed.split("\\R", -1)));
     }
 
