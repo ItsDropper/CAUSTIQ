@@ -265,7 +265,7 @@ public final class NvidiumIrisUniformBridge {
             Object color = invokeObject(state, "getFogColor");
             if (color != null) return vector3Array(color);
         } catch (ReflectiveOperationException | RuntimeException ignored) { }
-        return new double[]{0.0, 0.0, 0.0};
+        return skyColor(Minecraft.getInstance().level, snapshot);
     }
 
     private static double[] lightningBoltPosition(Object level, Snapshot snapshot) {
@@ -554,7 +554,7 @@ public final class NvidiumIrisUniformBridge {
         double moonAngleDegrees = normalizeDegrees(moonDegrees + 90.0);
         float normalizedSunAngle = (float) (sunAngleDegrees / 360.0);
         boolean isDay = sunAngleDegrees < 180.0;
-        float sunPathRotation = parseFloat(selectedDefines.get("sunPathRotation"), 0.0f);
+        float sunPathRotation = parseFloat(selectedDefines == null ? null : selectedDefines.get("sunPathRotation"), 0.0f);
         float celestialAngle = (float) Math.toRadians(sunDegrees);
         float rain = clamp01(invokeFloat(level, "getRainLevel", 1.0f, 0.0f));
         float thunder = clamp01(invokeFloat(level, "getThunderLevel", 1.0f, 0.0f));
@@ -727,7 +727,7 @@ public final class NvidiumIrisUniformBridge {
             putCelestialPositionComponents(values, "sunPosition", snapshot.modelView(),
                     celestialAngle, 100.0f, sunPathRotation);
             putCelestialPositionComponents(values, "moonPosition", snapshot.modelView(),
-                    (float) Math.toRadians(moonDegrees), -100.0f, sunPathRotation);
+                    (float) Math.toRadians(moonDegrees), 100.0f, sunPathRotation);
             double sx = values.get("sunPosition.x");
             double sy = values.get("sunPosition.y");
             double sz = values.get("sunPosition.z");
@@ -1059,8 +1059,7 @@ public final class NvidiumIrisUniformBridge {
     }
 
     private static boolean isSurvivalPlayer(Minecraft client) {
-        Object gameMode = invokeObject(client, "gameMode");
-        Object playerMode = invokeObject(gameMode, "getPlayerMode");
+        Object playerMode = invokeObject(client.gameMode, "getPlayerMode");
         return invokeBoolean(playerMode, "isSurvival", false);
     }
 
@@ -1084,7 +1083,24 @@ public final class NvidiumIrisUniformBridge {
     private static boolean optionBoolean(Minecraft client, String option, boolean fallback) {
         Object value = invokeObject(client.options, option);
         Object selected = invokeObject(value, "get");
-        return selected instanceof Boolean result ? result : fallback;
+        if (selected instanceof Boolean result) return result;
+        Object fieldValue = readField(client.options, option);
+        return fieldValue instanceof Boolean result ? result : fallback;
+    }
+
+    private static Object readField(Object target, String fieldName) {
+        if (target == null) return null;
+        Class<?> type = target.getClass();
+        while (type != null) {
+            try {
+                Field field = type.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                return field.get(target);
+            } catch (ReflectiveOperationException | RuntimeException ignored) {
+                type = type.getSuperclass();
+            }
+        }
+        return null;
     }
 
     private static double optionDouble(Minecraft client, String option, double fallback) {
@@ -1199,6 +1215,51 @@ public final class NvidiumIrisUniformBridge {
                 invokeDouble(entity, "getY", 0.0), invokeDouble(entity, "getZ", 0.0)};
     }
 
+    private static double attributeNumber(Minecraft client, String name, double fallback) {
+        Object value = environmentAttribute(client, name);
+        if (value instanceof Number number) return number.doubleValue();
+        Object index = invokeObject(value, "index");
+        return index instanceof Number number ? number.doubleValue() : fallback;
+    }
+
+    private static Object environmentAttribute(Minecraft client, String name) {
+        try {
+            Object camera = invokeObject(client.gameRenderer, "getMainCamera");
+            Object probe = invokeObject(camera, "attributeProbe");
+            Class<?> attributes = Class.forName("net.minecraft.world.attribute.EnvironmentAttributes");
+            Object key = attributes.getField(name).get(null);
+            Object tracker = invokeObject(client, "getDeltaTracker");
+            Object partial = invokeCompatibleQuietly(tracker, "getGameTimeDeltaPartialTick", false);
+            if (!(partial instanceof Number)) partial = 1.0f;
+            return invokeCompatibleQuietly(probe, "getValue", key, partial);
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static double normalizeDegrees(double degrees) {
+        double normalized = degrees % 360.0;
+        return normalized < 0.0 ? normalized + 360.0 : normalized;
+    }
+
+    private static long worldTimeForUniform(Object level, long dayTime) {
+        Object dimensionType = invokeObject(level, "dimensionType");
+        Object dimension = invokeObject(level, "dimension");
+        Object identifier = invokeObject(dimension, "identifier");
+        String path = String.valueOf(invokeObject(identifier, "getPath"));
+        boolean fixedTime = invokeBoolean(dimensionType, "hasFixedTime", false);
+        if (fixedTime && !path.equals("the_nether") && !path.equals("the_end")) return 0L;
+        return Math.floorMod(dayTime, 24_000L);
+    }
+
+    private static int moonPhase(Minecraft client, Object level) {
+        Object value = environmentAttribute(client, "MOON_PHASE");
+        Object index = invokeObject(value, "index");
+        if (index instanceof Number number) return number.intValue();
+        long dayTime = invokeLong(level, "getDayTime", 0L);
+        return (int) Math.floorMod(Math.floorDiv(dayTime, 24_000L), 8L);
+    }
+
     private static double[] skyColor(Object level, Snapshot snapshot) {
         Object colorValue = environmentAttribute(Minecraft.getInstance(), "SKY_COLOR");
         if (colorValue instanceof Number number) {
@@ -1244,6 +1305,14 @@ public final class NvidiumIrisUniformBridge {
 
     private static void putScalar(java.util.Map<String, Double> values, String name, double value) {
         values.put(name, Double.isFinite(value) ? value : 0.0);
+    }
+
+    private static void putVector4(java.util.Map<String, Double> values, String name, double[] components) {
+        putVector4(values, name,
+                components.length > 0 ? components[0] : 0.0,
+                components.length > 1 ? components[1] : 0.0,
+                components.length > 2 ? components[2] : 0.0,
+                components.length > 3 ? components[3] : 0.0);
     }
 
     private static void putVector3(java.util.Map<String, Double> values, String name, double[] components) {
