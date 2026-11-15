@@ -125,7 +125,8 @@ public final class NvidiumShadowRenderer {
     /** Shadow depth texture exposed to Iris shadowtex samplers. */
     public static int shadowTexture() {
         State state = activeState;
-        return state == null || !state.depthValid ? 0 : state.depthTexture;
+        return state == null || (!state.depthValid && !SHADOW_RASTERIZATION.get())
+                ? 0 : state.depthTexture;
     }
 
     public static int shadowResolution() {
