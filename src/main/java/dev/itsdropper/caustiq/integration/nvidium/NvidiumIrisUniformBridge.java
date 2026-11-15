@@ -232,7 +232,47 @@ public final class NvidiumIrisUniformBridge {
     }
 
     /** Mirrors Minecraft's eight-step lunar phase, derived from the world's day time. */
-    private static int moonPhase(Object level) {
+    private static double attributeNumber(Minecraft client, String name, double fallback) {
+        Object value = environmentAttribute(client, name);
+        if (value instanceof Number number) return number.doubleValue();
+        Object index = invokeObject(value, "index");
+        return index instanceof Number number ? number.doubleValue() : fallback;
+    }
+
+    private static Object environmentAttribute(Minecraft client, String name) {
+        try {
+            Object camera = invokeObject(client.gameRenderer, "getMainCamera");
+            Object probe = invokeObject(camera, "attributeProbe");
+            Class<?> attributes = Class.forName("net.minecraft.world.attribute.EnvironmentAttributes");
+            Object key = attributes.getField(name).get(null);
+            Object tracker = invokeObject(client, "getDeltaTracker");
+            Object partial = invokeCompatibleQuietly(tracker, "getGameTimeDeltaPartialTick", false);
+            if (!(partial instanceof Number)) partial = 1.0f;
+            return invokeCompatibleQuietly(probe, "getValue", key, partial);
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static double normalizeDegrees(double degrees) {
+        double normalized = degrees % 360.0;
+        return normalized < 0.0 ? normalized + 360.0 : normalized;
+    }
+
+    private static long worldTimeForUniform(Object level, long dayTime) {
+        Object dimensionType = invokeObject(level, "dimensionType");
+        Object dimension = invokeObject(level, "dimension");
+        Object identifier = invokeObject(dimension, "identifier");
+        String path = String.valueOf(invokeObject(identifier, "getPath"));
+        boolean fixedTime = invokeBoolean(dimensionType, "hasFixedTime", false);
+        if (fixedTime && !path.equals("the_nether") && !path.equals("the_end")) return 0L;
+        return Math.floorMod(dayTime, 24_000L);
+    }
+
+    private static int moonPhase(Minecraft client, Object level) {
+        Object value = environmentAttribute(client, "MOON_PHASE");
+        Object index = invokeObject(value, "index");
+        if (index instanceof Number number) return number.intValue();
         long dayTime = invokeLong(level, "getDayTime", 0L);
         return (int) Math.floorMod(Math.floorDiv(dayTime, 24_000L), 8L);
     }
@@ -529,7 +569,7 @@ public final class NvidiumIrisUniformBridge {
         putBiomeUniforms(values, biomeFloat(level, "getBaseTemperature"),
                 biomeFloat(level, "getDownfall"));
         putBiomeIdentity(values, biome);
-        putDimensionUniforms(values, level);
+        putDimensionUniforms(values, level, client);
         putVector2(values, "eyeBrightness", eyeBrightness(level, cameraEntity, false),
                 eyeBrightness(level, cameraEntity, true));
         putVector2(values, "eyeBrightnessSmooth", eyeBrightness(level, cameraEntity, false),
@@ -605,18 +645,21 @@ public final class NvidiumIrisUniformBridge {
                     modelViewProjection.get(new float[16]), 4);
             putMatrix3Components(values, "gl_NormalMatrix", snapshot.normalMatrix());
             org.joml.Vector3f up = new org.joml.Matrix4f().set(snapshot.modelView())
+                    .rotateY((float) -Math.PI / 2.0f)
                     .transformDirection(0.0f, 100.0f, 0.0f, new org.joml.Vector3f());
             putVector3(values, "upPosition", up.x, up.y, up.z);
-            putSunPositionComponents(values, snapshot.modelView(), celestialAngle);
+            putCelestialPositionComponents(values, "sunPosition", snapshot.modelView(),
+                    celestialAngle, 100.0f, sunPathRotation);
+            putCelestialPositionComponents(values, "moonPosition", snapshot.modelView(),
+                    (float) Math.toRadians(moonDegrees), -100.0f, sunPathRotation);
             double sx = values.get("sunPosition.x");
             double sy = values.get("sunPosition.y");
             double sz = values.get("sunPosition.z");
-            putVector3(values, "moonPosition", -sx, -sy, -sz);
-            boolean sunIsShadowSource = normalizedSunAngle <= 0.5f;
+            double mx = values.get("moonPosition.x");
+            double my = values.get("moonPosition.y");
+            double mz = values.get("moonPosition.z");
             putVector3(values, "shadowLightPosition",
-                    sunIsShadowSource ? sx : -sx,
-                    sunIsShadowSource ? sy : -sy,
-                    sunIsShadowSource ? sz : -sz);
+                    isDay ? sx : mx, isDay ? sy : my, isDay ? sz : mz);
             putVector3(values, "eyePosition", eyePosition(cameraEntity, snapshot));
             putVector3(values, "relativeEyePosition",
                     snapshot.cameraX() - values.get("eyePosition.x"),
@@ -742,19 +785,22 @@ public final class NvidiumIrisUniformBridge {
         values.put("MC_VERSION", 12111.0);
     }
 
-    private static void putDimensionUniforms(java.util.Map<String, Double> values, Object level) {
+    private static void putDimensionUniforms(
+            java.util.Map<String, Double> values, Object level, Minecraft client) {
         Object dimension = invokeObject(level, "dimensionType");
-        if (dimension != null && invokeObject(dimension, "value") != null) dimension = invokeObject(dimension, "value");
+        if (dimension != null && invokeObject(dimension, "value") != null) {
+            dimension = invokeObject(dimension, "value");
+        }
         putScalar(values, "ambientLight", invokeDouble(dimension, "ambientLight", 0.0));
         putScalar(values, "hasCeiling", invokeBoolean(dimension, "hasCeiling", false) ? 1.0 : 0.0);
-        putScalar(values, "hasSkylight", invokeBoolean(dimension, "hasSkyLight", false) ? 1.0 : 0.0);
-        putScalar(values, "bedrockLevel", invokeDouble(level, "getMinY", 0.0));
-        double minY = invokeDouble(level, "getMinY", 0.0);
-        double maxY = invokeDouble(level, "getMaxY", minY + 384.0);
-        putScalar(values, "heightLimit", maxY - minY);
-        putScalar(values, "logicalHeightLimit", invokeDouble(dimension, "logicalHeight", maxY - minY));
-        Object effects = invokeObject(level, "effects");
-        putScalar(values, "cloudHeight", invokeDouble(effects, "cloudHeight", 192.0));
+        putScalar(values, "hasSkylight", invokeBoolean(dimension, "hasSkyLight", true) ? 1.0 : 0.0);
+        putScalar(values, "bedrockLevel", invokeDouble(dimension, "minY",
+                invokeDouble(level, "getMinY", 0.0)));
+        double height = invokeDouble(dimension, "height",
+                invokeDouble(level, "getMaxY", 384.0) - invokeDouble(level, "getMinY", 0.0));
+        putScalar(values, "heightLimit", height);
+        putScalar(values, "logicalHeightLimit", invokeDouble(dimension, "logicalHeight", height));
+        putScalar(values, "cloudHeight", attributeNumber(client, "CLOUD_HEIGHT", 192.0));
     }
 
     private static void putBiomeIdentity(java.util.Map<String, Double> values, Object biomeHolder) {
@@ -1070,6 +1116,15 @@ public final class NvidiumIrisUniformBridge {
     }
 
     private static double[] skyColor(Object level, Snapshot snapshot) {
+        Object colorValue = environmentAttribute(Minecraft.getInstance(), "SKY_COLOR");
+        if (colorValue instanceof Number number) {
+            int argb = number.intValue();
+            return new double[]{
+                    ((argb >> 16) & 0xff) / 255.0,
+                    ((argb >> 8) & 0xff) / 255.0,
+                    (argb & 0xff) / 255.0
+            };
+        }
         if (level != null && snapshot != null) {
             try {
                 Class<?> vec3Type = Class.forName("net.minecraft.world.phys.Vec3");
@@ -1142,19 +1197,22 @@ public final class NvidiumIrisUniformBridge {
 
     static void putSunPositionComponents(java.util.Map<String, Double> values,
                                          float[] modelView, float sunAngle) {
-        // Minecraft's SkyRenderer builds the celestial pose as Y(-90 degrees) * X(sunAngle),
-        // then multiplies it by the active camera model-view matrix before translating the
-        // sun quad to (0, 100, 0). Iris exposes that transformed point in view space.
+        putCelestialPositionComponents(values, "sunPosition", modelView, sunAngle, 100.0f, 0.0f);
+    }
+
+    private static void putCelestialPositionComponents(java.util.Map<String, Double> values,
+                                                       String name, float[] modelView,
+                                                       float angleRadians, float height,
+                                                       float sunPathRotationDegrees) {
         org.joml.Matrix4f celestial = new org.joml.Matrix4f()
                 .rotationY((float) -Math.PI / 2.0f)
-                .rotateX(sunAngle);
-        org.joml.Vector3f sunPosition = new org.joml.Matrix4f()
+                .rotateZ((float) Math.toRadians(sunPathRotationDegrees))
+                .rotateX(angleRadians);
+        org.joml.Vector3f position = new org.joml.Matrix4f()
                 .set(modelView)
                 .mul(celestial)
-                .transformPosition(0.0f, 100.0f, 0.0f, new org.joml.Vector3f());
-        values.put("sunPosition.x", (double) sunPosition.x);
-        values.put("sunPosition.y", (double) sunPosition.y);
-        values.put("sunPosition.z", (double) sunPosition.z);
+                .transformPosition(0.0f, height, 0.0f, new org.joml.Vector3f());
+        putVector3(values, name, position.x, position.y, position.z);
     }
 
     static void putMatrixComponents(java.util.Map<String, Double> values,
