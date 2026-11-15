@@ -14,7 +14,9 @@
     "NvidiumExtendedVertexFormatMixin",
     "NvidiumRepackagedStrideMixin",
     "NvidiumBlockRendererVertexContextMixin",
-    "NvidiumFluidRendererVertexContextMixin"
+    "NvidiumFluidRendererVertexContextMixin",
+    "NvidiumPrimaryTerrainRasterizerMixin",
+    "NvidiumTranslucentTerrainRasterizerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
