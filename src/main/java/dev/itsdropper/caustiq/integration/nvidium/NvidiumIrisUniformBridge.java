@@ -786,13 +786,22 @@ public final class NvidiumIrisUniformBridge {
                 "heightLimit", "logicalHeightLimit", "near", "far", "alphaTestRef", "renderStage",
                 "fogDensity", "fogStart", "fogEnd", "fogMode", "fogShape", "textureFilteringMode",
                 "centerDepthSmooth", "dhRenderDistance", "dhNearPlane", "dhFarPlane", "textureReloadCount",
-                "gtextureId", "anisotropicFiltering", "pi"
+                "gtextureId", "anisotropicFiltering", "pi", "chunkFadeTimeInv", "seaLevel",
+                "cloudTime", "heavyFog", "iris_FogStart", "iris_FogEnd", "iris_FogDensity",
+                "iris_TextureScale", "iris_GlintAlpha", "iris_ModelScale", "iris_ModelOffset"
         };
         for (String name : scalars) values.putIfAbsent(name, 0.0);
         values.put("maxPlayerHealth", 20.0);
         values.put("maxPlayerHunger", 20.0);
         values.put("maxPlayerArmor", 20.0);
         values.put("maxPlayerAir", 300.0);
+        values.put("chunkFadeTimeInv", 0.0);
+        values.put("seaLevel", 63.0);
+        values.put("cloudTime", 0.0);
+        values.put("iris_TextureScale", 1.0);
+        values.put("iris_GlintAlpha", 1.0);
+        values.put("iris_ModelScale", 1.0);
+        values.put("iris_ModelOffset", 0.0);
         values.put("near", 0.05);
         values.put("far", 512.0);
         values.put("alphaTestRef", 0.1);
@@ -823,10 +832,18 @@ public final class NvidiumIrisUniformBridge {
         putVector3(values, "skyColor", 0.0, 0.0, 0.0);
         putVector3(values, "fogColor", 0.0, 0.0, 0.0);
         putVector3(values, "endFlashPosition", 0.0, 0.0, 0.0);
-        putVector3(values, "currentSelectedBlockPos", 0.0, 0.0, 0.0);
+        putVector3(values, "currentSelectedBlockPos", -256.0, -256.0, -256.0);
         putVector3(values, "chunkOffset", 0.0, 0.0, 0.0);
+        putVector3(values, "heldBlockLightColor", 1.0, 1.0, 1.0);
+        putVector3(values, "heldBlockLightColor2", 1.0, 1.0, 1.0);
+        putVector3(values, "iris_ModelScale", 1.0, 1.0, 1.0);
+        putVector3(values, "iris_ModelOffset", 0.0, 0.0, 0.0);
+        putVector3(values, "iris_CameraTranslation", 0.0, 0.0, 0.0);
+        putVector3(values, "u_RegionOffset", 0.0, 0.0, 0.0);
         putVector4(values, "lightningBoltPosition", 0.0, 0.0, 0.0, 0.0);
         putVector4(values, "entityColor", 0.0, 0.0, 0.0, 0.0);
+        putVector4(values, "iris_FogColor", 0.0, 0.0, 0.0, 0.0);
+        putVector4(values, "iris_ColorModulator", 1.0, 1.0, 1.0, 1.0);
         putVector4(values, "blendFunc", 1.0, 0.0, 1.0, 0.0);
         String[] matrices = {
                 "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
@@ -834,7 +851,9 @@ public final class NvidiumIrisUniformBridge {
                 "gbufferPreviousModelView", "gbufferPreviousProjection", "gl_ModelViewMatrix",
                 "gl_ModelViewMatrixInverse", "gl_ProjectionMatrix", "gl_ProjectionMatrixInverse",
                 "gl_ModelViewProjectionMatrix", "gl_TextureMatrix[0]",
-                "iris_ModelViewMatrix", "iris_ProjectionMatrix", "u_ModelViewProjectionMatrix"
+                "iris_ModelViewMatrix", "iris_ProjectionMatrix", "u_ModelViewProjectionMatrix",
+                "dhProjection", "dhProjectionInverse", "dhPreviousProjection",
+                "dhPreviousProjectionInverse", "iris_TextureMat", "iris_ModelViewMat", "iris_ProjMat"
         };
         for (String name : matrices) {
             float[] identity = new org.joml.Matrix4f().get(new float[16]);
@@ -842,6 +861,7 @@ public final class NvidiumIrisUniformBridge {
         }
         putMatrix3Components(values, "gl_NormalMatrix", new org.joml.Matrix3f().get(new float[9]));
         putMatrix3Components(values, "iris_NormalMatrix", new org.joml.Matrix3f().get(new float[9]));
+        putMatrix3Components(values, "iris_NormalMat", new org.joml.Matrix3f().get(new float[9]));
         values.put("CAT_NONE", 0.0);
         String[] categories = {"TAIGA", "EXTREME_HILLS", "JUNGLE", "MESA", "PLAINS", "SAVANNA",
                 "ICY", "THE_END", "BEACH", "FOREST", "OCEAN", "DESERT", "RIVER", "SWAMP",
