@@ -12,8 +12,8 @@ import java.util.regex.Pattern;
  * Nvidium material flags kept separate from tangent handedness.
  */
 public final class NvidiumTerrainVaryingAdapter {
-    public static final String PROFILE_ID = "caustiq-iris-vertex-abi-v4";
-    private static final String MARKER = "#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4";
+    public static final String PROFILE_ID = "caustiq-iris-vertex-abi-v5";
+    private static final String MARKER = "#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 5";
     private static final String TRANSLUCENT_MARKER = "#define CAUSTIQ_NVIDIUM_TRANSLUCENT_VERTEX_ABI 1";
     private static final Pattern SODIUM_VERTEX_FORMAT_DEFINE = Pattern.compile(
             "(?m)^[\\t ]*#[\\t ]*define[\\t ]+USE_SODIUM_VERTEX_FORMAT\\b");
@@ -33,8 +33,7 @@ public final class NvidiumTerrainVaryingAdapter {
             "    vec3 v_blockEntity;",
             "    vec3 v_normal;",
             "    vec4 v_tangent;",
-            "    flat mat3 v_tbn;",
-            "    flat uint v_materialFlags;");
+             "    flat uint v_materialFlags;");
     private static final String FRAGMENT_VARYINGS = MESH_VARYINGS;
     private static final String MESH_UNIFORM_ALIASES =
             NvidiumIrisTerrainAbi.vertexAliasDeclarations();
@@ -62,8 +61,7 @@ public final class NvidiumTerrainVaryingAdapter {
             "    OUT[id].v_blockEntity = caustiqDecodeBlockEntity(V.blockId);",
             "    OUT[id].v_normal = caustiqDecodeNormal(V);",
             "    OUT[id].v_tangent = caustiqDecodeTangent(V);",
-            "    OUT[id].v_tbn = caustiqDecodeTbn(V);",
-            "    OUT[id].v_materialFlags = V.nvidiumMaterial & 0xFFu;");
+             "    OUT[id].v_materialFlags = V.nvidiumMaterial & 0xFFu;");
     private static final String VERTEX_FORMAT_EXTENSION = String.join("\n",
             "    uint blockId;",
             "    uint normal;",
