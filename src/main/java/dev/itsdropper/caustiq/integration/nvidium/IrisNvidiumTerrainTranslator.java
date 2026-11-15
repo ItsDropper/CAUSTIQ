@@ -689,7 +689,7 @@ public final class IrisNvidiumTerrainTranslator {
                 "vec4(decodeVertexUV(caustiqCurrentVertex), 0.0, 1.0)");
         translated = replaceIdentifier(translated, "gl_MultiTexCoord1",
                 "vec4(decodeLightUV(caustiqCurrentVertex) * 256.0, 0.0, 1.0)");
-        translated = replaceIdentifier(translated, "gl_Color", "decodeVertexColour(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "gl_Color", "caustiqDecodeIrisColor(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "gl_Normal", "caustiqDecodeNormal(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "gl_Position", "caustiqIrisClipPosition");
         translated = replaceIdentifier(translated, "gl_TexCoord", "caustiqIrisTexCoord");
