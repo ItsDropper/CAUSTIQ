@@ -568,8 +568,10 @@ class IrisNvidiumTerrainTranslatorTest {
         Path shaderRoot = Path.of(root, "src/main/resources/assets/nvidium/shaders");
         return Map.of(
                 "TASK", expandNvidiumImports(Files.readString(shaderRoot.resolve("terrain/task.glsl")), shaderRoot, Set.of()),
-                "MESH", expandNvidiumImports(Files.readString(shaderRoot.resolve("terrain/mesh.glsl")), shaderRoot, Set.of()),
-                "FRAGMENT", expandNvidiumImports(Files.readString(shaderRoot.resolve("terrain/frag.frag")), shaderRoot, Set.of()));
+                "MESH", expandNvidiumImports(Files.readString(shaderRoot.resolve("terrain/mesh.glsl")), shaderRoot, Set.of())
+                        .replace("#version 460", "#version 460\\n#define USE_SODIUM_VERTEX_FORMAT"),
+                "FRAGMENT", expandNvidiumImports(Files.readString(shaderRoot.resolve("terrain/frag.frag")), shaderRoot, Set.of())
+                        .replace("#version 460", "#version 460\\n#define USE_SODIUM_VERTEX_FORMAT"));
     }
 
     private static String expandNvidiumImports(String source, Path shaderRoot, Set<String> ancestors)
