@@ -115,7 +115,7 @@ public final class NvidiumShaderProgramBridge {
             }
         }
         if (!original.keySet().containsAll(TERRAIN_STAGES)) return;
-        if (!NvidiumIrisChunkVertex.isCommitted()) return;
+        if (!NvidiumCompatibility.isExtendedVertexFormatCommitted()) return;
 
         LAST_TERRAIN_PROGRAM.set(Snapshot.from(original));
         dumpShaderSources("before-adaptation", original);
