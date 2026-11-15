@@ -608,7 +608,8 @@ public final class IrisNvidiumTerrainTranslator {
             if (Pattern.compile("\\b" + Pattern.quote(symbol) + "\\b").matcher(body).find()) return true;
             for (String candidate : functions.keySet()) {
                 if (!reachable.contains(candidate)
-                        && Pattern.compile("\\b" + Pattern.quote(candidate) + "\\s*\\(")
+                        && Pattern.compile("(?<![A-Za-z0-9_])" + Pattern.quote(candidate)
+                                + "(?![A-Za-z0-9_])\\s*" + Pattern.quote("("))
                         .matcher(body).find()) {
                     pending.addLast(candidate);
                 }
