@@ -11,6 +11,13 @@ class NvidiumShaderProgramBridgeTest {
     @BeforeEach void resetBefore() { NvidiumShaderProgramBridge.resetForTests(); }
     @AfterEach void reset() { NvidiumShaderProgramBridge.resetForTests(); }
 
+    @Test void nativeAdapterIsNotActiveUntilTheExtendedVertexFormatIsRequested() {
+        assertFalse(NvidiumShaderProgramBridge.hasNativeSourceAdapter());
+        Map<Object, String> sources = terrainSources();
+        NvidiumShaderProgramBridge.transformBeforeCompile(sources);
+        assertEquals("mesh source content", sources.get(Stage.MESH));
+        assertFalse(NvidiumShaderProgramBridge.hasNativeSourceAdapter());
+    }
     @Test void capturesTerrainStagesAtCompileBoundary() {
         Map<Object, String> sources = terrainSources();
         NvidiumShaderProgramBridge.transformBeforeCompile(sources);
