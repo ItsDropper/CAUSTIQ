@@ -47,6 +47,48 @@ class IrisShaderPackParserTest {
     }
 
     @Test
+    void acceptsImplementedNvidiumColortexSettingsAndDiagnosesOnlyUnavailableTargets() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("RenderTargetPack/shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), """
+                colortex1Format=RGBA16F
+                colortex1Clear=false
+                colortex1ClearColor=0.0 0.0 0.0 0.0
+                colortex1Mipmap=true
+                colortex1Nearest=true
+                colortex8Format=RGBA16F
+                """);
+        Files.writeString(shaders.resolve("composite.vsh"), """
+                #version 150
+                void main() { gl_Position = vec4(0.0); }
+                """);
+        Files.writeString(shaders.resolve("composite.fsh"), """
+                #version 150
+                /* RENDERTARGETS: 1 */
+                layout(location = 0) out vec4 color;
+                void main() { color = vec4(1.0); }
+                """);
+
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("render-targets", "RenderTargetPack",
+                temporaryDirectory.resolve("RenderTargetPack"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 3, 3, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            assertFalse(model.diagnostics().stream().anyMatch(issue ->
+                    issue.contains("multi-render-target allocation and pass routing are not implemented")),
+                    model.diagnostics().toString());
+            assertTrue(model.diagnostics().stream().anyMatch(issue ->
+                    issue.contains("colortex0-colortex7") && issue.contains("colortex8Format")),
+                    model.diagnostics().toString());
+            IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
+            assertEquals(java.util.Set.of(1), plan.passes().get(0).pass().writes());
+            assertEquals("RGBA16F", plan.targets().get(1).format());
+            assertFalse(plan.targets().get(1).clear());
+            assertTrue(plan.targets().get(1).mipmap());
+            assertTrue(plan.targets().get(1).nearest());
+        }
+    }
+
+    @Test
     void expandsRelativeAndRootedIrisIncludesForProgramStages() throws IOException {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("Pack/shaders/lib"));
         Files.writeString(shaders.resolve("common.glsl"), "vec4 caustiqIncluded(){ return vec4(1.0); }");
