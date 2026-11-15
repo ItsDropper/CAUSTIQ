@@ -11,8 +11,6 @@ import java.util.Random;
 public final class NvidiumIrisTextureBridge {
     private static final int NOISE_SIZE = 512;
     private static int noiseTexture;
-    private static int normalTexture;
-    private static int specularTexture;
     private static BindingState bindingState;
 
     private NvidiumIrisTextureBridge() { }
@@ -22,14 +20,12 @@ public final class NvidiumIrisTextureBridge {
         if (bindingState != null) restoreBindings();
         ensureTextures();
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
-        int[] previousBindings = new int[3];
-        int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE3, GL13C.GL_TEXTURE4,
-                GL13C.GL_TEXTURE5, GL13C.GL_TEXTURE6, GL13C.GL_TEXTURE7, GL13C.GL_TEXTURE8,
-                GL13C.GL_TEXTURE10, GL13C.GL_TEXTURE11, GL13C.GL_TEXTURE12, GL13C.GL_TEXTURE13,
-                GL13C.GL_TEXTURE15};
-        int[] textures = {noiseTexture, normalTexture, specularTexture,
-                noiseTexture, noiseTexture, noiseTexture, noiseTexture,
-                noiseTexture, noiseTexture, noiseTexture, noiseTexture, noiseTexture};
+        int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE5, GL13C.GL_TEXTURE6, GL13C.GL_TEXTURE7};
+        int[] textures = {noiseTexture,
+                NvidiumGBufferTargets.texture(1),
+                NvidiumGBufferTargets.texture(2),
+                NvidiumGBufferTargets.texture(4)};
+        int[] previousBindings = new int[units.length];
         for (int i = 0; i < units.length; i++) {
             GL13C.glActiveTexture(units[i]);
             previousBindings[i] = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
@@ -39,7 +35,7 @@ public final class NvidiumIrisTextureBridge {
         bindingState = new BindingState(previousActive, units, previousBindings);
     }
 
-    /** Restores texture units 2-4 exactly as they were before the Nvidium terrain draw. */
+    /** Restores CAUSTIQ's noise and Iris colortex units after the terrain draw. */
     public static void restoreBindings() {
         BindingState state = bindingState;
         if (state == null) return;
@@ -55,17 +51,11 @@ public final class NvidiumIrisTextureBridge {
     public static void destroy() {
         restoreBindings();
         if (noiseTexture != 0) GL11C.glDeleteTextures(noiseTexture);
-        if (normalTexture != 0) GL11C.glDeleteTextures(normalTexture);
-        if (specularTexture != 0) GL11C.glDeleteTextures(specularTexture);
         noiseTexture = 0;
-        normalTexture = 0;
-        specularTexture = 0;
     }
 
     private static void ensureTextures() {
         if (noiseTexture == 0) noiseTexture = createNoiseTexture();
-        if (normalTexture == 0) normalTexture = createSolidTexture(128, 128, 255, 255);
-        if (specularTexture == 0) specularTexture = createSolidTexture(0, 0, 0, 255);
     }
 
     private static int createNoiseTexture() {
@@ -77,12 +67,6 @@ public final class NvidiumIrisTextureBridge {
         }
         pixels.flip();
         return createTexture(NOISE_SIZE, NOISE_SIZE, pixels);
-    }
-
-    private static int createSolidTexture(int red, int green, int blue, int alpha) {
-        ByteBuffer pixel = ByteBuffer.allocateDirect(4);
-        pixel.put((byte) red).put((byte) green).put((byte) blue).put((byte) alpha).flip();
-        return createTexture(1, 1, pixel);
     }
 
     private static int createTexture(int width, int height, ByteBuffer pixels) {
