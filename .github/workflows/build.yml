@@ -55,16 +55,17 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install --yes glslang-tools
+          sudo apt-get install --yes glslang-tools xvfb libgl1-mesa-dri libglx-mesa0
 
       - name: Build mod and package example shader pack
         shell: bash
         env:
           GLSLANG_VALIDATOR: glslangValidator
           CAUSTIQ_COMPAT_OUTPUT_DIR: ${{ github.workspace }}/build/nvidium-compat
+          CAUSTIQ_GL_SMOKE: "1"
         run: |
           set -o pipefail
-          ./gradlew build --stacktrace --info 2>&1 | tee build.log
+          xvfb-run -a -s "-screen 0 1280x720x24" env LIBGL_ALWAYS_SOFTWARE=1 ./gradlew build --stacktrace --info 2>&1 | tee build.log
 
       - name: Verify pinned Photon and Nvidium integration tests executed (not skipped)
         shell: bash
@@ -97,6 +98,7 @@ jobs:
               raise SystemExit("Pinned Nvidium + Photon combined-source integration test failed.")
           photon_compute_tests = {
               "resolvesPinnedPhotonLpvComputeProgramsAndTheir3dImages",
+              "executesPinnedPhotonLpvComputeProgramsOnHeadlessOpenGl",
           }
           photon_matches = []
           for report in glob.glob("build/test-results/test/TEST-*.xml"):

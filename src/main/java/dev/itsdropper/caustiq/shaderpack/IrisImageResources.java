@@ -64,6 +64,11 @@ final class IrisImageResources implements AutoCloseable {
 
     Set<String> imageNames() { return images.keySet(); }
 
+    int textureId(String name) {
+        Image image = images.get(name);
+        return image == null ? 0 : image.texture;
+    }
+
     boolean bindSampler(String name, int unit, int uniformLocation) {
         Image image = samplers.get(name);
         if (image == null) return false;
