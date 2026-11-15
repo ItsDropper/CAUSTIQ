@@ -242,6 +242,17 @@ class IrisNvidiumTerrainTranslatorTest {
             assertEquals(alias, aliases.get(name), "Missing runtime alias for " + name);
             assertTrue(declarations.contains("uniform sampler2D " + alias + ";"),
                     "Missing shader sampler declaration for " + name);
+            String fragmentSource = """
+                    #version 150
+                    uniform sampler2D %s;
+                    void main() { gl_FragColor = texture2D(%s, vec2(0.5)); }
+                    """.formatted(name, name);
+            String translated = translator("""
+                    #version 150
+                    void main() { gl_Position = ftransform(); }
+                    """, fragmentSource).adapt(nativeStages()).get("FRAGMENT");
+            assertTrue(translated.contains("texture(" + alias + ", vec2(0.5))"),
+                    "The translator did not accept and rewrite " + name);
         }
     }
 
