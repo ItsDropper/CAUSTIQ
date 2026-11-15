@@ -59,15 +59,14 @@ public final class IrisTerrainCompatibilityAnalyzer {
             "gl_MultiTexCoord4", "gl_MultiTexCoord5", "gl_MultiTexCoord6", "gl_MultiTexCoord7",
             "gl_SecondaryColor", "gl_FogCoord", "gl_ClipVertex", "gl_PointSize");
     private static final Set<String> UNAVAILABLE_TRANSFORMS = Set.of(
-            "gbufferPreviousModelView", "gbufferPreviousModelViewInverse",
-            "gbufferPreviousProjection", "gbufferPreviousProjectionInverse",
-            "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse",
-            "previousCameraPosition");
+            "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse");
     private static final Set<String> AVAILABLE_VERTEX_UNIFORMS = Set.of(
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection",
-            "gbufferProjectionInverse", "cameraPosition", "frameTimeCounter", "frameCounter",
+            "gbufferProjectionInverse", "gbufferPreviousModelView", "gbufferPreviousModelViewInverse",
+            "gbufferPreviousProjection", "gbufferPreviousProjectionInverse", "previousCameraPosition",
+            "cameraPosition", "frameTimeCounter", "frameCounter",
             "near", "far", "atlasSize", "rainStrength", "wetness", "taa_offset", "light_dir",
-            "world_age", "worldTime", "worldDay", "time_sunrise", "time_noon", "time_sunset",
+            "world_age", "worldTime", "worldDay", "day_factor", "eyePosition", "time_sunrise", "time_noon", "time_sunset",
             "time_midnight", "biome_temperature", "biome_humidity", "alphaTestRef",
             "blockEntityId", "entityId", "currentRenderedItemId", "entityColor", "view_res", "view_pixel_size");
     private static final Set<String> AVAILABLE_SAMPLERS = Set.of(
@@ -175,11 +174,9 @@ public final class IrisTerrainCompatibilityAnalyzer {
         Matcher samplers = SAMPLER.matcher(source);
         while (samplers.find()) {
             String sampler = samplers.group(2);
-            if (stage.equals("vertex") || !AVAILABLE_SAMPLERS.contains(sampler)) {
+            if (!AVAILABLE_SAMPLERS.contains(sampler)) {
                 issues.add(new Issue("UNBOUND_SAMPLER", sampler,
-                        stage.equals("vertex")
-                                ? "Nvidium does not bind Iris terrain samplers to the mesh/vertex stage."
-                                : "The sampler has no binding in Nvidium's current terrain fragment pipeline."));
+                        "The sampler has no binding in Nvidium's current terrain stage ABI."));
             }
         }
     }
