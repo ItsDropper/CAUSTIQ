@@ -36,7 +36,9 @@ public final class NvidiumGBufferTargets {
     private static final int REQUIRED_DRAW_BUFFERS = ATTACHMENT_COUNT + 1;
 
     private static final int[] TEXTURES = new int[ATTACHMENT_COUNT];
+    private static final int[] ALTERNATE_TEXTURES = new int[ATTACHMENT_COUNT];
     private static final TextureTarget[] TARGETS = new TextureTarget[ATTACHMENT_COUNT];
+    private static final TextureTarget[] ALTERNATE_TARGETS = new TextureTarget[ATTACHMENT_COUNT];
     private static int width;
     private static int height;
     private static FramebufferState activeState;
@@ -179,12 +181,20 @@ public final class NvidiumGBufferTargets {
         restore(state);
     }
 
-    /** Returns the GL texture object for an auxiliary color attachment (1 through 4). */
+    /** Returns the terrain-produced GL texture for an auxiliary color attachment (1 through 7). */
     public static int texture(int attachment) {
         if (attachment < NORMAL || attachment > MAX_ATTACHMENT) {
             throw new IllegalArgumentException("G-buffer attachment must be between 1 and " + MAX_ATTACHMENT + ".");
         }
         return TEXTURES[attachment - 1];
+    }
+
+    /** Alternate storage used by Iris deferred/composite ping-pong passes. */
+    public static int alternateTexture(int attachment) {
+        if (attachment < NORMAL || attachment > MAX_ATTACHMENT) {
+            throw new IllegalArgumentException("G-buffer attachment must be between 1 and " + MAX_ATTACHMENT + ".");
+        }
+        return ALTERNATE_TEXTURES[attachment - 1];
     }
 
     /** Minecraft GPU view for sampling this attachment in a RenderPass. */
@@ -205,8 +215,11 @@ public final class NvidiumGBufferTargets {
         end();
         for (int i = 0; i < TARGETS.length; i++) {
             if (TARGETS[i] != null) TARGETS[i].destroyBuffers();
+            if (ALTERNATE_TARGETS[i] != null) ALTERNATE_TARGETS[i].destroyBuffers();
             TARGETS[i] = null;
+            ALTERNATE_TARGETS[i] = null;
             TEXTURES[i] = 0;
+            ALTERNATE_TEXTURES[i] = 0;
         }
         width = 0;
         height = 0;
@@ -222,9 +235,14 @@ public final class NvidiumGBufferTargets {
             for (int i = 0; i < TARGETS.length; i++) {
                 TARGETS[i] = new TextureTarget("Caustiq Nvidium G-buffer " + (i + 1),
                         newWidth, newHeight, false);
+                ALTERNATE_TARGETS[i] = new TextureTarget("Caustiq Iris ping-pong " + (i + 1),
+                        newWidth, newHeight, false);
             }
         } else if (width != newWidth || height != newHeight) {
-            for (TextureTarget target : TARGETS) target.resize(newWidth, newHeight);
+            for (int i = 0; i < TARGETS.length; i++) {
+                TARGETS[i].resize(newWidth, newHeight);
+                ALTERNATE_TARGETS[i].resize(newWidth, newHeight);
+            }
         }
         int previousActiveTexture = GL11C.glGetInteger(GL13_ACTIVE_TEXTURE);
         int previousTextureBinding = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
@@ -240,18 +258,11 @@ public final class NvidiumGBufferTargets {
                 boolean nearest = spec != null && spec.nearest();
                 boolean mipmap = spec != null && spec.mipmap();
                 TEXTURES[i] = ((GlTexture) TARGETS[i].getColorTexture()).glId();
-                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, TEXTURES[i]);
-                GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER,
-                        mipmap ? GL11C.GL_LINEAR_MIPMAP_LINEAR : (nearest ? GL11C.GL_NEAREST : GL11C.GL_LINEAR));
-                GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER,
-                        nearest ? GL11C.GL_NEAREST : GL11C.GL_LINEAR);
-                GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, GL12_CLAMP_TO_EDGE);
-                GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, GL12_CLAMP_TO_EDGE);
-                if (formatsDirty || width != newWidth || height != newHeight) {
-                    GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, format.internalFormat(),
-                            newWidth, newHeight, 0, format.externalFormat(), format.dataType(),
-                            (java.nio.ByteBuffer) null);
-                }
+                ALTERNATE_TEXTURES[i] = ((GlTexture) ALTERNATE_TARGETS[i].getColorTexture()).glId();
+                configureTexture(TEXTURES[i], format, nearest, mipmap, newWidth, newHeight,
+                        formatsDirty || width != newWidth || height != newHeight);
+                configureTexture(ALTERNATE_TEXTURES[i], format, nearest, mipmap, newWidth, newHeight,
+                        formatsDirty || width != newWidth || height != newHeight);
             }
             width = newWidth;
             height = newHeight;
@@ -261,6 +272,23 @@ public final class NvidiumGBufferTargets {
             GL13C.glActiveTexture(previousActiveTexture);
             GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
             GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+        }
+    }
+
+    private static void configureTexture(int texture, FormatDescriptor format, boolean nearest,
+                                         boolean mipmap, int textureWidth, int textureHeight,
+                                         boolean allocateStorage) {
+        GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER,
+                mipmap ? GL11C.GL_LINEAR_MIPMAP_LINEAR : (nearest ? GL11C.GL_NEAREST : GL11C.GL_LINEAR));
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER,
+                nearest ? GL11C.GL_NEAREST : GL11C.GL_LINEAR);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, GL12_CLAMP_TO_EDGE);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, GL12_CLAMP_TO_EDGE);
+        if (allocateStorage) {
+            GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, format.internalFormat(),
+                    textureWidth, textureHeight, 0, format.externalFormat(), format.dataType(),
+                    (java.nio.ByteBuffer) null);
         }
     }
 
