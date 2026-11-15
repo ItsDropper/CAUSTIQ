@@ -617,13 +617,13 @@ public final class NvidiumIrisUniformBridge {
                     sunIsShadowSource ? sx : -sx,
                     sunIsShadowSource ? sy : -sy,
                     sunIsShadowSource ? sz : -sz);
-            putVector3(values, "eyePosition", eyePosition(player, snapshot));
+            putVector3(values, "eyePosition", eyePosition(cameraEntity, snapshot));
             putVector3(values, "relativeEyePosition",
                     snapshot.cameraX() - values.get("eyePosition.x"),
                     snapshot.cameraY() - values.get("eyePosition.y"),
                     snapshot.cameraZ() - values.get("eyePosition.z"));
-            putVector3(values, "playerLookVector", entityVector(player, "getViewVector", 0.0f, 0.0f, -1.0f));
-            putVector3(values, "playerBodyVector", entityVector(player, "getForward", 0.0f, 0.0f, -1.0f));
+            putVector3(values, "playerLookVector", entityVector(cameraEntity, "getViewVector", 0.0f, 0.0f, -1.0f));
+            putVector3(values, "playerBodyVector", entityVector(cameraEntity, "getForward", 0.0f, 0.0f, -1.0f));
             Object vehicle = invokeObject(player, "getVehicle");
             putVector3(values, "vehicleLookVector", entityVector(vehicle, "getForward", 0.0f, 0.0f, -1.0f));
             double[] vehiclePosition = entityPosition(vehicle);
@@ -870,25 +870,73 @@ public final class NvidiumIrisUniformBridge {
         }
     }
 
-    private static boolean effectPresent(Object player, String effectPath) {
-        if (player == null) return false;
-        Object effects = invokeObject(player, "getActiveEffects");
-        if (!(effects instanceof Iterable<?> iterable)) return false;
+    private static Object activeEffect(Object entity, String effectPath) {
+        if (entity == null) return null;
+        Object effects = invokeObject(entity, "getActiveEffects");
+        if (!(effects instanceof Iterable<?> iterable)) return null;
         for (Object instance : iterable) {
             Object holder = invokeObject(instance, "getEffect");
             Object effect = invokeObject(holder, "value");
             if (effect == null) effect = holder;
             try {
                 Object key = BuiltInRegistries.MOB_EFFECT.getKey((net.minecraft.world.effect.MobEffect) effect);
-                if (key != null && effectPath.equals(invokeObject(key, "getPath"))) return true;
+                if (key != null && effectPath.equals(invokeObject(key, "getPath"))) return instance;
             } catch (RuntimeException ignored) { }
         }
-        return false;
+        return null;
+    }
+
+    private static double blindnessFactor(Object entity) {
+        Object effect = activeEffect(entity, "blindness");
+        if (effect == null) return 0.0;
+        if (invokeBoolean(effect, "isInfiniteDuration", false)) return 1.0;
+        return clamp01(invokeDouble(effect, "getDuration", 0.0) / 20.0);
+    }
+
+    private static double darknessFactor(Object entity) {
+        Object effect = activeEffect(entity, "darkness");
+        if (effect == null) return 0.0;
+        Object value = invokeCompatibleQuietly(effect, "getBlendFactor", entity, 1.0f);
+        return value instanceof Number number ? clamp01(number.doubleValue()) : 0.0;
+    }
+
+    private static double nightVisionFactor(Minecraft client, Object entity) {
+        if (entity != null) {
+            try {
+                Class<?> gameRenderer = Class.forName("net.minecraft.client.renderer.GameRenderer");
+                for (Method method : gameRenderer.getMethods()) {
+                    if (method.getName().equals("getNightVisionScale") && java.lang.reflect.Modifier.isStatic(method.getModifiers())
+                            && method.getParameterCount() == 2) {
+                        Object value = method.invoke(null, entity, 1.0f);
+                        if (value instanceof Number number) return clamp01(number.doubleValue());
+                    }
+                }
+            } catch (ReflectiveOperationException | RuntimeException ignored) { }
+        }
+        Object player = client.player;
+        return activeEffect(player, "night_vision") != null
+                || activeEffect(player, "conduit_power") != null ? 1.0 : 0.0;
+    }
+
+    private static double irisCapturedFloat(String methodName, double fallback) {
+        try {
+            Class<?> stateType = Class.forName("net.irisshaders.iris.uniforms.CapturedRenderingState");
+            Object state = stateType.getField("INSTANCE").get(null);
+            return invokeDouble(state, methodName, fallback);
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
+    private static boolean isSurvivalPlayer(Minecraft client) {
+        Object gameMode = invokeObject(client, "gameMode");
+        Object playerMode = invokeObject(gameMode, "getPlayerMode");
+        return invokeBoolean(playerMode, "isSurvival", false);
     }
 
     private static boolean vehicleInWater(Object player) {
         Object vehicle = invokeObject(player, "getVehicle");
-        return invokeBoolean(vehicle, "isInWater", false);
+        return invokeBoolean(vehicle, "isInShallowWater", false);
     }
 
     private static boolean isRightHanded(Minecraft client) {
@@ -919,6 +967,41 @@ public final class NvidiumIrisUniformBridge {
         if (target == null) return null;
         try { return target.getClass().getMethod(name).invoke(target); }
         catch (ReflectiveOperationException | RuntimeException ignored) { return null; }
+    }
+
+    private static Object invokeCompatibleQuietly(Object target, String name, Object... arguments) {
+        try { return invokeCompatible(target, name, arguments); }
+        catch (ReflectiveOperationException | RuntimeException ignored) { return null; }
+    }
+
+    private static int invokeIntField(Object target, String fieldName, int fallback) {
+        if (target == null) return fallback;
+        Class<?> type = target.getClass();
+        while (type != null) {
+            try {
+                Field field = type.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                Object value = field.get(target);
+                return value instanceof Number number ? number.intValue() : fallback;
+            } catch (ReflectiveOperationException | RuntimeException ignored) {
+                type = type.getSuperclass();
+            }
+        }
+        return fallback;
+    }
+
+    private static double clamp01(double value) {
+        return Math.max(0.0, Math.min(1.0, value));
+    }
+
+    private static float parseFloat(String value, float fallback) {
+        if (value == null) return fallback;
+        try {
+            float parsed = Float.parseFloat(value);
+            return Float.isFinite(parsed) ? parsed : fallback;
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 
     private static Object invokeCompatible(Object target, String name, Object... arguments)
