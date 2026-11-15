@@ -44,6 +44,12 @@ class IrisExpressionTest {
     }
 
     @Test
+    void supportsComplementaryFourArgumentSmoothWithExplicitStateIds() {
+        assertEquals(0.625, IrisExpression.evaluate("smooth(101, 0.625, 20, 10)", ignored -> null), 1.0e-9);
+        assertEquals(1.0, IrisExpression.evaluate("in(2, 0, 1, 2)", ignored -> null), 1.0e-9);
+    }
+
+    @Test
     void rejectsUnknownVariablesAndMalformedExpressions() {
         assertThrows(IllegalArgumentException.class, () -> IrisExpression.evaluate("unknown + 1", ignored -> null));
         assertThrows(IllegalArgumentException.class, () -> IrisExpression.evaluate("sin(", ignored -> null));
