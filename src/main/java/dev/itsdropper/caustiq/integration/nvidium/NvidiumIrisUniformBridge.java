@@ -880,12 +880,16 @@ public final class NvidiumIrisUniformBridge {
         values.put("iris_ModelOffset", 0.0);
         values.put("near", 0.05);
         values.put("far", 512.0);
+        values.put("dhNearPlane", 0.05);
+        values.put("dhFarPlane", 512.0);
+        values.put("dhRenderDistance", 512.0);
         values.put("alphaTestRef", 0.1);
         values.put("pi", Math.PI);
         putVector2(values, "eyeBrightness", 0.0, 0.0);
         putVector2(values, "eyeBrightnessSmooth", 0.0, 0.0);
-        putVector2(values, "atlasSize", 0.0, 0.0);
-        putVector2(values, "gtextureSize", 0.0, 0.0);
+        putVector2(values, "atlasSize", 1.0, 1.0);
+        putVector2(values, "gtextureSize", 1.0, 1.0);
+        putVector2(values, "u_TextureScale", 1.0, 1.0);
         putVector2(values, "currentYearTime", 0.0, 0.0);
         putVector2(values, "viewSize", 1.0, 1.0);
         putVector2(values, "iris_ScreenSize", 1.0, 1.0);
@@ -916,6 +920,7 @@ public final class NvidiumIrisUniformBridge {
         putVector3(values, "iris_ModelOffset", 0.0, 0.0, 0.0);
         putVector3(values, "iris_CameraTranslation", 0.0, 0.0, 0.0);
         putVector3(values, "u_RegionOffset", 0.0, 0.0, 0.0);
+        putVector3(values, "u_ModelScale", 1.0, 1.0, 1.0);
         putVector4(values, "lightningBoltPosition", 0.0, 0.0, 0.0, 0.0);
         putVector4(values, "entityColor", 0.0, 0.0, 0.0, 0.0);
         putVector4(values, "iris_FogColor", 0.0, 0.0, 0.0, 0.0);
