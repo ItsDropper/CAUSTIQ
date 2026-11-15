@@ -229,6 +229,13 @@ assert "NvidiumIrisChunkVertex.commit()" in compatibility
 assert "use_sodium_vertex_format=true" in compatibility
 assert "isCommitted()" in (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
 assert "SODIUM_VERTEX_FORMAT_DEFINE" in adapter
+preprocessor = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/IrisGlslConditionalPreprocessor.java").read_text(encoding="utf-8")
+assert "maskComments(normalized)" in preprocessor
+assert "private static String maskComments(String source)" in preprocessor
+translator = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/IrisNvidiumTerrainTranslator.java").read_text(encoding="utf-8")
+assert "softwareRenderHarnessSources()" in translator
+render_smoke = (caustiq_root / "src/test/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisTerrainGlRenderSmokeTest.java").read_text(encoding="utf-8")
+assert "rendersTheTranslatedPhotonTerrainVertexAndFragmentProgramsOnMesa" in render_smoke
 bridge = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumShaderProgramBridge.java").read_text(encoding="utf-8")
 assert 'dumpShaderSources("before-adaptation", original)' in bridge
 assert 'dumpShaderSources("compiled", transformed)' in bridge
