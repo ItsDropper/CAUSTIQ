@@ -43,8 +43,7 @@ public final class IrisNvidiumTerrainTranslator {
     private static final Set<String> UNSUPPORTED_RUNTIME_UNIFORMS = Set.of(
             "normals", "specular", "depthtex1", "colortex15",
             "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans",
-            "taa_offset",
-            "time_sunrise", "time_noon", "time_sunset", "time_midnight");
+            "taa_offset");
     private static final Set<String> SUPPORTED_ATTRIBUTES = Set.of(
             "mc_Entity", "at_midBlock", "mc_midTexCoord", "at_midTexCoord",
             "iris_Normal", "at_tangent", "vaPosition", "vaUV0", "vaUV2", "vaColor",
