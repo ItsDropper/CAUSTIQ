@@ -116,9 +116,22 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             }
         }
 
-        int maxLocation = writes.stream().mapToInt(Integer::intValue).max().orElse(0);
-        int[] drawBuffers = new int[maxLocation + 1];
-        for (int i = 0; i < drawBuffers.length; i++) drawBuffers[i] = GL11C.GL_NONE;
+        Map<Integer, Integer> outputTargets = pass.outputTargets();
+        int maxOutputSlot = outputTargets.keySet().stream().mapToInt(Integer::intValue).max().orElse(0);
+        int[] drawBuffers = new int[maxOutputSlot + 1];
+        java.util.Arrays.fill(drawBuffers, GL11C.GL_NONE);
+        if (outputTargets.isEmpty()) {
+            drawBuffers[0] = GL30C.GL_COLOR_ATTACHMENT0;
+        } else {
+            outputTargets.forEach((slot, target) -> {
+                if (slot < 0 || slot >= drawBuffers.length || !writes.contains(target)) {
+                    throw new IllegalStateException("Iris pass '" + pass.name()
+                            + "' has an invalid fragment output mapping: slot " + slot
+                            + " -> colortex" + target + ".");
+                }
+                drawBuffers[slot] = GL30C.GL_COLOR_ATTACHMENT0 + target;
+            });
+        }
 
         GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, framebuffer);
         for (int location = 0; location <= MAX_COLOR_TARGET; location++) {
