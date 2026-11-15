@@ -267,14 +267,13 @@ public final class IrisShaderResources implements AutoCloseable {
             String vectorName = name.substring(0, separator);
             TypedExpression vector = variables.get(vectorName);
             if (vector != null && componentCount(vector.type()) > 1) {
-                int component = vectorComponent(name.substring(separator + 1));
-                double[] components = evaluateVariableTyped(vectorName, vector.type(),
-                        context, evaluated, stack);
-                if (component >= components.length) {
-                    throw new IllegalArgumentException("Iris vector variable '" + vectorName
-                            + "' has no component '" + name.substring(separator + 1) + "'.");
-                }
-                return components[component];
+                return resolveVectorComponent(vectorName, name.substring(separator + 1), vector.type(),
+                        context, evaluated, stack, false);
+            }
+            vector = uniforms.get(vectorName);
+            if (vector != null && componentCount(vector.type()) > 1) {
+                return resolveVectorComponent(vectorName, name.substring(separator + 1), vector.type(),
+                        context, evaluated, stack, true);
             }
         }
         return evaluateVariable(name, context, evaluated, stack);
@@ -288,6 +287,47 @@ public final class IrisShaderResources implements AutoCloseable {
             case "w", "a" -> 3;
             default -> throw new IllegalArgumentException("Unsupported Iris vector component '" + component + "'.");
         };
+    }
+
+    private double resolveVectorComponent(String name, String componentName, String type,
+                                           Map<String, Double> context, Map<String, Double> evaluated,
+                                           List<String> stack, boolean uniform) {
+        int component = vectorComponent(componentName);
+        double[] components = uniform
+                ? evaluateUniformVectorTyped(name, type, context, evaluated, stack)
+                : evaluateVariableTyped(name, type, context, evaluated, stack);
+        if (component >= components.length) {
+            throw new IllegalArgumentException("Iris vector " + (uniform ? "uniform" : "variable") + " '" + name
+                    + "' has no component '" + componentName + "'.");
+        }
+        return components[component];
+    }
+
+    private double[] evaluateUniformVectorTyped(String name, String expectedType, Map<String, Double> context,
+                                                Map<String, Double> evaluated, List<String> stack) {
+        TypedExpression expression = uniforms.get(name);
+        if (expression == null) throw new IllegalArgumentException("Unknown Iris vector uniform '" + name + "'.");
+        if (!expression.type().equals(expectedType)) {
+            throw new IllegalArgumentException("Iris uniform '" + name + "' has type " + expression.type()
+                    + " but " + expectedType + " was required.");
+        }
+        String marker = "uniform:" + name;
+        if (stack.contains(marker)) {
+            throw new IllegalArgumentException("Cyclic Iris uniform dependency: "
+                    + String.join(" -> ", stack) + " -> " + marker);
+        }
+        stack.add(marker);
+        double[] value = evaluateVectorExpression(expression, context, evaluated, stack);
+        stack.removeLast();
+        return value;
+    }
+
+    private double[] evaluateVectorReference(String name, String expectedType, Map<String, Double> context,
+                                             Map<String, Double> evaluated, List<String> stack) {
+        if (variables.containsKey(name)) {
+            return evaluateVariableTyped(name, expectedType, context, evaluated, stack);
+        }
+        return evaluateUniformVectorTyped(name, expectedType, context, evaluated, stack);
     }
 
     private double evaluateVariable(String name, Map<String, Double> context,
@@ -340,8 +380,9 @@ public final class IrisShaderResources implements AutoCloseable {
     private double[] evaluateVectorExpression(TypedExpression expression, Map<String, Double> context,
                                               Map<String, Double> evaluated, List<String> stack) {
         String source = expression.expression().trim();
-        if (source.matches("[A-Za-z_][A-Za-z0-9_]*") && variables.containsKey(source)) {
-            return evaluateVariableTyped(source, expression.type(), context, evaluated, stack);
+        if (source.matches("[A-Za-z_][A-Za-z0-9_]*")
+                && (variables.containsKey(source) || uniforms.containsKey(source))) {
+            return evaluateVectorReference(source, expression.type(), context, evaluated, stack);
         }
         String prefix = expression.type() + "(";
         if (source.startsWith(prefix) && source.endsWith(")")) {

@@ -80,6 +80,30 @@ class IrisShaderResourcesTest {
     }
 
     @Test
+    void resolvesComponentsAndAliasesOfCustomVectorUniforms() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("UniformVectors/shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), """
+                uniform.vec3.sun_dir=vec3(0.25, -0.5, 0.75)
+                variable.float.day_factor_u=clamp(abs(sun_dir.y) / 0.3, 0.0, 1.0)
+                uniform.float.day_factor=day_factor_u * day_factor_u
+                uniform.float.sun_vertical=abs(sun_dir.y)
+                uniform.vec3.sun_dir_copy=sun_dir
+                """);
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("uniform-vectors", "UniformVectors",
+                temporaryDirectory.resolve("UniformVectors"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            try (IrisShaderResources resources = IrisShaderResources.load(model.properties(), sources)) {
+                Map<String, double[]> values = resources.evaluateUniformValues(Map.of());
+                assertEquals(1.0, values.get("day_factor")[0], 1.0e-9);
+                assertEquals(0.5, values.get("sun_vertical")[0], 1.0e-9);
+                assertArrayEquals(new double[]{0.25, -0.5, 0.75}, values.get("sun_dir_copy"), 1.0e-9);
+            }
+        }
+    }
+
+    @Test
     void loadsProgramScopedRawThreeDimensionalTextures() throws IOException {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("Scoped/shaders"));
         Path imageDirectory = Files.createDirectories(shaders.resolve("image"));
