@@ -105,6 +105,16 @@ public final class IrisGlslConditionalPreprocessor {
      * offsets; active non-directive lines are still emitted from the original
      * source so comments remain intact in the resulting shader.
      */
+    /**
+     * Removes GLSL comments without interpreting a slash-star sequence that
+     * occurs inside a line comment as the start of a block comment. Photon
+     * uses the Iris-compatible //*, //*/ toggle idiom, which regex-based
+     * block-comment stripping corrupts.
+     */
+    public static String stripComments(String source) {
+        return maskComments(source);
+    }
+
     private static String maskComments(String source) {
         char[] masked = source.toCharArray();
         boolean blockComment = false;
