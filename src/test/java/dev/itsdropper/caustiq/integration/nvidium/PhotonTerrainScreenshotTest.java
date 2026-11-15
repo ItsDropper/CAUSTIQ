@@ -122,7 +122,7 @@ class PhotonTerrainScreenshotTest {
                 ByteBuffer pixels = BufferUtils.createByteBuffer(WIDTH * HEIGHT * 4);
                 GL11C.glReadPixels(0, 0, WIDTH, HEIGHT, GL11C.GL_RGBA, GL11C.GL_UNSIGNED_BYTE, pixels);
                 BufferedImage image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_ARGB);
-                boolean nonBlackPixel = false;
+                boolean renderedPixel = false;
                 for (int y = 0; y < HEIGHT; y++) {
                     for (int x = 0; x < WIDTH; x++) {
                         int offset = (y * WIDTH + x) * 4;
@@ -131,10 +131,10 @@ class PhotonTerrainScreenshotTest {
                         int b = Byte.toUnsignedInt(pixels.get(offset + 2));
                         int a = Byte.toUnsignedInt(pixels.get(offset + 3));
                         image.setRGB(x, HEIGHT - 1 - y, (a << 24) | (r << 16) | (g << 8) | b);
-                        nonBlackPixel |= r != 0 || g != 0 || b != 0 || a != 0;
+                        renderedPixel |= r != 9 || g != 14 || b != 23;
                     }
                 }
-                assertTrue(nonBlackPixel, "Photon terrain render produced an entirely empty framebuffer.");
+                assertTrue(renderedPixel, "Photon terrain render produced only the framebuffer clear color.");
                 Path output = Path.of(System.getenv().getOrDefault(
                         "CAUSTIQ_SCREENSHOT_DIR", "build/caustiq-photon-screenshots"));
                 Files.createDirectories(output);
