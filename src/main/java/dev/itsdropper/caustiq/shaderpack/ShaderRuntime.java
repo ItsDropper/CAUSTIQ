@@ -228,8 +228,11 @@ public final class ShaderRuntime {
             preparedTerrainAdapterRegistered = false;
         }
         if (!preparedTerrainAdapterRegistered) {
+            IrisTerrainPassScheduler.Plan dimensionPlan = preparedPackModel == null
+                    ? null : new IrisTerrainPassScheduler().schedule(
+                            preparedPackModel, dimensionId.isEmpty() ? null : dimensionId);
             NvidiumGBufferTargets.configureTargets(
-                    preparedTerrainPlan == null ? Map.of() : preparedTerrainPlan.targets());
+                    dimensionPlan == null ? Map.of() : dimensionPlan.targets());
             NvidiumShaderProgramBridge.registerTerrainAdapter(
                     translator::adapt, translator.renderTargetIndices());
             activeTerrainDimensionKey = adapterKey;
