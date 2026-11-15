@@ -536,6 +536,31 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
 
+    @Test
+    void translatesAndDeclaresIrisAspectRatioAndEmitsRealNewlinesForMrtOutputs() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                /* RENDERTARGETS: 1, 2 */
+                uniform float aspectRatio;
+                out vec4 first;
+                out vec4 second;
+                void main() {
+                    first = vec4(aspectRatio);
+                    second = vec4(1.0);
+                }
+                """);
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform float caustiqAspectRatio;"));
+        assertTrue(fragment.contains("first = vec4(caustiqAspectRatio);"));
+        assertTrue(fragment.contains("layout(location = 2) out vec4 caustiqIrisOutput0;\n"));
+        assertTrue(fragment.contains("layout(location = 3) out vec4 caustiqIrisOutput1;\n"));
+        assertFalse(fragment.contains("\\n"),
+                "Generated GLSL must not contain literal backslash-n tokens from MRT declarations.");
+    }
+
     private static Map<String, String> pinnedNvidiumStages() throws Exception {
         String root = System.getenv("NVIDIUM_SOURCE_DIR");
         Assumptions.assumeTrue(root != null && !root.isBlank(),
