@@ -95,6 +95,15 @@ class IrisBlockPropertiesParserTest {
     }
 
     @Test
+    void treatsNaturalLanguageIfCommentsAsCommentsInsteadOfConditionalDirectives() {
+        var result = parser.parse("""
+                #if you want to add modded blocks, please feel free to put your block IDs in the following sections:
+                block.4=minecraft:stone
+                """);
+        assertEquals(java.util.Map.of("minecraft:stone", 4), result);
+    }
+
+    @Test
     void ignoresNonBlockPropertiesAndComments() {
         var result = parser.parse("""
                 entity.1=minecraft:zombie
