@@ -23,6 +23,10 @@ public final class IrisTerrainPassScheduler {
     private static final Pattern OUTPUT_LOCATION = Pattern.compile(
             "(?m)layout\\s*\\([^)]*location\\s*=\\s*(\\d+)[^)]*\\)\\s*out\\s+");
     private static final Pattern FRAG_DATA = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]");
+    private static final Pattern RENDERTARGETS = Pattern.compile(
+            "/\\\\*\\\\s*RENDERTARGETS\\\\s*:\\s*([^*]*?)\\\\*/", Pattern.CASE_INSENSITIVE);
+    private static final Pattern DRAWBUFFERS = Pattern.compile(
+            "/\\\\*\\\\s*DRAWBUFFERS\\\\s*:\\s*([^*]*?)\\\\*/", Pattern.CASE_INSENSITIVE);
     private static final Pattern TARGET_KEY = Pattern.compile(
             "^([0-9]+)(Format|Clear|ClearColor|Mipmap|Persistent|Scale|ScaleX|ScaleY|Nearest)$",
             Pattern.CASE_INSENSITIVE);
@@ -105,12 +109,63 @@ public final class IrisTerrainPassScheduler {
         while (matcher.find()) targets.add(Integer.parseInt(matcher.group(1)));
     }
 
+    /**
+     * Resolves GLSL fragment output slots to Iris colortex indices. RENDERTARGETS
+     * and legacy DRAWBUFFERS comments describe the mapping; layout(location) and
+     * gl_FragData indices are only output slots, not colortex indices themselves.
+     */
     private static void collectOutputs(String source, Set<Integer> targets) {
+        Set<Integer> outputSlots = new LinkedHashSet<>();
         Matcher locations = OUTPUT_LOCATION.matcher(source);
-        while (locations.find()) targets.add(Integer.parseInt(locations.group(1)));
+        while (locations.find()) outputSlots.add(Integer.parseInt(locations.group(1)));
         Matcher legacy = FRAG_DATA.matcher(source);
-        while (legacy.find()) targets.add(Integer.parseInt(legacy.group(1)));
-        if (targets.isEmpty() && !source.isBlank()) targets.add(0);
+        while (legacy.find()) outputSlots.add(Integer.parseInt(legacy.group(1)));
+        if (outputSlots.isEmpty()) {
+            if (!source.isBlank()) targets.add(0);
+            return;
+        }
+
+        List<Integer> targetMapping = parseOutputTargetMapping(source);
+        for (int outputSlot : outputSlots) {
+            if (targetMapping == null) {
+                targets.add(outputSlot);
+            } else {
+                if (outputSlot >= targetMapping.size()) {
+                    throw new IllegalArgumentException("Fragment output slot " + outputSlot
+                            + " has no entry in its Iris RENDERTARGETS/DRAWBUFFERS directive.");
+                }
+                targets.add(targetMapping.get(outputSlot));
+            }
+        }
+    }
+
+    private static List<Integer> parseOutputTargetMapping(String source) {
+        Matcher renderTargets = RENDERTARGETS.matcher(source);
+        Matcher drawBuffers = DRAWBUFFERS.matcher(source);
+        if (renderTargets.find() && drawBuffers.find()) {
+            throw new IllegalArgumentException("A fragment shader cannot declare both RENDERTARGETS and DRAWBUFFERS.");
+        }
+        if (renderTargets.reset().find()) {
+            List<Integer> result = new ArrayList<>();
+            for (String token : renderTargets.group(1).trim().split("\\s*,\\s*")) {
+                if (!token.matches("\\d+")) {
+                    throw new IllegalArgumentException("Invalid Iris RENDERTARGETS entry: " + token);
+                }
+                result.add(Integer.parseInt(token));
+            }
+            if (result.isEmpty()) throw new IllegalArgumentException("Iris RENDERTARGETS directive is empty.");
+            return List.copyOf(result);
+        }
+        if (drawBuffers.reset().find()) {
+            String digits = drawBuffers.group(1).replaceAll("\\s+", "");
+            if (digits.isEmpty() || !digits.matches("[0-7]+")) {
+                throw new IllegalArgumentException("Invalid Iris DRAWBUFFERS directive: " + drawBuffers.group(1));
+            }
+            List<Integer> result = new ArrayList<>(digits.length());
+            for (int i = 0; i < digits.length(); i++) result.add(digits.charAt(i) - '0');
+            return List.copyOf(result);
+        }
+        return null;
     }
 
     private static Set<Integer> parseImageBindings(String source) {
