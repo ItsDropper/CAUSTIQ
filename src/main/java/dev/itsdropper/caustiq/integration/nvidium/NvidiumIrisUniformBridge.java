@@ -637,6 +637,7 @@ public final class NvidiumIrisUniformBridge {
         putScalar(values, "viewWidth", viewWidth);
         putScalar(values, "viewHeight", viewHeight);
         putScalar(values, "aspectRatio", viewHeight <= 0 ? 1.0 : (double) viewWidth / viewHeight);
+        putVector2(values, "iris_ScreenSize", viewWidth, viewHeight);
         putVector2(values, "viewSize", viewWidth, viewHeight);
         putVector2(values, "iris_ScreenSize", viewWidth, viewHeight);
         putVector2(values, "iris_ScreenSize", viewWidth, viewHeight);
@@ -880,6 +881,10 @@ public final class NvidiumIrisUniformBridge {
         values.put("iris_ModelOffset", 0.0);
         values.put("near", 0.05);
         values.put("far", 512.0);
+        values.put("aspectRatio", 1.0);
+        values.put("viewWidth", 1.0);
+        values.put("viewHeight", 1.0);
+        values.put("frameTime", 1.0 / 60.0);
         values.put("dhNearPlane", 0.05);
         values.put("dhFarPlane", 512.0);
         values.put("dhRenderDistance", 512.0);
