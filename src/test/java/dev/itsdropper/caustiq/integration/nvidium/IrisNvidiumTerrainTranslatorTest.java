@@ -25,10 +25,16 @@ import static org.junit.jupiter.api.Assertions.*;
 class IrisNvidiumTerrainTranslatorTest {
     @Test
     void hoistsIrisExtensionDirectivesIntoNativeShaderPreamble() {
-        String nativeSource = "#version 460 core\\n"
-                + "layout(local_size_x = 1) in;\\nvoid main() {}\\n";
-        String injectedSource = "#extension GL_ARB_gpu_shader5 : enable\\n"
-                + "uniform float value;\\nvoid irisMain() {}\\n";
+        String nativeSource = """
+                #version 460 core
+                layout(local_size_x = 1) in;
+                void main() {}
+                """;
+        String injectedSource = """
+                #extension GL_ARB_gpu_shader5 : enable
+                uniform float value;
+                void irisMain() {}
+                """;
 
         String hoisted = IrisNvidiumTerrainTranslator.hoistExtensions(nativeSource, injectedSource);
         String cleaned = IrisNvidiumTerrainTranslator.stripExtensions(injectedSource);
