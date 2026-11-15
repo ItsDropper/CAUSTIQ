@@ -189,7 +189,16 @@ public final class ShaderRuntime {
             String dimensionId = minecraft.level.dimension().location().toString();
             String directory = preparedDimensionMappings.getOrDefault(
                     dimensionId, builtInDimensionDirectory(dimensionId));
-            if (!preparedTerrainDimensionKey.equals(directory)) return false;
+            if (!preparedTerrainDimensionKey.equals(directory)) {
+                if (preparedTerrainAdapterRegistered) {
+                    NvidiumShaderProgramBridge.unregisterTerrainAdapter();
+                    NvidiumGBufferTargets.resetOutputRouting();
+                    NvidiumGBufferTargets.configureTargets(Map.of());
+                    preparedTerrainAdapterRegistered = false;
+                    NvidiumRenderBridge.reloadShaders();
+                }
+                return false;
+            }
         }
 
         if (!preparedTerrainAdapterRegistered) {
