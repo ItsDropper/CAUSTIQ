@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 public final class IrisGlProgramCompiler {
     private static final Pattern VERSION = Pattern.compile("(?m)^\\s*#\\s*version[^\\r\\n]*\\R?");
     private static final Pattern EXTENSION = Pattern.compile("(?m)^\\s*#\\s*extension[^\\r\\n]*\\R?");
-    private static final Pattern SAMPLER = Pattern.compile("(?m)^\\s*uniform\\s+sampler2D\\s+(\\w+)\\s*;\\s*");
+    private static final Pattern SAMPLER = Pattern.compile("(?m)^\\s*uniform\\s+(sampler\\w+)\\s+(\\w+)\\s*;\\s*");
     private static final Pattern FRAG_DATA = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]");
     private static final Pattern TEXCOORD = Pattern.compile("\\bgl_TexCoord\\s*\\[\\s*(\\d+)\\s*]");
     private static final String FULLSCREEN_VERTEX = """
@@ -35,11 +35,6 @@ public final class IrisGlProgramCompiler {
                 uv = t;
             }
             """;
-
-    private static final Set<String> SUPPORTED_SAMPLERS = Set.of(
-            "gcolor", "DiffuseSampler", "texture", "tex",
-            "colortex0", "colortex1", "colortex2", "colortex3",
-            "colortex4", "colortex5", "colortex6", "colortex7");
 
     public IrisGlProgram compile(ShaderPackProgramCatalog.Program program,
                                  GlslPreprocessor.SourceProvider sourceProvider,
@@ -103,10 +98,11 @@ public final class IrisGlProgramCompiler {
         Set<String> samplers = new LinkedHashSet<>();
         Matcher matcher = SAMPLER.matcher(source);
         while (matcher.find()) {
-            String name = matcher.group(1);
-            if (!SUPPORTED_SAMPLERS.contains(name)) {
-                throw new IOException("Unsupported Iris pass sampler '" + name
-                        + "'. Shadow, depth, noise and custom texture bindings require their own render resources.");
+            String samplerType = matcher.group(1);
+            String name = matcher.group(2);
+            if (!samplerType.equals("sampler2D")) {
+                throw new IOException("Iris sampler '" + name + "' uses " + samplerType
+                        + "; only sampler2D resources are currently supported by the GL pass executor.");
             }
             samplers.add(name);
         }
@@ -185,7 +181,7 @@ public final class IrisGlProgramCompiler {
         StringBuilder declarations = new StringBuilder();
         if (usesFragColor) declarations.append("layout(location = 0) out vec4 caustiqFragColor;\n");
         for (int index : fragData) {
-            if (index > 7) throw new IOException("Iris MRT location " + index + " exceeds Nvidium's eight draw buffers.");
+            if (index > 31) throw new IOException("Iris MRT location " + index + " exceeds CAUSTIQ's bounded colortex0-colortex31 range.");
             declarations.append("layout(location = ").append(index)
                     .append(") out vec4 caustiqFragData").append(index).append(";\n");
         }
@@ -223,7 +219,7 @@ public final class IrisGlProgramCompiler {
         Matcher matcher = TEXCOORD.matcher(source);
         while (matcher.find()) {
             int index = Integer.parseInt(matcher.group(1));
-            if (index > 7) throw new IOException("Iris gl_TexCoord index " + index + " exceeds the supported range 0-7.");
+            if (index > 31) throw new IOException("Iris gl_TexCoord index " + index + " exceeds the supported range 0-7.");
             indices.add(index);
         }
         return indices;
@@ -234,7 +230,7 @@ public final class IrisGlProgramCompiler {
         Matcher matcher = FRAG_DATA.matcher(source);
         while (matcher.find()) {
             int index = Integer.parseInt(matcher.group(1));
-            if (index > 7) throw new IOException("Iris MRT location " + index + " exceeds Nvidium's eight draw buffers.");
+            if (index > 31) throw new IOException("Iris MRT location " + index + " exceeds Nvidium's eight draw buffers.");
             indices.add(index);
         }
         return indices;

@@ -2,7 +2,9 @@ package dev.itsdropper.caustiq.integration.nvidium;
 
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;
+import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL30C;
+import dev.itsdropper.caustiq.shaderpack.IrisShaderResources;
 
 import java.nio.ByteBuffer;
 import java.util.Random;
@@ -12,12 +14,17 @@ public final class NvidiumIrisTextureBridge {
     private static final int NOISE_SIZE = 512;
     private static int noiseTexture;
     private static BindingState bindingState;
+    private static IrisShaderResources customResources;
 
     private NvidiumIrisTextureBridge() { }
 
     /** Binds deterministic noise and neutral material maps to the explicit shader units 2-4. */
     public static void bindForTerrain() {
-        if (bindingState != null) restoreBindings();
+        bindForTerrain(0);
+    }
+
+    public static void bindForTerrain(int program) {
+        if (bindingState != null || customResources != null) restoreBindings();
         ensureTextures();
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
         int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE5, GL13C.GL_TEXTURE6, GL13C.GL_TEXTURE7};
@@ -33,18 +40,39 @@ public final class NvidiumIrisTextureBridge {
         }
         GL13C.glActiveTexture(previousActive);
         bindingState = new BindingState(previousActive, units, previousBindings);
+        if (program != 0) {
+            int noiseLocation = GL20C.glGetUniformLocation(program, "noisetex");
+            if (noiseLocation >= 0) GL20C.glUniform1i(noiseLocation, 2);
+        }
+    }
+
+    /** Returns the managed fallback noise texture for fullscreen sampler bindings. */
+    public static int noiseTexture() {
+        ensureTextures();
+        return noiseTexture;
     }
 
     /** Restores CAUSTIQ's noise and Iris colortex units after the terrain draw. */
+    public static void bindCustomTextures(IrisShaderResources resources, int program) {
+        if (customResources != null) customResources.restoreTerrainTextures();
+        customResources = resources;
+        if (resources != null) resources.bindTerrainTextures(program, 8);
+    }
+
     public static void restoreBindings() {
         BindingState state = bindingState;
-        if (state == null) return;
         bindingState = null;
-        for (int i = 0; i < state.units().length; i++) {
-            GL13C.glActiveTexture(state.units()[i]);
-            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, state.bindings()[i]);
+        if (state != null) {
+            for (int i = 0; i < state.units().length; i++) {
+                GL13C.glActiveTexture(state.units()[i]);
+                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, state.bindings()[i]);
+            }
+            GL13C.glActiveTexture(state.activeTexture());
         }
-        GL13C.glActiveTexture(state.activeTexture());
+        if (customResources != null) {
+            customResources.restoreTerrainTextures();
+            customResources = null;
+        }
     }
 
     /** Releases owned textures; call on the render thread while an OpenGL context is current. */

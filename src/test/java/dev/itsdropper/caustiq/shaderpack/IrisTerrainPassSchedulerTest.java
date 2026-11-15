@@ -138,6 +138,24 @@ class IrisTerrainPassSchedulerTest {
         }
     }
 
+    @Test
+    void schedulesFullscreenTargetsBeyondNvidiumsSevenAuxiliaryAttachments() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("ExtendedTargets/shaders"));
+        writeProgram(shaders, "composite", """
+                /* RENDERTARGETS: 8, 12, 15 */
+                layout(location = 0) out vec4 first;
+                layout(location = 1) out vec4 second;
+                layout(location = 2) out vec4 third;
+                void main(){ first=vec4(1.0); second=vec4(0.5); third=vec4(0.25); }
+                """);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor("ExtendedTargets", 3))) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
+            assertEquals(java.util.Set.of(8, 12, 15), plan.passes().getFirst().pass().writes());
+            assertTrue(plan.targets().keySet().containsAll(Set.of(8, 12, 15)));
+        }
+    }
+
     private void writeProgram(Path directory, String name, String fragment) throws IOException {
         Files.writeString(directory.resolve(name + ".vsh"), """
                 #version 150

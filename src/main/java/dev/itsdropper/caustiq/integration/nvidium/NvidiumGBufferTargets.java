@@ -39,6 +39,7 @@ public final class NvidiumGBufferTargets {
     private static final int[] ALTERNATE_TEXTURES = new int[ATTACHMENT_COUNT];
     private static final TextureTarget[] TARGETS = new TextureTarget[ATTACHMENT_COUNT];
     private static final TextureTarget[] ALTERNATE_TARGETS = new TextureTarget[ATTACHMENT_COUNT];
+    private static final boolean[] PERSISTENT_INITIALIZED = new boolean[ATTACHMENT_COUNT];
     private static int width;
     private static int height;
     private static FramebufferState activeState;
@@ -52,6 +53,7 @@ public final class NvidiumGBufferTargets {
     /** Applies Iris colortex format/filter/clear directives before the next terrain draw. */
     public static void configureTargets(Map<Integer, IrisTerrainPassScheduler.RenderTarget> specs) {
         targetSpecs = Map.copyOf(specs);
+        Arrays.fill(PERSISTENT_INITIALIZED, false);
         formatsDirty = true;
     }
 
@@ -225,12 +227,15 @@ public final class NvidiumGBufferTargets {
         height = 0;
         targetSpecs = Map.of();
         resetOutputRouting();
+        Arrays.fill(PERSISTENT_INITIALIZED, false);
         formatsDirty = true;
     }
 
     private static void ensureTargets(int newWidth, int newHeight) {
         int previousDrawFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
         int previousReadFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
+        boolean resized = TARGETS[0] == null || width != newWidth || height != newHeight;
+        if (resized || formatsDirty) Arrays.fill(PERSISTENT_INITIALIZED, false);
         if (TARGETS[0] == null) {
             for (int i = 0; i < TARGETS.length; i++) {
                 TARGETS[i] = new TextureTarget("Caustiq Nvidium G-buffer " + (i + 1),
@@ -293,11 +298,13 @@ public final class NvidiumGBufferTargets {
             for (int i = 0; i < ATTACHMENT_COUNT; i++) {
                 int index = i + 1;
                 IrisTerrainPassScheduler.RenderTarget spec = targetSpecs.get(index);
-                if (spec != null && !spec.clear()) continue;
+                if (spec != null && (!spec.clear()
+                        || (spec.persistent() && PERSISTENT_INITIALIZED[i]))) continue;
                 float[] color = parseClearColor(spec == null ? "0.0 0.0 0.0 0.0" : spec.clearColor());
                 FloatBuffer clearValue = stack.mallocFloat(4);
                 clearValue.put(color).flip();
                 GL30C.glClearBufferfv(GL11C.GL_COLOR, index, clearValue);
+                PERSISTENT_INITIALIZED[i] = true;
             }
         }
     }

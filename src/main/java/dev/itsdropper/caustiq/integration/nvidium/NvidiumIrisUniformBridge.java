@@ -1,6 +1,7 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
 import dev.itsdropper.caustiq.CaustiqClient;
+import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 import org.joml.Matrix3f;
 import org.joml.Matrix3fc;
 import org.joml.Matrix4f;
@@ -78,7 +79,9 @@ public final class NvidiumIrisUniformBridge {
             int frameLocation = GL20C.glGetUniformLocation(program, "caustiqFrameCounter");
             if (frameLocation >= 0) GL20C.glUniform1i(frameLocation, snapshot.frameCounter());
             uploadPhotonUniforms(program, snapshot);
-            NvidiumIrisTextureBridge.bindForTerrain();
+            NvidiumIrisTextureBridge.bindForTerrain(program);
+            ShaderRuntime.uploadTerrainCustomUniforms(program);
+            ShaderRuntime.bindTerrainCustomTextures(program);
             warnedUploadFailure = false;
         } catch (ReflectiveOperationException | RuntimeException exception) {
             if (!warnedUploadFailure) {
@@ -169,6 +172,26 @@ public final class NvidiumIrisUniformBridge {
         }
     }
 
+    private static double invokeDouble(Object target, String name, double fallback) {
+        if (target == null) return fallback;
+        try {
+            Object value = target.getClass().getMethod(name).invoke(target);
+            return value instanceof Number number ? number.doubleValue() : fallback;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
+    private static boolean invokeBoolean(Object target, String name, boolean fallback) {
+        if (target == null) return fallback;
+        try {
+            Object value = target.getClass().getMethod(name).invoke(target);
+            return value instanceof Boolean result ? result : fallback;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
     private static long invokeLong(Object target, String name, long fallback) {
         if (target == null) return fallback;
         try {
@@ -222,6 +245,54 @@ public final class NvidiumIrisUniformBridge {
         if (timeLocation >= 0) GL20C.glUniform1f(timeLocation, snapshot.frameTimeCounter());
         int frameLocation = GL20C.glGetUniformLocation(program, "frameCounter");
         if (frameLocation >= 0) GL20C.glUniform1i(frameLocation, snapshot.frameCounter());
+    }
+
+    /** Current frame values exposed to Iris custom uniform/variable expressions. */
+    public static java.util.Map<String, Double> expressionVariables(int viewWidth, int viewHeight) {
+        java.util.Map<String, Double> values = new java.util.HashMap<>();
+        Snapshot snapshot = CURRENT.get();
+        Object level = Minecraft.getInstance().level;
+        long worldAge = invokeLong(level, "getGameTime", 0L);
+        long dayTime = invokeLong(level, "getDayTime", 0L);
+        float rain = invokeFloat(level, "getRainLevel", 1.0f, 0.0f);
+        float sunAngle = invokeFloat(level, "getSunAngle", 1.0f, 0.0f);
+        values.put("frameCounter", snapshot == null ? 0.0 : (double) snapshot.frameCounter());
+        values.put("frameTimeCounter", snapshot == null ? 0.0 : (double) snapshot.frameTimeCounter());
+        values.put("worldAge", (double) worldAge);
+        values.put("worldDay", (double) Math.floorDiv(dayTime, 24_000L));
+        values.put("worldTime", (double) Math.floorMod(dayTime, 24_000L));
+        values.put("rainStrength", (double) rain);
+        values.put("wetness", (double) rain);
+        values.put("sunAngle", (double) sunAngle);
+        values.put("viewWidth", (double) viewWidth);
+        values.put("viewHeight", (double) viewHeight);
+        values.put("aspectRatio", viewHeight == 0 ? 1.0 : (double) viewWidth / viewHeight);
+        values.put("viewSize.x", (double) viewWidth);
+        values.put("viewSize.y", (double) viewHeight);
+        values.put("isNight", Math.floorMod(dayTime, 24_000L) >= 13_000L ? 1.0 : 0.0);
+        values.put("isDay", Math.floorMod(dayTime, 24_000L) < 13_000L ? 1.0 : 0.0);
+        values.put("isRaining", invokeBoolean(level, "isRaining", false) ? 1.0 : 0.0);
+        values.put("isThundering", invokeBoolean(level, "isThundering", false) ? 1.0 : 0.0);
+        Object player = Minecraft.getInstance().player;
+        values.put("eyeAltitude", invokeDouble(player, "getEyeY", 0.0));
+        values.put("health", invokeDouble(player, "getHealth", 20.0));
+        values.put("maxHealth", invokeDouble(player, "getMaxHealth", 20.0));
+        values.put("isSneaking", invokeBoolean(player, "isShiftKeyDown", false) ? 1.0 : 0.0);
+        values.put("isOnGround", invokeBoolean(player, "onGround", false) ? 1.0 : 0.0);
+        values.put("isInWater", invokeBoolean(player, "isInWater", false) ? 1.0 : 0.0);
+        values.put("isInLava", invokeBoolean(player, "isInLava", false) ? 1.0 : 0.0);
+        values.put("isSprinting", invokeBoolean(player, "isSprinting", false) ? 1.0 : 0.0);
+        if (snapshot != null) {
+            values.put("cameraPositionX", (double) snapshot.cameraX());
+            values.put("cameraPositionY", (double) snapshot.cameraY());
+            values.put("cameraPositionZ", (double) snapshot.cameraZ());
+            values.put("cameraPosition.x", (double) snapshot.cameraX());
+            values.put("cameraPosition.y", (double) snapshot.cameraY());
+            values.put("cameraPosition.z", (double) snapshot.cameraZ());
+            values.put("near", (double) projectionDistance(snapshot.projection(), false));
+            values.put("far", (double) projectionDistance(snapshot.projection(), true));
+        }
+        return java.util.Map.copyOf(values);
     }
 
     static Snapshot snapshot() { return CURRENT.get(); }

@@ -1,0 +1,78 @@
+package dev.itsdropper.caustiq.shaderpack;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Set;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class IrisShaderResourcesTest {
+    @TempDir Path temporaryDirectory;
+
+    @Test
+    void loadsCustomPngTexturesAndScalarAndVectorUniformDeclarations() throws IOException {
+        Path textureDirectory = Files.createDirectories(temporaryDirectory.resolve("Pack/shaders/textures"));
+        BufferedImage image = new BufferedImage(2, 2, BufferedImage.TYPE_INT_ARGB);
+        image.setRGB(0, 0, 0xffff0000);
+        image.setRGB(1, 0, 0xff00ff00);
+        image.setRGB(0, 1, 0xff0000ff);
+        image.setRGB(1, 1, 0xffffffff);
+        ImageIO.write(image, "png", textureDirectory.resolve("lookup.png").toFile());
+        Files.writeString(textureDirectory.getParent().resolve("shaders.properties"), """
+                texture.lookupSampler=textures/lookup.png
+                variable.float.baseBrightness=rainStrength * 2.0
+                variable.vec2.offset=vec2(0.25, 0.75)
+                uniform.float.customBrightness=clamp(baseBrightness, 0.0, 1.0)
+                uniform.vec2.customOffset=offset
+                """);
+
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("resource-pack", "ResourcePack",
+                temporaryDirectory.resolve("Pack"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            assertTrue(model.diagnostics().isEmpty(), model.diagnostics().toString());
+            try (IrisShaderResources resources = IrisShaderResources.load(model.properties(), sources)) {
+                assertEquals(Set.of("lookupSampler"), resources.textureNames());
+                assertEquals(Set.of("customBrightness", "customOffset"), resources.uniformNames());
+                assertEquals(Set.of("baseBrightness", "offset"), resources.variableNames());
+                Map<String, double[]> values = resources.evaluateUniformValues(Map.of("rainStrength", 0.25));
+                assertEquals(0.5, values.get("customBrightness")[0], 1.0e-9);
+                assertArrayEquals(new double[]{0.25, 0.75}, values.get("customOffset"), 1.0e-9);
+            }
+        }
+    }
+
+    @Test
+    void rejectsCustomTexturePathTraversal() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("Unsafe/shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), "texture.bad=../outside.png\n");
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("unsafe", "Unsafe",
+                temporaryDirectory.resolve("Unsafe"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            assertThrows(IOException.class, () -> IrisShaderResources.load(model.properties(), sources));
+        }
+    }
+
+    @Test
+    void rejectsUnsupportedCustomUniformTypesInsteadOfSilentlyIgnoringThem() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("Unsupported/shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), "uniform.mat4.customMatrix=mat4(1.0)\n");
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("unsupported", "Unsupported",
+                temporaryDirectory.resolve("Unsupported"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            assertThrows(IOException.class, () -> IrisShaderResources.load(model.properties(), sources));
+        }
+    }
+}

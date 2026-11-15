@@ -101,6 +101,40 @@ public final class ShaderPackSources implements GlslPreprocessor.SourceProvider,
         return List.copyOf(paths);
     }
 
+    /** Reads a bounded binary shader-pack asset without applying text decoding. */
+    public byte[] readBytes(String normalizedPath) throws IOException {
+        String safePath = validateRelativePath(normalizedPath);
+        if (archive != null) {
+            ZipEntry entry = archive.getEntry(archivePrefix + safePath);
+            if (entry == null || entry.isDirectory() || entry.getSize() < 0
+                    || entry.getSize() > 16L * 1024L * 1024L) {
+                throw new IOException("Shader asset is missing or exceeds the 16 MiB limit: " + safePath);
+            }
+            try (InputStream input = archive.getInputStream(entry)) {
+                return readBinaryBounded(input, safePath);
+            }
+        }
+        Path file = directoryRoot.resolve(safePath).normalize();
+        if (!file.startsWith(directoryRoot)) throw new IOException("Shader asset path escapes the pack root: " + safePath);
+        Path current = directoryRoot;
+        for (Path segment : directoryRoot.relativize(file)) {
+            current = current.resolve(segment);
+            if (Files.isSymbolicLink(current)) throw new IOException("Symbolic links are not permitted in shader assets: " + safePath);
+        }
+        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || Files.size(file) > 16L * 1024L * 1024L) {
+            throw new IOException("Shader asset is missing or exceeds the 16 MiB limit: " + safePath);
+        }
+        try (InputStream input = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
+            return readBinaryBounded(input, safePath);
+        }
+    }
+
+    private byte[] readBinaryBounded(InputStream input, String path) throws IOException {
+        byte[] bytes = input.readNBytes(16 * 1024 * 1024 + 1);
+        if (bytes.length > 16 * 1024 * 1024) throw new IOException("Shader asset exceeds the 16 MiB limit: " + path);
+        return bytes;
+    }
+
     @Override
     public String read(String normalizedPath) throws IOException {
         String safePath = validateRelativePath(normalizedPath);

@@ -5,6 +5,8 @@ import dev.itsdropper.caustiq.CaustiqClient;
 import dev.itsdropper.caustiq.CaustiqConfig;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumGBufferTargets;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisVertexContext;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTextureBridge;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumRenderBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumShaderProgramBridge;
 import dev.itsdropper.caustiq.integration.nvidium.IrisNvidiumTerrainTranslator;
@@ -25,6 +27,7 @@ public final class ShaderRuntime {
     private static final List<CompiledShaderProgram> COMPILED = new ArrayList<>();
     private static final ShaderPostProcessPass POST_PROCESS = new ShaderPostProcessPass();
     private static final IrisGlPassExecutor IRIS_PASS_EXECUTOR = new IrisGlPassExecutor();
+    private static IrisShaderResources irisShaderResources = IrisShaderResources.empty();
     private static final Map<String, IrisGlProgram> IRIS_GL_PROGRAMS = new LinkedHashMap<>();
     private static boolean discoveryStarted, discoveryFinished;
     private static ShaderPackSources sources;
@@ -61,6 +64,8 @@ public final class ShaderRuntime {
         NvidiumGBufferTargets.resetOutputRouting();
         POST_PROCESS.close();
         closeIrisPrograms();
+        irisShaderResources.close();
+        irisShaderResources = IrisShaderResources.empty();
         IRIS_PASS_EXECUTOR.close();
         NvidiumGBufferTargets.destroy();
         NvidiumGBufferTargets.configureTargets(Map.of());
@@ -83,6 +88,27 @@ public final class ShaderRuntime {
         activeTerrainDimensionKey = "";
         preparedTerrainAdapterRegistered = false;
         prepareSelectedNvidiumTerrainAdapter();
+    }
+
+    /** Uploads the selected pack's custom uniforms to Nvidium's active terrain program. */
+    public static void uploadTerrainCustomUniforms(int program) {
+        if (program == 0) return;
+        try {
+            RenderTarget target = Minecraft.getInstance().getMainRenderTarget();
+            irisShaderResources.uploadUniforms(program,
+                    NvidiumIrisUniformBridge.expressionVariables(target.width, target.height));
+        } catch (RuntimeException exception) {
+            CaustiqClient.LOGGER.warn("Could not evaluate or upload custom Iris terrain uniforms: {}", exception.getMessage());
+        }
+    }
+
+    /** Binds declared custom textures to the active Nvidium terrain program. */
+    public static void bindTerrainCustomTextures(int program) {
+        try {
+            NvidiumIrisTextureBridge.bindCustomTextures(irisShaderResources, program);
+        } catch (RuntimeException exception) {
+            CaustiqClient.LOGGER.warn("Could not bind custom Iris terrain textures: {}", exception.getMessage());
+        }
     }
 
     public static IrisTerrainPassScheduler.Plan activePassPlan() { return activePassPlan; }
@@ -120,6 +146,9 @@ public final class ShaderRuntime {
 
         try (ShaderPackSources selectedSources = ShaderPackSources.open(selected)) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(selectedSources);
+            IrisShaderResources loadedResources = IrisShaderResources.load(model.properties(), selectedSources);
+            irisShaderResources.close();
+            irisShaderResources = loadedResources;
             if (!model.requiredFeatures().isEmpty()) {
                 CaustiqClient.LOGGER.warn(
                         "Shader pack '{}' requires Iris feature flags {}; Nvidium terrain translation remains disabled.",
@@ -179,6 +208,8 @@ public final class ShaderRuntime {
                     selected.displayName(), translators.size(), unsupportedDimensions.size());
             activateTerrainAdapterForCurrentWorld();
         } catch (IOException | RuntimeException exception) {
+            irisShaderResources.close();
+            irisShaderResources = IrisShaderResources.empty();
             NvidiumShaderProgramBridge.unregisterTerrainAdapter();
             preparedPackModel = null;
             preparedPackId = "";
@@ -338,7 +369,7 @@ public final class ShaderRuntime {
         try {
             observeNvidiumTerrainBackend();
             IRIS_PASS_EXECUTOR.render(activePassPlan, IRIS_GL_PROGRAMS,
-                    Minecraft.getInstance().getMainRenderTarget());
+                    Minecraft.getInstance().getMainRenderTarget(), irisShaderResources);
         } catch (RuntimeException exception) {
             irisPassFailureLogged = true;
             CaustiqClient.LOGGER.error("CAUSTIQ disabled its Iris multi-pass executor after a render failure.", exception);
@@ -430,6 +461,8 @@ public final class ShaderRuntime {
             }
             IrisShaderPackModel packModel = selected.id().equals(preparedPackId) && preparedPackModel != null
                     ? preparedPackModel : new IrisShaderPackParser().parse(sources);
+            irisShaderResources.close();
+            irisShaderResources = IrisShaderResources.load(packModel.properties(), sources);
             String currentDimension = Minecraft.getInstance().level == null ? null
                     : Minecraft.getInstance().level.dimension().identifier().toString();
             activePassPlan = new IrisTerrainPassScheduler().schedule(packModel, currentDimension);
@@ -537,7 +570,9 @@ public final class ShaderRuntime {
                 discoveryFinished = true;
                 closeSources();
             }
-        } catch (IOException exception) {
+        } catch (IOException | RuntimeException exception) {
+            irisShaderResources.close();
+            irisShaderResources = IrisShaderResources.empty();
             CaustiqClient.LOGGER.error("Unable to prepare shader pack '{}': {}", selected.displayName(), exception.getMessage());
             discoveryFinished = true;
             closeSources();

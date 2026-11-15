@@ -6,6 +6,7 @@ import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumGBufferTargets;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTextureBridge;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL20C;
@@ -27,21 +28,34 @@ import java.util.Set;
  * colortex attachments in scheduled composite/deferred/final order.
  */
 public final class IrisGlPassExecutor implements AutoCloseable {
-    private static final int MAX_COLOR_TARGET = NvidiumGBufferTargets.MAX_ATTACHMENT;
+    private static final int MAX_COLOR_TARGET = 31;
+    private static final int MAX_TERRAIN_TARGET = NvidiumGBufferTargets.MAX_ATTACHMENT;
     private int framebuffer;
     private int vertexArray;
     private TextureTarget outputTarget;
-    private final TextureTarget[][] scaledTargets = new TextureTarget[MAX_COLOR_TARGET + 1][2];
-    private final int[][] scaledWidths = new int[MAX_COLOR_TARGET + 1][2];
-    private final int[][] scaledHeights = new int[MAX_COLOR_TARGET + 1][2];
-    private final String[][] scaledFormats = new String[MAX_COLOR_TARGET + 1][2];
+    private final int[][] customTargets = new int[MAX_COLOR_TARGET + 1][2];
+    private final int[][] customWidths = new int[MAX_COLOR_TARGET + 1][2];
+    private final int[][] customHeights = new int[MAX_COLOR_TARGET + 1][2];
+    private final String[][] customFormats = new String[MAX_COLOR_TARGET + 1][2];
+    private final boolean[] persistentAlternateCurrent = new boolean[MAX_COLOR_TARGET + 1];
+    private final boolean[] persistentInitialized = new boolean[MAX_COLOR_TARGET + 1];
+    private int persistentWidth;
+    private int persistentHeight;
     private int width;
     private int height;
 
     public void render(IrisTerrainPassScheduler.Plan plan,
                        Map<String, IrisGlProgram> programs,
                        RenderTarget mainTarget) {
+        render(plan, programs, mainTarget, IrisShaderResources.empty());
+    }
+
+    public void render(IrisTerrainPassScheduler.Plan plan,
+                       Map<String, IrisGlProgram> programs,
+                       RenderTarget mainTarget,
+                       IrisShaderResources resources) {
         if (plan == null || plan.isEmpty() || mainTarget == null || programs.isEmpty()) return;
+        if (resources == null) resources = IrisShaderResources.empty();
         int targetWidth = mainTarget.width;
         int targetHeight = mainTarget.height;
         if (targetWidth <= 0 || targetHeight <= 0) return;
@@ -49,13 +63,27 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         boolean[] alternateCurrent = new boolean[MAX_COLOR_TARGET + 1];
         boolean[] hasWritten = new boolean[MAX_COLOR_TARGET + 1];
         try {
-            Set<Integer> fullscreenWrites = new HashSet<>();
+            Set<Integer> usedTargets = new HashSet<>();
+            Set<Integer> terrainWrites = new HashSet<>();
             for (IrisTerrainPassScheduler.ScheduledPass scheduled : plan.passes()) {
-                if (scheduled.pass().group() != ShaderPackProgramCatalog.Group.GBUFFERS) {
-                    fullscreenWrites.addAll(scheduled.pass().writes());
+                if (scheduled.pass().group() == ShaderPackProgramCatalog.Group.GBUFFERS) {
+                    terrainWrites.addAll(scheduled.pass().writes());
+                } else {
+                    usedTargets.addAll(scheduled.pass().writes());
+                    usedTargets.addAll(scheduled.pass().reads());
                 }
             }
-            ensureResources(targetWidth, targetHeight, plan.targets(), fullscreenWrites);
+            ensureResources(targetWidth, targetHeight, plan.targets(), usedTargets);
+            for (int index = 1; index <= MAX_COLOR_TARGET; index++) {
+                IrisTerrainPassScheduler.RenderTarget target = plan.targets().get(index);
+                if (target != null && target.persistent() && persistentInitialized[index]) {
+                    clearedTargets[index] = true;
+                    if (!terrainWrites.contains(index)) {
+                        alternateCurrent[index] = persistentAlternateCurrent[index];
+                        hasWritten[index] = true;
+                    }
+                }
+            }
             for (IrisTerrainPassScheduler.ScheduledPass scheduled : plan.passes()) {
                 IrisTerrainPassScheduler.Pass pass = scheduled.pass();
                 if (pass.group() == ShaderPackProgramCatalog.Group.GBUFFERS) continue;
@@ -76,7 +104,17 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 if (program == null) {
                     throw new IllegalStateException("Scheduled Iris pass has no linked program: " + pass.name());
                 }
-                renderPass(pass, plan.targets(), program, mainTarget, targetWidth, targetHeight, alternateCurrent, hasWritten);
+                renderPass(pass, plan.targets(), program, mainTarget, targetWidth, targetHeight, alternateCurrent, hasWritten, clearedTargets, resources);
+            }
+            for (int index = 1; index <= MAX_COLOR_TARGET; index++) {
+                IrisTerrainPassScheduler.RenderTarget target = plan.targets().get(index);
+                if (target != null && target.persistent() && hasWritten[index]) {
+                    persistentAlternateCurrent[index] = alternateCurrent[index];
+                    persistentInitialized[index] = true;
+                } else if (target == null || !target.persistent()) {
+                    persistentAlternateCurrent[index] = false;
+                    persistentInitialized[index] = false;
+                }
             }
             if (hasWritten[0] && alternateCurrent[0]) {
                 RenderSystem.getDevice().createCommandEncoder().copyTextureToTexture(
@@ -97,31 +135,28 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                             int targetWidth,
                             int targetHeight,
                             boolean[] alternateCurrent,
-                            boolean[] hasWritten) {
+                            boolean[] hasWritten,
+                            boolean[] clearedTargets,
+                            IrisShaderResources resources) {
         Set<Integer> writes = pass.writes().isEmpty() ? Set.of(0) : pass.writes();
         for (int location : writes) {
             if (location < 0 || location > MAX_COLOR_TARGET) {
                 throw new IllegalStateException("Iris pass '" + pass.name()
-                        + "' writes colortex" + location + "; this Nvidium path exposes colortex0-colortex7.");
+                        + "' writes colortex" + location + "; this Nvidium path exposes colortex0-colortex31.");
             }
             IrisTerrainPassScheduler.RenderTarget target = targets.get(location);
             if (location == 0 && target != null
                     && (target.scaleX() != 1.0f || target.scaleY() != 1.0f)) {
                 throw new IllegalStateException("Iris colortex0 must remain at the main framebuffer size.");
             }
-            if (target != null && location > 0
-                    && !target.format().equalsIgnoreCase("RGBA16F")
-                    && !target.format().equalsIgnoreCase("RGBA8")) {
-                throw new IllegalStateException("Iris colortex" + location + " format '" + target.format()
-                        + "' is not supported by the current Nvidium attachment allocation.");
-            }
+            if (target != null && location > 0) formatDescriptor(target.format());
         }
 
         for (int location : pass.reads()) {
             if (location < 0 || location > MAX_COLOR_TARGET) {
                 throw new IllegalStateException("Iris pass '" + pass.name()
                         + "' reads colortex" + location
-                        + "; this Nvidium path exposes colortex0-colortex7.");
+                        + "; the active renderer path supports colortex0-colortex31.");
             }
         }
 
@@ -134,25 +169,22 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                     + "' requires more draw-buffer slots than this OpenGL context exposes.");
         }
         int maxColorAttachments = GL11C.glGetInteger(GL30C.GL_MAX_COLOR_ATTACHMENTS);
-        if (writes.stream().anyMatch(location -> location >= maxColorAttachments)) {
+        if (drawBuffers.length > maxColorAttachments) {
             throw new IllegalStateException("Iris pass '" + pass.name()
-                    + "' writes a color attachment beyond this OpenGL context's limit.");
+                    + "' requires more simultaneous color attachments than this OpenGL context exposes.");
         }
 
         GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, framebuffer);
-        for (int location = 0; location <= MAX_COLOR_TARGET; location++) {
-            if (writes.contains(location)) {
-                int texture = writeTexture(location, mainTarget, alternateCurrent, hasWritten);
-                if (texture == 0) {
-                    throw new IllegalStateException("Iris pass '" + pass.name()
-                            + "' has no allocated colortex" + location + " texture.");
-                }
-                GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER,
-                        GL30C.GL_COLOR_ATTACHMENT0 + location, GL11C.GL_TEXTURE_2D, texture, 0);
-            } else {
-                GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER,
-                        GL30C.GL_COLOR_ATTACHMENT0 + location, GL11C.GL_TEXTURE_2D, 0, 0);
+        for (int outputSlot = 0; outputSlot < maxColorAttachments; outputSlot++) {
+            Integer targetIndex = outputTargets.get(outputSlot);
+            int texture = targetIndex == null ? 0
+                    : writeTexture(targetIndex, mainTarget, alternateCurrent, hasWritten);
+            if (targetIndex != null && texture == 0) {
+                throw new IllegalStateException("Iris pass '" + pass.name()
+                        + "' has no allocated colortex" + targetIndex + " texture.");
             }
+            GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER,
+                    GL30C.GL_COLOR_ATTACHMENT0 + outputSlot, GL11C.GL_TEXTURE_2D, texture, 0);
         }
         GL20C.glDrawBuffers(drawBuffers);
         int status = GL30C.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER);
@@ -166,12 +198,14 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         GL11C.glDisable(GL11C.GL_BLEND);
         GL11C.glDisable(GL11C.GL_CULL_FACE);
         GL11C.glDisable(GL11C.GL_SCISSOR_TEST);
-        clearOutputs(outputTargets, targets);
+        clearOutputs(outputTargets, targets, clearedTargets);
 
         GL20C.glUseProgram(program.programId());
-        bindSamplers(program, mainTarget, alternateCurrent, hasWritten);
+        bindSamplers(program, mainTarget, alternateCurrent, hasWritten, resources);
         uploadScreenUniforms(program.programId(), outputSize.width(), outputSize.height());
         NvidiumIrisUniformBridge.uploadProgram(program.programId());
+        resources.uploadUniforms(program.programId(),
+                NvidiumIrisUniformBridge.expressionVariables(outputSize.width(), outputSize.height()));
         GL30C.glBindVertexArray(vertexArray);
         GL11C.glDrawArrays(GL11C.GL_TRIANGLES, 0, 3);
 
@@ -188,17 +222,19 @@ public final class IrisGlPassExecutor implements AutoCloseable {
     }
 
     private static void clearOutputs(Map<Integer, Integer> outputTargets,
-                                     Map<Integer, IrisTerrainPassScheduler.RenderTarget> targets) {
+                                     Map<Integer, IrisTerrainPassScheduler.RenderTarget> targets,
+                                     boolean[] clearedTargets) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             for (Map.Entry<Integer, Integer> output : outputTargets.entrySet()) {
                 int drawBuffer = output.getKey();
                 int targetIndex = output.getValue();
                 IrisTerrainPassScheduler.RenderTarget target = targets.get(targetIndex);
-                if (target != null && !target.clear()) continue;
+                if ((target != null && !target.clear()) || clearedTargets[targetIndex]) continue;
                 float[] rgba = parseClearColor(target == null ? "0.0 0.0 0.0 0.0" : target.clearColor());
                 FloatBuffer value = stack.mallocFloat(4);
                 value.put(rgba).flip();
                 GL30C.glClearBufferfv(GL11C.GL_COLOR, drawBuffer, value);
+                clearedTargets[targetIndex] = true;
             }
         }
     }
@@ -214,7 +250,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 throw new IllegalStateException("Invalid Iris fragment output mapping: slot "
                         + slot + " -> colortex" + target + ".");
             }
-            result[slot] = GL30C.GL_COLOR_ATTACHMENT0 + target;
+            result[slot] = GL30C.GL_COLOR_ATTACHMENT0 + slot;
         });
         return result;
     }
@@ -253,13 +289,24 @@ public final class IrisGlPassExecutor implements AutoCloseable {
     }
 
     private void bindSamplers(IrisGlProgram program, RenderTarget mainTarget,
-                              boolean[] alternateCurrent, boolean[] hasWritten) {
+                              boolean[] alternateCurrent, boolean[] hasWritten,
+                              IrisShaderResources resources) {
         int unit = 0;
         for (String sampler : program.samplers()) {
             int location = GL20C.glGetUniformLocation(program.programId(), sampler);
             if (location < 0) continue;
+            if (unit >= GL11C.glGetInteger(GL20C.GL_MAX_TEXTURE_IMAGE_UNITS)) {
+                throw new IllegalStateException("Iris pass '" + program.name()
+                        + "' exceeds the fragment-stage texture-unit limit.");
+            }
+            if (resources.bindTexture(sampler, unit, location)) {
+                unit++;
+                continue;
+            }
             int texture;
-            if (sampler.equals("gcolor") || sampler.equals("DiffuseSampler")
+            if (sampler.equals("noisetex")) {
+                texture = NvidiumIrisTextureBridge.noiseTexture();
+            } else if (sampler.equals("gcolor") || sampler.equals("DiffuseSampler")
                     || sampler.equals("texture") || sampler.equals("tex")
                     || sampler.equals("colortex0")) {
                 texture = currentTexture(0, mainTarget, alternateCurrent, hasWritten);
@@ -272,16 +319,12 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 }
                 if (index < 1 || index > MAX_COLOR_TARGET) {
                     throw new IllegalStateException("Iris sampler '" + sampler
-                            + "' is outside the Nvidium colortex0-colortex7 range.");
+                            + "' is outside the supported colortex0-colortex31 range.");
                 }
                 texture = currentTexture(index, mainTarget, alternateCurrent, hasWritten);
             } else {
                 throw new IllegalStateException("Iris sampler '" + sampler
                         + "' has no CAUSTIQ texture binding.");
-            }
-            if (unit >= GL11C.glGetInteger(GL20C.GL_MAX_TEXTURE_IMAGE_UNITS)) {
-                throw new IllegalStateException("Iris pass '" + program.name()
-                        + "' exceeds the fragment-stage texture-unit limit.");
             }
             GL13C.glActiveTexture(GL13C.GL_TEXTURE0 + unit);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
@@ -297,9 +340,12 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                     ? textureId(outputTarget.getColorTexture())
                     : textureId(mainTarget.getColorTexture());
         }
-        if (scaledTargets[location][0] != null) {
-            int side = !hasWritten[location] ? 0 : (alternateCurrent[location] ? 1 : 0);
-            return textureId(scaledTargets[location][side].getColorTexture());
+        if (customTargets[location][0] != 0) {
+            int side = alternateCurrent[location] ? 0 : 1;
+            return customTargets[location][side];
+        }
+        if (location > MAX_TERRAIN_TARGET) {
+            throw new IllegalStateException("colortex" + location + " was not allocated.");
         }
         return !hasWritten[location] || !alternateCurrent[location]
                 ? NvidiumGBufferTargets.alternateTexture(location)
@@ -313,11 +359,11 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                     ? textureId(mainTarget.getColorTexture())
                     : textureId(outputTarget.getColorTexture());
         }
-        if (scaledTargets[location][0] != null) {
-            if (!hasWritten[location]) return NvidiumGBufferTargets.texture(location);
-            int side = alternateCurrent[location] ? 0 : 1;
-            return textureId(scaledTargets[location][side].getColorTexture());
+        if (customTargets[location][0] != 0) {
+            int side = alternateCurrent[location] ? 1 : 0;
+            return customTargets[location][side];
         }
+        if (location > MAX_TERRAIN_TARGET) return 0;
         return !hasWritten[location] || !alternateCurrent[location]
                 ? NvidiumGBufferTargets.texture(location)
                 : NvidiumGBufferTargets.alternateTexture(location);
@@ -342,7 +388,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
 
     private void ensureResources(int targetWidth, int targetHeight,
                                  Map<Integer, IrisTerrainPassScheduler.RenderTarget> targets,
-                                 Set<Integer> fullscreenWrites) {
+                                 Set<Integer> usedTargets) {
         if (framebuffer == 0) framebuffer = GL30C.glGenFramebuffers();
         if (vertexArray == 0) vertexArray = GL30C.glGenVertexArrays();
         if (outputTarget == null) {
@@ -355,51 +401,82 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             height = targetHeight;
         }
 
+        if (persistentWidth != targetWidth || persistentHeight != targetHeight) {
+            Arrays.fill(persistentInitialized, false);
+            Arrays.fill(persistentAlternateCurrent, false);
+            persistentWidth = targetWidth;
+            persistentHeight = targetHeight;
+        }
         IrisTerrainPassScheduler.RenderTarget mainSpec = targets.get(0);
         if (mainSpec != null && (mainSpec.scaleX() != 1.0f || mainSpec.scaleY() != 1.0f)) {
             throw new IllegalStateException("Iris colortex0 must remain at the main framebuffer size.");
+        }
+        for (int index : usedTargets) {
+            if (index < 0 || index > MAX_COLOR_TARGET) {
+                throw new IllegalStateException("Iris colortex" + index
+                        + " exceeds CAUSTIQ's bounded target index range 0-31.");
+            }
         }
         for (int index = 1; index <= MAX_COLOR_TARGET; index++) {
             IrisTerrainPassScheduler.RenderTarget spec = targets.get(index);
             float scaleX = spec == null ? 1.0f : spec.scaleX();
             float scaleY = spec == null ? 1.0f : spec.scaleY();
-            if (!fullscreenWrites.contains(index) || (scaleX == 1.0f && scaleY == 1.0f)) {
-                destroyScaledTargets(index);
+            boolean needsOwnedStorage = usedTargets.contains(index)
+                    && (index > MAX_TERRAIN_TARGET || scaleX != 1.0f || scaleY != 1.0f);
+            if (!needsOwnedStorage) {
+                destroyCustomTargets(index);
                 continue;
-            }
-            if (spec != null && !spec.format().equalsIgnoreCase("RGBA8")
-                    && !spec.format().equalsIgnoreCase("RGBA16F")) {
-                throw new IllegalStateException("Scaled Iris colortex" + index + " format '"
-                        + spec.format() + "' is not supported by the scaled pass allocator.");
             }
             IrisRenderTargetSize size = IrisRenderTargetSize.of(targetWidth, targetHeight, scaleX, scaleY);
             String format = spec == null ? "RGBA8" : spec.format().toUpperCase(java.util.Locale.ROOT);
+            FormatDescriptor descriptor = formatDescriptor(format);
             boolean nearest = spec != null && spec.nearest();
             boolean mipmap = spec != null && spec.mipmap();
             for (int side = 0; side < 2; side++) {
-                TextureTarget target = scaledTargets[index][side];
-                boolean allocate = target == null || scaledWidths[index][side] != size.width()
-                        || scaledHeights[index][side] != size.height()
-                        || !format.equals(scaledFormats[index][side]);
-                if (target == null) {
-                    target = new TextureTarget("Caustiq scaled colortex" + index + " ping-pong " + side,
-                            size.width(), size.height(), false);
-                    scaledTargets[index][side] = target;
-                } else if (scaledWidths[index][side] != size.width()
-                        || scaledHeights[index][side] != size.height()) {
-                    target.resize(size.width(), size.height());
-                }
-                int texture = textureId(target.getColorTexture());
-                configureScaledTexture(texture, format, nearest, mipmap,
+                boolean allocate = customTargets[index][side] == 0
+                        || customWidths[index][side] != size.width()
+                        || customHeights[index][side] != size.height()
+                        || !format.equals(customFormats[index][side]);
+                if (customTargets[index][side] == 0) customTargets[index][side] = GL11C.glGenTextures();
+                configureCustomTexture(customTargets[index][side], descriptor, nearest, mipmap,
                         size.width(), size.height(), allocate);
-                scaledWidths[index][side] = size.width();
-                scaledHeights[index][side] = size.height();
-                scaledFormats[index][side] = format;
+                if ((allocate || spec == null || !spec.persistent()) && (spec == null || spec.clear())) {
+                    clearCustomTexture(customTargets[index][side], descriptor,
+                            parseClearColor(spec == null ? "0.0 0.0 0.0 0.0" : spec.clearColor()));
+                }
+                if (allocate) {
+                    persistentInitialized[index] = false;
+                    persistentAlternateCurrent[index] = false;
+                }
+                customWidths[index][side] = size.width();
+                customHeights[index][side] = size.height();
+                customFormats[index][side] = format;
             }
         }
     }
 
-    private static void configureScaledTexture(int texture, String format, boolean nearest,
+    private static FormatDescriptor formatDescriptor(String name) {
+        return switch (name.toUpperCase(java.util.Locale.ROOT)) {
+            case "RGBA8" -> new FormatDescriptor(GL30C.GL_RGBA8, GL11C.GL_RGBA, GL11C.GL_UNSIGNED_BYTE);
+            case "RGBA16F" -> new FormatDescriptor(GL30C.GL_RGBA16F, GL11C.GL_RGBA, GL30C.GL_HALF_FLOAT);
+            case "RGBA32F" -> new FormatDescriptor(GL30C.GL_RGBA32F, GL11C.GL_RGBA, GL11C.GL_FLOAT);
+            case "RGB8" -> new FormatDescriptor(GL30C.GL_RGB8, GL11C.GL_RGB, GL11C.GL_UNSIGNED_BYTE);
+            case "RGB16F" -> new FormatDescriptor(GL30C.GL_RGB16F, GL11C.GL_RGB, GL30C.GL_HALF_FLOAT);
+            case "RGB32F" -> new FormatDescriptor(GL30C.GL_RGB32F, GL11C.GL_RGB, GL11C.GL_FLOAT);
+            case "RG8" -> new FormatDescriptor(GL30C.GL_RG8, GL30C.GL_RG, GL11C.GL_UNSIGNED_BYTE);
+            case "RG16F" -> new FormatDescriptor(GL30C.GL_RG16F, GL30C.GL_RG, GL30C.GL_HALF_FLOAT);
+            case "RG32F" -> new FormatDescriptor(GL30C.GL_RG32F, GL30C.GL_RG, GL11C.GL_FLOAT);
+            case "R8" -> new FormatDescriptor(GL30C.GL_R8, GL11C.GL_RED, GL11C.GL_UNSIGNED_BYTE);
+            case "R16F" -> new FormatDescriptor(GL30C.GL_R16F, GL11C.GL_RED, GL30C.GL_HALF_FLOAT);
+            case "R32F" -> new FormatDescriptor(GL30C.GL_R32F, GL11C.GL_RED, GL11C.GL_FLOAT);
+            case "RGB10_A2" -> new FormatDescriptor(GL30C.GL_RGB10_A2, GL11C.GL_RGBA, GL30C.GL_UNSIGNED_INT_2_10_10_10_REV);
+            case "R11F_G11F_B10F" -> new FormatDescriptor(GL30C.GL_R11F_G11F_B10F, GL11C.GL_RGB,
+                    GL30C.GL_UNSIGNED_INT_10F_11F_11F_REV);
+            default -> throw new IllegalArgumentException("Unsupported Iris colortex format: " + name);
+        };
+    }
+
+    private static void configureCustomTexture(int texture, FormatDescriptor format, boolean nearest,
                                                boolean mipmap, int targetWidth, int targetHeight,
                                                boolean allocateStorage) {
         GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
@@ -410,22 +487,31 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, 0x812F);
         GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, 0x812F);
         if (allocateStorage) {
-            int internal = format.equalsIgnoreCase("RGBA16F") ? GL30C.GL_RGBA16F : GL30C.GL_RGBA8;
-            int type = format.equalsIgnoreCase("RGBA16F") ? GL30C.GL_HALF_FLOAT : GL11C.GL_UNSIGNED_BYTE;
-            GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, internal,
-                    targetWidth, targetHeight, 0, GL11C.GL_RGBA, type, (java.nio.ByteBuffer) null);
+            GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, format.internalFormat(),
+                    targetWidth, targetHeight, 0, format.externalFormat(), format.dataType(),
+                    (java.nio.ByteBuffer) null);
         }
     }
 
-    private void destroyScaledTargets(int index) {
-        for (int side = 0; side < 2; side++) {
-            if (scaledTargets[index][side] != null) scaledTargets[index][side].destroyBuffers();
-            scaledTargets[index][side] = null;
-            scaledWidths[index][side] = 0;
-            scaledHeights[index][side] = 0;
-            scaledFormats[index][side] = null;
+    private static void clearCustomTexture(int texture, FormatDescriptor format, float[] color) {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            FloatBuffer value = stack.mallocFloat(4);
+            value.put(color).flip();
+            org.lwjgl.opengl.GL44C.glClearTexImage(texture, 0, format.externalFormat(), GL11C.GL_FLOAT, value);
         }
     }
+
+    private void destroyCustomTargets(int index) {
+        for (int side = 0; side < 2; side++) {
+            if (customTargets[index][side] != 0) GL11C.glDeleteTextures(customTargets[index][side]);
+            customTargets[index][side] = 0;
+            customWidths[index][side] = 0;
+            customHeights[index][side] = 0;
+            customFormats[index][side] = null;
+        }
+    }
+
+    private record FormatDescriptor(int internalFormat, int externalFormat, int dataType) { }
 
     private static int textureId(Object texture) {
         return texture instanceof GlTexture glTexture ? glTexture.glId() : 0;
@@ -496,7 +582,11 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         vertexArray = 0;
         if (outputTarget != null) outputTarget.destroyBuffers();
         outputTarget = null;
-        for (int index = 1; index <= MAX_COLOR_TARGET; index++) destroyScaledTargets(index);
+        for (int index = 1; index <= MAX_COLOR_TARGET; index++) destroyCustomTargets(index);
+        Arrays.fill(persistentInitialized, false);
+        Arrays.fill(persistentAlternateCurrent, false);
+        persistentWidth = 0;
+        persistentHeight = 0;
         width = 0;
         height = 0;
     }

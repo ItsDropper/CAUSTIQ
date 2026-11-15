@@ -65,7 +65,7 @@ flowchart TB
     AN --> TR["IrisNvidiumTerrainTranslator<br/>→ task / mesh / fragment"]
     TR --> HK["Shader.Builder.compile() hook<br/>+ native varying ABI adapter"]
     HK --> NV["Nvidium terrain raster<br/>(Nvidium owns submission)"]
-    NV --> GB[("MRT G-buffers<br/>colortex 0–7")]
+    NV --> GB[("Terrain G-buffers 0–7<br/>Fullscreen colortex 0–31")]
     P2 --> SC["Pass scheduler<br/>dependency-ordered plan"]
     SC --> EX["Fullscreen pass executor"]
     GB --> EX
@@ -113,7 +113,9 @@ Nvidium's Iris opt-out is overridden only when CAUSTIQ has a prepared terrain ad
 `NvidiumGBufferTargets` temporarily adds CAUSTIQ's auxiliary attachments to the framebuffer Nvidium is rasterising into, then restores the original colour/depth attachments and draw-buffer routing straight after the draw.
 
 - **Attachment 0** stays Nvidium's normal shaded terrain colour.
-- **Attachments 1–7** are available for Iris colortex outputs, with pack-declared format, filter and clear directives applied before the next draw. One draw-buffer location is reserved for Nvidium's native colour, so at most **seven** Iris MRT outputs are supported.
+- **Attachments 1–7** are the Nvidium terrain G-buffer outputs; that native terrain adapter remains limited to seven auxiliary outputs.
+- Fullscreen deferred/composite/final passes can address **colortex0–colortex31**. The executor allocates independent ping-pong textures for targets beyond Nvidium's seven terrain attachments and maps fragment output slots to compact framebuffer attachments, so high-numbered colortex targets do not consume equally high GL attachment indices.
+- Pack-declared formats, independent X/Y scales, nearest/linear filtering, mipmaps, clear colours and persistent-target state are applied to fullscreen targets. Simultaneous outputs still obey the active GL draw-buffer/attachment limits.
 
 </details>
 
@@ -121,7 +123,9 @@ Nvidium's Iris opt-out is overridden only when CAUSTIQ has a prepared terrain ad
 <summary><b>4 · Pass scheduling &amp; execution</b></summary>
 <br>
 
-The `IrisTerrainPassScheduler` turns a pack's program set and `colortex` declarations into a deterministic, dependency-ordered plan (dimension overrides are never silently merged with the base set). `IrisGlPassExecutor` then runs the **deferred → composite → final** fullscreen passes over the real MRT attachments in that order.
+The `IrisTerrainPassScheduler` turns a pack's program set and `colortex` declarations into a deterministic, dependency-ordered plan (dimension overrides are never silently merged with the base set). `IrisGlPassExecutor` then runs the **deferred → composite → final** fullscreen passes in that order, with per-target ping-pong, scaled storage, persistent state and compact MRT routing.
+
+Custom `texture.<name>` image assets are decoded and uploaded as managed `sampler2D` textures for both terrain and fullscreen programs. Custom `uniform.*` and `variable.*` declarations support float/int/bool and vec2/vec3/vec4 values, arithmetic, conditionals and common scalar math functions. Non-2D sampler types and vector-valued expression operations remain unsupported.
 
 Shadow passes and compute/geometry/tessellation passes are **not** executed; they raise a clear error instead of rendering something wrong.
 
@@ -137,12 +141,14 @@ Shadow passes and compute/geometry/tessellation passes are **not** executed; the
 | Iris pack model, parser & block properties | ✅ | |
 | Terrain compatibility analyzer | ✅ | Rejection gate, not a translator |
 | `gbuffers_terrain` → Nvidium translator | ✅ | Fails closed on unsupported inputs |
-| MRT terrain G-buffers | ✅ | Format / filter / clear directives |
-| Pass scheduler + fullscreen executor | ✅ | `deferred`, `composite`, `final` |
+| MRT terrain G-buffers | ✅ | Nvidium terrain attachments 1–7 |
+| Fullscreen colortex allocator | ✅ | colortex0–31, compact MRT slots, scaling, ping-pong and persistence |
+| Custom textures + uniforms | 🟡 | Managed custom sampler2D images; scalar expressions and typed scalar/vector uniforms |
+| Pass scheduler + fullscreen executor | ✅ | `deferred`, `composite`, `final`; GL output limits checked |
 | **In-game verification** | ⬜ | **Not done** — build success ≠ working renderer |
 | Shadow rendering | ⬜ | Needs a light-space Nvidium terrain pass |
 | Depth, compute, geometry/tessellation passes | ⬜ | |
-| Arbitrary pack uniforms & texture bindings | ⬜ | |
+| Full Iris expression VM and non-2D sampler types | ⬜ | |
 | Validation against real packs & benchmarks | ⬜ | |
 
 ## 🔬 What Nvidium can actually provide
@@ -155,7 +161,8 @@ CAUSTIQ describes this honestly in `NvidiumIrisTerrainAbi`: a *capability* contr
 | `lmcoord`, `gl_MultiTexCoord1` / `vaUV2`, `gtexture`, `lightmap`, `gbufferModelView`, `gbufferProjection`, `cameraPosition`, `frameCounter`, `fogColor` | ✅ exact |
 | `gl_Vertex` / `vaPosition`, `gl_MultiTexCoord0` / `vaUV0`, `gl_Color` / `vaColor`, matrix inverses, `viewWidth` / `viewHeight`, `frameTimeCounter` | 🟡 derived |
 | `viewSpacePosition` | ❌ unavailable — Nvidium's position is region-transformed and camera-relative, not Iris view space |
-| `normals`, `specular`, `depthtex1`, `colortex15`, Distant Horizons / Voxy depth textures, `taa_offset` | ❌ rejected at translation |
+| `normals`, `specular`, `depthtex1`, Distant Horizons / Voxy depth textures, `taa_offset` | ❌ rejected at translation |
+| `colortex15` | 🟡 available to fullscreen passes; not a Nvidium terrain attachment |
 
 Two caveats worth knowing: the extra normal is the **per-triangle geometric normal** reconstructed from transformed packed positions (degenerate triangles are guarded), not a smooth interpolated vertex normal; and the audited sampler bindings are the terrain atlas on unit 0 and Minecraft's lightmap on unit 1.
 
@@ -200,7 +207,7 @@ Produces `build/libs/caustiq-nvidium-*.jar` and the Stillwater shader ZIP in `bu
 
 - [ ] **In-game validation** of mixin application, shader linking and visuals on the pinned Sodium + Nvidium stack.
 - [ ] **Shadows** — a light-space Nvidium terrain pass.
-- [ ] **Depth & remaining resources** — depth attachments, `depthtex1`, specular/normal buffers, and pack-specific texture bindings.
+- [ ] **Depth & remaining resources** — depth attachments, `depthtex1`, specular/normal buffers, and additional Iris built-in samplers.
 - [ ] **Compute, geometry and tessellation** pass support.
 - [ ] **GLSL** — AST-based transforms in place of regex rewriting.
 - [ ] **Validation** — Complementary Reimagined, BSL and other real packs against Iris output, with Nvidium benchmarked against Sodium.

@@ -18,10 +18,8 @@ import java.util.regex.Pattern;
  * Parses the parts of the Iris shader-pack contract that can be represented
  * without starting Iris' OpenGL pipeline: properties, dimension program sets,
  * stage inventories, options, feature declarations and GLSL include graphs.
- *
- * <p>This intentionally does not pretend to implement Iris' JCPP preprocessor,
- * directive semantics, custom-uniform expressions, texture lifecycle or render
- * target scheduler. Those remain explicit diagnostics/capability boundaries.</p>
+ * Custom uniform expressions and texture declarations are retained in the
+ * property model and consumed by IrisShaderResources on the render thread.
  */
 public final class IrisShaderPackParser {
     private static final int MAX_PROPERTIES_BYTES = 1024 * 1024;
@@ -142,12 +140,6 @@ public final class IrisShaderPackParser {
         if (!conditionalPrograms.isEmpty()) {
             diagnostics.add("Conditional program enablement was parsed but Iris option-expression evaluation is not implemented.");
         }
-        if (properties.keySet().stream().anyMatch(key -> key.startsWith("uniform.") || key.startsWith("variable."))) {
-            diagnostics.add("Custom Iris uniform/variable expressions were detected; they are not evaluated by CAUSTIQ.");
-        }
-        if (properties.keySet().stream().anyMatch(key -> key.startsWith("texture.") || key.equals("texture.noise"))) {
-            diagnostics.add("Custom Iris texture declarations were detected; texture loading and sampler binding are not implemented by the Nvidium bridge.");
-        }
         validateNvidiumRenderTargets(renderTargets, diagnostics);
         if (paths.stream().anyMatch(path -> path.endsWith(".csh"))) {
             diagnostics.add("Compute shader stages were discovered and preprocessed; Nvidium terrain translation does not execute Iris compute passes.");
@@ -200,9 +192,9 @@ public final class IrisShaderPackParser {
                 return;
             }
             String property = matcher.group(2).toLowerCase(Locale.ROOT);
-            if (index > 7) {
-                diagnostics.add("Nvidium currently exposes colortex0-colortex7; "
-                        + key + "=" + value + " requires an unavailable attachment.");
+            if (index > 31) {
+                diagnostics.add("CAUSTIQ's bounded Iris render-target range is colortex0-colortex31; "
+                        + key + "=" + value + " exceeds that limit.");
                 return;
             }
             if (property.equals("format")) {
@@ -217,9 +209,11 @@ public final class IrisShaderPackParser {
                     || property.equals("scaley")) {
                 try {
                     float scale = Float.parseFloat(value.trim());
-                    if (!Float.isFinite(scale) || scale <= 0.0f || scale != 1.0f) {
-                        diagnostics.add("Nvidium terrain MRT attachments are fixed to screen resolution; "
-                                + key + "=" + value + " is unsupported.");
+                    if (!Float.isFinite(scale) || scale <= 0.0f) {
+                        diagnostics.add("Invalid Iris render-target scale in " + key + "=" + value + ".");
+                    } else if (index == 0 && scale != 1.0f) {
+                        diagnostics.add("Iris colortex0 is the Minecraft main framebuffer and cannot be scaled: "
+                                + key + "=" + value + ".");
                     }
                 } catch (NumberFormatException exception) {
                     diagnostics.add("Invalid Iris render-target scale in " + key + "=" + value + ".");

@@ -50,12 +50,13 @@ class IrisShaderPackParserTest {
     void acceptsImplementedNvidiumColortexSettingsAndDiagnosesOnlyUnavailableTargets() throws IOException {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("RenderTargetPack/shaders"));
         Files.writeString(shaders.resolve("shaders.properties"), """
-                colortex1Format=RGBA16F
-                colortex1Clear=false
-                colortex1ClearColor=0.0 0.0 0.0 0.0
-                colortex1Mipmap=true
-                colortex1Nearest=true
                 colortex8Format=RGBA16F
+                colortex8Clear=false
+                colortex8ClearColor=0.0 0.0 0.0 0.0
+                colortex8Mipmap=true
+                colortex8Nearest=true
+                colortex8Scale=0.5
+                colortex32Format=RGBA16F
                 """);
         Files.writeString(shaders.resolve("composite.vsh"), """
                 #version 150
@@ -63,7 +64,7 @@ class IrisShaderPackParserTest {
                 """);
         Files.writeString(shaders.resolve("composite.fsh"), """
                 #version 150
-                /* RENDERTARGETS: 1 */
+                /* RENDERTARGETS: 8 */
                 layout(location = 0) out vec4 color;
                 void main() { color = vec4(1.0); }
                 """);
@@ -77,15 +78,17 @@ class IrisShaderPackParserTest {
                     issue.contains("multi-render-target allocation and pass routing are not implemented")),
                     model.diagnostics().toString());
             assertTrue(model.diagnostics().stream().anyMatch(issue ->
-                    issue.contains("colortex0-colortex7") && issue.contains("8Format=RGBA16F")),
+                    issue.contains("colortex0-colortex31") && issue.contains("32Format=RGBA16F")),
                     model.diagnostics().toString());
             assertEquals(1, model.diagnostics().size(), model.diagnostics().toString());
             IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
-            assertEquals(java.util.Set.of(1), plan.passes().get(0).pass().writes());
-            assertEquals("RGBA16F", plan.targets().get(1).format());
-            assertFalse(plan.targets().get(1).clear());
-            assertTrue(plan.targets().get(1).mipmap());
-            assertTrue(plan.targets().get(1).nearest());
+            assertEquals(java.util.Set.of(8), plan.passes().get(0).pass().writes());
+            assertEquals("RGBA16F", plan.targets().get(8).format());
+            assertEquals(0.5f, plan.targets().get(8).scaleX());
+            assertEquals(0.5f, plan.targets().get(8).scaleY());
+            assertFalse(plan.targets().get(8).clear());
+            assertTrue(plan.targets().get(8).mipmap());
+            assertTrue(plan.targets().get(8).nearest());
         }
     }
 

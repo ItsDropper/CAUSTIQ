@@ -12,8 +12,8 @@ class IrisGlPassExecutorTest {
     void preservesNonIdentityFragmentOutputToAttachmentRouting() {
         assertArrayEquals(new int[]{
                         org.lwjgl.opengl.GL30C.GL_COLOR_ATTACHMENT0,
-                        org.lwjgl.opengl.GL30C.GL_COLOR_ATTACHMENT3,
-                        org.lwjgl.opengl.GL30C.GL_COLOR_ATTACHMENT7
+                        org.lwjgl.opengl.GL30C.GL_COLOR_ATTACHMENT1,
+                        org.lwjgl.opengl.GL30C.GL_COLOR_ATTACHMENT2
                 },
                 IrisGlPassExecutor.createDrawBuffers(Map.of(0, 0, 1, 3, 2, 7), Set.of(0, 3, 7)));
     }
@@ -23,9 +23,18 @@ class IrisGlPassExecutorTest {
         assertArrayEquals(new int[]{
                         org.lwjgl.opengl.GL30C.GL_COLOR_ATTACHMENT0,
                         org.lwjgl.opengl.GL11C.GL_NONE,
-                        org.lwjgl.opengl.GL30C.GL_COLOR_ATTACHMENT5
+                        org.lwjgl.opengl.GL30C.GL_COLOR_ATTACHMENT2
                 },
                 IrisGlPassExecutor.createDrawBuffers(Map.of(0, 0, 2, 5), Set.of(0, 5)));
+    }
+
+    @Test
+    void routesFullscreenOutputsBeyondNvidiumsTerrainAttachmentRange() {
+        assertArrayEquals(new int[]{
+                        org.lwjgl.opengl.GL30C.GL_COLOR_ATTACHMENT0,
+                        org.lwjgl.opengl.GL30C.GL_COLOR_ATTACHMENT1
+                },
+                IrisGlPassExecutor.createDrawBuffers(Map.of(0, 8, 1, 12), Set.of(8, 12)));
     }
 
     @Test

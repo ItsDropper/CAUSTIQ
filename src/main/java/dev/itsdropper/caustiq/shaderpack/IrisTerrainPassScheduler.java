@@ -59,10 +59,17 @@ public final class IrisTerrainPassScheduler {
             writes.addAll(outputTargets.values());
             if (program.hasCompute()) writes.addAll(parseImageBindings(compute));
 
-            for (int target : writes) {
-                if (!targets.containsKey(target)) {
-                    targets.put(target, RenderTarget.defaultTarget(target));
+            for (int target : reads) {
+                if (target < 0 || target > 31) {
+                    throw new IllegalArgumentException("Iris colortex" + target + " exceeds CAUSTIQ's bounded target index range 0-31.");
                 }
+                targets.putIfAbsent(target, RenderTarget.defaultTarget(target));
+            }
+            for (int target : writes) {
+                if (target < 0 || target > 31) {
+                    throw new IllegalArgumentException("Iris colortex" + target + " exceeds CAUSTIQ's bounded target index range 0-31.");
+                }
+                targets.putIfAbsent(target, RenderTarget.defaultTarget(target));
             }
             passes.add(new Pass(program.name(), group, program.stages(), reads, writes, outputTargets,
                     program.hasCompute(), program.hasGeometryOrTessellation()));
