@@ -29,6 +29,7 @@ public final class IrisShaderResources implements AutoCloseable {
 
     private final Map<String, TextureAsset> textureAssets;
     private final Map<String, Integer> glTextures = new HashMap<>();
+    private final IrisImageResources imageResources;
     private int terrainActiveTexture;
     private int[] terrainUnits = new int[0];
     private int[] terrainBindings = new int[0];
@@ -38,18 +39,25 @@ public final class IrisShaderResources implements AutoCloseable {
 
     private IrisShaderResources(Map<String, TextureAsset> textures,
                                 Map<String, TypedExpression> uniforms,
-                                Map<String, TypedExpression> variables) {
+                                Map<String, TypedExpression> variables,
+                                IrisImageResources imageResources) {
         this.textureAssets = Map.copyOf(textures);
         this.uniforms = Map.copyOf(uniforms);
         this.variables = Map.copyOf(variables);
+        this.imageResources = imageResources;
     }
 
     public static IrisShaderResources empty() {
-        return new IrisShaderResources(Map.of(), Map.of(), Map.of());
+        return new IrisShaderResources(Map.of(), Map.of(), Map.of(), IrisImageResources.empty());
     }
 
     public static IrisShaderResources load(Map<String, String> properties, ShaderPackSources sources)
             throws IOException {
+        return load(properties, sources, Map.of());
+    }
+
+    public static IrisShaderResources load(Map<String, String> properties, ShaderPackSources sources,
+                                           Map<String, String> defines) throws IOException {
         Map<String, TextureAsset> textures = new LinkedHashMap<>();
         Map<String, TypedExpression> uniforms = new LinkedHashMap<>();
         Map<String, TypedExpression> variables = new LinkedHashMap<>();
@@ -92,10 +100,18 @@ public final class IrisShaderResources implements AutoCloseable {
             TypedExpression parsed = new TypedExpression(type, property.getValue().trim());
             (kind.equals("uniform") ? uniforms : variables).put(name, parsed);
         }
-        return new IrisShaderResources(textures, uniforms, variables);
+        String propertiesSource;
+        try { propertiesSource = sources.read("shaders.properties"); }
+        catch (IOException missing) { propertiesSource = ""; }
+        IrisImageResources images = IrisImageResources.load(propertiesSource, defines);
+        return new IrisShaderResources(textures, uniforms, variables, images);
     }
 
     public java.util.Set<String> textureNames() { return textureAssets.keySet(); }
+    public java.util.Set<String> imageNames() { return imageResources.imageNames(); }
+    public void bindProgramImages(int program, java.util.Set<String> names) { imageResources.bindImages(program, names); }
+    public void restoreProgramImages() { imageResources.restoreImages(); }
+    public void clearImage(String name) { imageResources.clear(name); }
     public java.util.Set<String> uniformNames() { return uniforms.keySet(); }
     public java.util.Set<String> variableNames() { return variables.keySet(); }
 
@@ -134,11 +150,13 @@ public final class IrisShaderResources implements AutoCloseable {
         }
         terrainUnits = units.stream().mapToInt(Integer::intValue).toArray();
         terrainBindings = bindings.stream().mapToInt(Integer::intValue).toArray();
+        imageResources.bindTerrainImages(program);
         GL13C.glActiveTexture(terrainActiveTexture);
     }
 
     /** Restores texture units temporarily used by the terrain program. */
     public void restoreTerrainTextures() {
+        imageResources.restoreImages();
         if (terrainUnits.length == 0) return;
         for (int i = 0; i < terrainUnits.length; i++) {
             GL13C.glActiveTexture(terrainUnits[i]);
@@ -151,6 +169,7 @@ public final class IrisShaderResources implements AutoCloseable {
 
     /** Binds a declared custom texture and returns true when the sampler was resolved. */
     public boolean bindTexture(String sampler, int unit, int uniformLocation) {
+        if (imageResources.bindSampler(sampler, unit, uniformLocation)) return true;
         String name = sampler.equals("noisetex") && textureAssets.containsKey("noise") ? "noise" : sampler;
         TextureAsset asset = textureAssets.get(name);
         if (asset == null) return false;
@@ -388,6 +407,7 @@ public final class IrisShaderResources implements AutoCloseable {
         closed = true;
         glTextures.values().forEach(IrisShaderResources::deleteTexture);
         glTextures.clear();
+        imageResources.close();
     }
 
     private record ImageData(int width, int height, BufferedImage image) { }
