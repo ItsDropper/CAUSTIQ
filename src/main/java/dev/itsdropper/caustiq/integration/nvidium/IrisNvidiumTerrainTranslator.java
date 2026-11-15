@@ -249,7 +249,7 @@ public final class IrisNvidiumTerrainTranslator {
     /** Adapts only Nvidium's primary opaque terrain pipeline; other pipelines remain native. */
     public Map<String, String> adapt(Map<String, String> nativeStages) {
         Objects.requireNonNull(nativeStages, "nativeStages");
-        if (!NvidiumTerrainVaryingAdapter.isPrimary(nativeStages)) return Map.copyOf(nativeStages);
+        if (!NvidiumTerrainVaryingAdapter.isPrimaryMesh(nativeStages)) return Map.copyOf(nativeStages);
 
         String mesh = Objects.requireNonNull(nativeStages.get("MESH"), "MESH");
         String fragment = Objects.requireNonNull(nativeStages.get("FRAGMENT"), "FRAGMENT");
@@ -266,9 +266,12 @@ public final class IrisNvidiumTerrainTranslator {
         mesh = insertIntoInterfaceBlock(mesh, "out Interpolants", declarations, "} OUT[];");
         mesh = insertBefore(mesh, "vec4 transformVertex(Vertex V) {", vertexProgramSource());
         String vertexInvocation = vertexInvocation();
-        String assignmentAnchor = "    OUT[id].v_materialFlags = V.nvidiumMaterial;";
+        String assignmentAnchor = "    OUT[id].v_materialFlags = V.nvidiumMaterial & 0xFFu;";
         if (!mesh.contains(assignmentAnchor)) {
-            throw new IllegalStateException("Nvidium primary mesh shader no longer exposes its material-flag assignment.");
+            assignmentAnchor = "    OUT[id].v_materialFlags = V.nvidiumMaterial;";
+        }
+        if (!mesh.contains(assignmentAnchor) || mesh.indexOf(assignmentAnchor) != mesh.lastIndexOf(assignmentAnchor)) {
+            throw new IllegalStateException("Nvidium primary mesh shader no longer exposes one unambiguous material-flag assignment.");
         }
         mesh = mesh.replace(assignmentAnchor, assignmentAnchor + "\n" + vertexInvocation);
         return mesh;

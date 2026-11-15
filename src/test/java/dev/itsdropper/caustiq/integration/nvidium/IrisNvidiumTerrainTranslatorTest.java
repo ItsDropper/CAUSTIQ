@@ -168,7 +168,7 @@ class IrisNvidiumTerrainTranslatorTest {
                 } OUT[];
                 vec4 transformVertex(Vertex V) { return vec4(0.0); }
                 void putVertex(uint id, Vertex V) {
-                    OUT[id].v_materialFlags = V.nvidiumMaterial;
+                    OUT[id].v_materialFlags = V.nvidiumMaterial & 0xFFu;
                 }
                 void main() {}
                 """;

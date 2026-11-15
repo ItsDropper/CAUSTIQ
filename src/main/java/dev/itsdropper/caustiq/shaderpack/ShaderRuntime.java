@@ -6,6 +6,8 @@ import dev.itsdropper.caustiq.CaustiqConfig;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumGBufferTargets;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisVertexContext;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumRenderBridge;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumShaderProgramBridge;
+import dev.itsdropper.caustiq.integration.nvidium.IrisNvidiumTerrainTranslator;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 
@@ -41,6 +43,8 @@ public final class ShaderRuntime {
     /** Invalidates compiled resources after a UI/configuration change. Render-thread only. */
     public static void requestReload() {
         closeSources();
+        NvidiumShaderProgramBridge.unregisterTerrainAdapter();
+        NvidiumGBufferTargets.resetOutputRouting();
         POST_PROCESS.close();
         NvidiumGBufferTargets.configureTargets(Map.of());
         COMPILED.forEach(CompiledShaderProgram::close);
@@ -166,6 +170,36 @@ public final class ShaderRuntime {
             }
             IrisShaderPackModel packModel = new IrisShaderPackParser().parse(sources);
             activePassPlan = new IrisTerrainPassScheduler().schedule(packModel, null);
+            NvidiumGBufferTargets.configureTargets(activePassPlan.targets());
+
+            // Install only a translator built from a real, selected Iris terrain
+            // program. Unsupported pack features keep Nvidium's Iris opt-out intact.
+            if (FabricLoader.getInstance().isModLoaded("nvidium")
+                    && NvidiumShaderProgramBridge.hasNativeSourceAdapter()
+                    && packModel.dimensionOverrides().isEmpty()
+                    && packModel.requiredFeatures().isEmpty()
+                    && packModel.diagnostics().isEmpty()
+                    && packModel.base().programs().containsKey("gbuffers_terrain")) {
+                try {
+                    IrisNvidiumTerrainTranslator terrainTranslator =
+                            IrisNvidiumTerrainTranslator.from(packModel);
+                    NvidiumShaderProgramBridge.registerTerrainAdapter(
+                            terrainTranslator::adapt, terrainTranslator.renderTargetIndices());
+                    if (!NvidiumRenderBridge.reloadShaders()) {
+                        CaustiqClient.LOGGER.warn(
+                                "Iris terrain translation is registered, but Nvidium's live shader programs could not be reloaded yet.");
+                    } else {
+                        CaustiqClient.LOGGER.info(
+                                "Installed Iris gbuffers_terrain translation for Nvidium with MRT routing {}.",
+                                terrainTranslator.renderTargetIndices());
+                    }
+                } catch (IllegalArgumentException | IllegalStateException exception) {
+                    NvidiumShaderProgramBridge.unregisterTerrainAdapter();
+                    CaustiqClient.LOGGER.warn(
+                            "Shader pack '{}' has a gbuffers_terrain program that cannot be represented by the current Nvidium ABI; keeping Nvidium's Iris safety gate enabled: {}",
+                            selected.displayName(), exception.getMessage());
+                }
+            }
             CaustiqClient.LOGGER.info(
                     "Built Iris pass schedule for '{}': {} ordered program pass(es), {} declared render target(s): {}.",
                     selected.displayName(), activePassPlan.passes().size(), activePassPlan.targets().size(),

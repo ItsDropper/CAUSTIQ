@@ -27,6 +27,11 @@ public final class NvidiumShaderProgramBridge {
         nativeSourceAdapter = Objects.requireNonNull(adapter, "adapter");
     }
 
+    /** True when the pinned Nvidium vertex-format adapter is installed. */
+    public static boolean hasNativeSourceAdapter() {
+        return nativeSourceAdapter != null;
+    }
+
     /** Installs the primary opaque/cutout terrain translator. */
     public static void registerTerrainAdapter(UnaryOperator<Map<String, String>> adapter) {
         registerTerrainAdapter(adapter, List.of(0, 1, 2, 3, 4, 5, 6, 7));
