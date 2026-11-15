@@ -228,6 +228,7 @@ assert "formatField.setBoolean(config, true)" in compatibility
 assert "NvidiumIrisChunkVertex.commit()" in compatibility
 assert "use_sodium_vertex_format=true" in compatibility
 assert "isCommitted()" in (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
+bridge = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumShaderProgramBridge.java").read_text(encoding="utf-8")
 abi_state = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumVertexAbiState.java").read_text(encoding="utf-8")
 assert "static boolean isCommitted()" in abi_state
 assert "NvidiumVertexAbiState.commit()" in vertex_encoder
@@ -240,7 +241,6 @@ translator = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/n
 assert "softwareRenderHarnessSources()" in translator
 render_smoke = (caustiq_root / "src/test/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisTerrainGlRenderSmokeTest.java").read_text(encoding="utf-8")
 assert "rendersTheTranslatedPhotonTerrainVertexAndFragmentProgramsOnMesa" in render_smoke
-bridge = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumShaderProgramBridge.java").read_text(encoding="utf-8")
 assert 'dumpShaderSources("before-adaptation", original)' in bridge
 assert 'dumpShaderSources("compiled", transformed)' in bridge
 assert "caustiq.dumpNvidiumShaders" in bridge
