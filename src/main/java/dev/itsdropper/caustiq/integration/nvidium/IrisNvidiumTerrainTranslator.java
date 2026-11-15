@@ -117,15 +117,29 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("entityColor", "caustiqEntityColor"),
             Map.entry("view_res", "(screenSize * 2.0)"),
             Map.entry("view_pixel_size", "(1.0 / (screenSize * 2.0))"));
-    private static final Set<String> NATIVE_INTERPOLANTS = Set.of(
-            "uv", "v_colour", "v_vertexColour", "v_lightmapCoord", "v_renderPosition",
-            "v_quadMidUv", "v_quadMidPosition", "v_midBlock", "v_blockEntity",
-            "v_normal", "v_tangent", "v_tbn", "v_materialFlags",
-            "v_irisTexCoord0", "v_irisTexCoord1", "v_irisTexCoord2", "v_irisTexCoord3",
-            "v_irisTexCoord4", "v_irisTexCoord5", "v_irisTexCoord6", "v_irisTexCoord7");
+    private static final Map<String, String> NATIVE_INTERPOLANTS = Map.ofEntries(
+            Map.entry("uv", "vec2"),
+            Map.entry("v_colour", "vec3"),
+            Map.entry("v_vertexColour", "vec3"),
+            Map.entry("v_lightmapCoord", "vec2"),
+            Map.entry("v_renderPosition", "vec3"),
+            Map.entry("v_quadMidUv", "vec2"),
+            Map.entry("v_quadMidPosition", "vec3"),
+            Map.entry("v_midBlock", "vec3"),
+            Map.entry("v_blockEntity", "vec3"),
+            Map.entry("v_normal", "vec3"),
+            Map.entry("v_tangent", "vec4"),
+            Map.entry("v_tbn", "mat3"),
+            Map.entry("v_materialFlags", "uint"),
+            Map.entry("v_irisTexCoord0", "vec4"),
+            Map.entry("v_irisTexCoord1", "vec4"),
+            Map.entry("v_irisTexCoord2", "vec4"),
+            Map.entry("v_irisTexCoord3", "vec4"),
+            Map.entry("v_irisTexCoord4", "vec4"),
+            Map.entry("v_irisTexCoord5", "vec4"),
+            Map.entry("v_irisTexCoord6", "vec4"),
+            Map.entry("v_irisTexCoord7", "vec4"));
 
-    private final String vertexSource;
-    private final String fragmentSource;
     private final List<Varying> varyings;
     private final List<FragmentOutput> outputs;
     private final boolean usesFragData;
@@ -273,8 +287,14 @@ public final class IrisNvidiumTerrainTranslator {
             members.append("    vec4 v_irisTexCoord").append(index).append(";\n");
         }
         for (Varying varying : varyings) {
-            if (NATIVE_INTERPOLANTS.contains(varying.name())) {
-                throw new IllegalArgumentException("Iris varying collides with Nvidium ABI member: " + varying.name());
+            String nativeType = NATIVE_INTERPOLANTS.get(varying.name());
+            if (nativeType != null) {
+                if (!nativeType.equals(varying.type())) {
+                    throw new IllegalArgumentException("Iris varying '" + varying.name()
+                            + "' collides with Nvidium ABI type " + nativeType + " (pack requested "
+                            + varying.type() + ").");
+                }
+                continue;
             }
             members.append("    ");
             if (varying.qualifier() != null && !varying.qualifier().equals("smooth")) {
