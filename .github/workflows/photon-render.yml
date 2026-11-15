@@ -35,12 +35,12 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Install Mesa, Xvfb and screenshot utility
+      - name: Install Mesa and virtual display
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install --yes xvfb libgl1-mesa-dri libglx-mesa0 imagemagick
+          sudo apt-get install --yes xvfb libgl1-mesa-dri libglx-mesa0
 
       - name: Download pinned Photon shader pack
         shell: bash
@@ -64,39 +64,36 @@ jobs:
           CAUSTIQ_CI_SHADERPACK: ${{ github.workspace }}/run/shaderpacks/Photon
           LIBGL_ALWAYS_SOFTWARE: "1"
           MESA_GL_VERSION_OVERRIDE: "4.6"
+          CAUSTIQ_CI_SCREENSHOT: ${{ github.workspace }}/build/caustiq-photon-minecraft/minecraft-photon-validation.png
         run: |
           set -uo pipefail
           mkdir -p build/caustiq-photon-minecraft
           log="$GITHUB_WORKSPACE/build/caustiq-photon-minecraft/minecraft.log"
           screenshot="$GITHUB_WORKSPACE/build/caustiq-photon-minecraft/minecraft-photon-validation.png"
-          export CAUSTIQ_CI_SHADER_VALIDATION CAUSTIQ_CI_SHADERPACK LIBGL_ALWAYS_SOFTWARE MESA_GL_VERSION_OVERRIDE
-          xvfb-run -a -s "-screen 0 1280x720x24" bash -c '
-            set -uo pipefail
-            setsid ./gradlew runClient --stacktrace --info > "'"$log"'" 2>&1 &
-            client_pid=$!
-            result=timeout
-            for second in $(seq 1 480); do
-              if grep -q "CAUSTIQ_CI_SHADER_VALIDATION_PASS" "'"$log"'"; then
-                result=pass
-                break
-              fi
-              if grep -q "CAUSTIQ_CI_SHADER_VALIDATION_FAIL" "'"$log"'"; then
-                result=fail
-                break
-              fi
-              if ! kill -0 "$client_pid" 2>/dev/null; then
-                result=exited
-                break
-              fi
-              sleep 1
-            done
-            sleep 2
-            import -window root "'"$screenshot"'" || true
-            kill -- -"$client_pid" 2>/dev/null || true
-            wait "$client_pid" 2>/dev/null || true
-            echo "Minecraft validation result: $result"
-            test "$result" = pass
-          '
+          export CAUSTIQ_CI_SHADER_VALIDATION CAUSTIQ_CI_SHADERPACK LIBGL_ALWAYS_SOFTWARE MESA_GL_VERSION_OVERRIDE CAUSTIQ_CI_SCREENSHOT
+          setsid ./gradlew runClient --stacktrace --info > "$log" 2>&1 &
+          client_pid=$!
+          result=timeout
+          for second in $(seq 1 480); do
+            if grep -q "CAUSTIQ_CI_SHADER_VALIDATION_PASS" "$log"; then
+              result=pass
+              break
+            fi
+            if grep -q "CAUSTIQ_CI_SHADER_VALIDATION_FAIL" "$log"; then
+              result=fail
+              break
+            fi
+            if ! kill -0 "$client_pid" 2>/dev/null; then
+              result=exited
+              break
+            fi
+            sleep 1
+          done
+          kill -- -"$client_pid" 2>/dev/null || true
+          wait "$client_pid" 2>/dev/null || true
+          echo "Minecraft validation result: $result"
+          test "$result" = pass
+          test -s "$screenshot"
 
       - name: Verify Minecraft and Photon validation result
         if: always()
