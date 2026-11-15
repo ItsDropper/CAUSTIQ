@@ -81,6 +81,14 @@ public final class NvidiumIrisUniformBridge {
             matrix(program, "caustiqProjectionInverse", snapshot.projectionInverse());
             matrix(program, "caustiqModelViewInverse", snapshot.modelViewInverse());
             matrix3(program, "caustiqNormalMatrix", snapshot.normalMatrix());
+            Snapshot previous = PREVIOUS.get();
+            if (previous == null) previous = snapshot;
+            matrix(program, "caustiqPreviousProjection", previous.projection());
+            matrix(program, "caustiqPreviousProjectionInverse", previous.projectionInverse());
+            matrix(program, "caustiqPreviousModelView", previous.modelView());
+            matrix(program, "caustiqPreviousModelViewInverse", previous.modelViewInverse());
+            vector3(program, "caustiqPreviousCameraPosition",
+                    previous.cameraX(), previous.cameraY(), previous.cameraZ());
             if (NvidiumShadowRenderer.isShadowRasterization()) {
                 float[] shadowView = NvidiumShadowRenderer.shadowModelView();
                 float[] shadowProjection = NvidiumShadowRenderer.shadowProjection();
