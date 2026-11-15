@@ -1,6 +1,8 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import dev.itsdropper.caustiq.CaustiqClient;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -679,10 +681,9 @@ public final class NvidiumShadowRenderer {
             MemoryUtil.memPutLong(cursor, address(readField(pipeline, "originOffsetArray"))); cursor += 8L;
             MemoryUtil.memPutLong(cursor, address(statisticsBuffer)); cursor += 8L;
 
-            int screenWidth = ((Number) invoke(invoke(Class.forName("net.minecraft.client.Minecraft")
-                    .getMethod("getInstance").invoke(null), "getWindow"), "getWidth")).intValue();
-            int screenHeight = ((Number) invoke(invoke(Class.forName("net.minecraft.client.Minecraft")
-                    .getMethod("getInstance").invoke(null), "getWindow"), "getHeight")).intValue();
+            Minecraft minecraft = Minecraft.getInstance();
+            int screenWidth = minecraft.getWindow().getWidth();
+            int screenHeight = minecraft.getWindow().getHeight();
             MemoryUtil.memPutFloat(cursor, screenWidth * 0.5f); cursor += 4L;
             MemoryUtil.memPutFloat(cursor, screenHeight * 0.5f); cursor += 4L;
             writeVector4(cursor, fogParameters, "red", "green", "blue", "alpha",
@@ -709,30 +710,13 @@ public final class NvidiumShadowRenderer {
         }
 
         private float readSunAngle() {
-            try {
-                Object minecraft = Class.forName("net.minecraft.client.Minecraft").getMethod("getInstance").invoke(null);
-                Object level = readField(minecraft, "level");
-                if (level == null) return 0.0f;
-                Object angle = invoke(level, "getSunAngle", 1.0f);
-                return ((Number) angle).floatValue();
-            } catch (ReflectiveOperationException | RuntimeException ignored) {
-                return 0.0f;
-            }
+            Minecraft minecraft = Minecraft.getInstance();
+            return minecraft.level == null ? 0.0f : minecraft.level.getSunAngle(1.0f);
         }
 
         private int[] atlasSize() {
-            try {
-                Object minecraft = Class.forName("net.minecraft.client.Minecraft").getMethod("getInstance").invoke(null);
-                Object manager = invoke(minecraft, "getTextureManager");
-                Class<?> atlasType = Class.forName("net.minecraft.client.renderer.texture.TextureAtlas");
-                Object location = readField(atlasType, "LOCATION_BLOCKS");
-                Object atlas = invoke(manager, "getTexture", location);
-                return new int[]{
-                        ((Number) invoke(atlas, "getWidth")).intValue(),
-                        ((Number) invoke(atlas, "getHeight")).intValue()};
-            } catch (ReflectiveOperationException | RuntimeException ignored) {
-                return new int[]{1024, 1024};
-            }
+            var atlas = Minecraft.getInstance().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
+            return new int[]{atlas.getWidth(), atlas.getHeight()};
         }
 
         private int subTexelPrecisionBits() {
