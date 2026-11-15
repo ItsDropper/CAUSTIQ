@@ -202,6 +202,49 @@ public final class NvidiumIrisUniformBridge {
         return stack.isEmpty() ? 0 : BuiltInRegistries.ITEM.getId(stack.getItem());
     }
 
+    private static double[] heldBlockLightColor(InteractionHand hand) {
+        Object player = Minecraft.getInstance().player;
+        if (player == null) return new double[]{1.0, 1.0, 1.0};
+        try {
+            Object stack = invokeCompatible(player, "getItemInHand", hand);
+            Object item = invokeObject(stack, "getItem");
+            if (item != null) {
+                for (Method method : item.getClass().getMethods()) {
+                    if (method.getName().equals("getLightColor") && method.getParameterCount() == 2) {
+                        Object color = method.invoke(item, player, stack);
+                        if (color != null) return vector3Array(color);
+                    }
+                }
+            }
+        } catch (ReflectiveOperationException | RuntimeException ignored) { }
+        return new double[]{1.0, 1.0, 1.0};
+    }
+
+    private static void selectedBlockUniforms(java.util.Map<String, Double> values,
+                                              Minecraft client, Object level, Snapshot snapshot) {
+        putScalar(values, "currentSelectedBlockId", 0.0);
+        putVector3(values, "currentSelectedBlockPos", -256.0, -256.0, -256.0);
+        if (level == null) return;
+        Object hitResult = readField(client, "hitResult");
+        Object hitType = invokeObject(hitResult, "getType");
+        if (hitType == null || !hitType.toString().equals("BLOCK")) return;
+        try {
+            Object position = invokeObject(hitResult, "getBlockPos");
+            Object state = invokeCompatible(level, "getBlockState", position);
+            if (state instanceof net.minecraft.world.level.block.state.BlockState blockState) {
+                putScalar(values, "currentSelectedBlockId",
+                        NvidiumIrisVertexContext.blockIdForState(blockState));
+            }
+            Object center = invokeObject(position, "getCenter");
+            double[] centerPosition = vector3Array(center);
+            double cameraX = snapshot == null ? 0.0 : snapshot.cameraX();
+            double cameraY = snapshot == null ? 0.0 : snapshot.cameraY();
+            double cameraZ = snapshot == null ? 0.0 : snapshot.cameraZ();
+            putVector3(values, "currentSelectedBlockPos", centerPosition[0] - cameraX,
+                    centerPosition[1] - cameraY, centerPosition[2] - cameraZ);
+        } catch (ReflectiveOperationException | RuntimeException ignored) { }
+    }
+
     private static int[] blockAtlasSize() {
         try {
             Object atlas = Minecraft.getInstance().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
@@ -603,6 +646,7 @@ public final class NvidiumIrisUniformBridge {
         putScalar(values, "is_hurt", invokeIntField(player, "hurtTime", 0) > 0 ? 1.0 : 0.0);
         putScalar(values, "is_invisible", invokeBoolean(player, "isInvisible", false) ? 1.0 : 0.0);
         putScalar(values, "isElytraFlying", isElytraFlying() ? 1.0 : 0.0);
+        putScalar(values, "inSwimmingAnimation", invokeBoolean(player, "isSwimming", false) ? 1.0 : 0.0);
         putScalar(values, "isRiding", invokeBoolean(player, "isPassenger", false) ? 1.0 : 0.0);
         putScalar(values, "feetInWater", invokeBoolean(player, "isInShallowWater", false) ? 1.0 : 0.0);
         putScalar(values, "vehicleInWater", vehicleInWater(player) ? 1.0 : 0.0);
@@ -648,14 +692,19 @@ public final class NvidiumIrisUniformBridge {
         putVector2(values, "gtextureSize", atlas[0], atlas[1]);
         putScalar(values, "heldBlockLightValue", heldBlockLightValue(InteractionHand.MAIN_HAND));
         putScalar(values, "heldBlockLightValue2", heldBlockLightValue(InteractionHand.OFF_HAND));
+        putVector3(values, "heldBlockLightColor", heldBlockLightColor(InteractionHand.MAIN_HAND));
+        putVector3(values, "heldBlockLightColor2", heldBlockLightColor(InteractionHand.OFF_HAND));
         putScalar(values, "heldItemId", heldItemId(InteractionHand.MAIN_HAND));
         putScalar(values, "heldItemId2", heldItemId(InteractionHand.OFF_HAND));
         putScalar(values, "entityId", -1);
         putScalar(values, "blockEntityId", -1);
         putScalar(values, "currentRenderedItemId", -1);
-        putScalar(values, "vehicleId", 0);
-        putScalar(values, "currentSelectedBlockId", 0);
-        putScalar(values, "textureReloadCount", 0);
+        Object vehicle = invokeObject(player, "getVehicle");
+        Object vehicleType = invokeObject(vehicle, "getType");
+        putScalar(values, "vehicleId", vehicleType == null ? 0 : BuiltInRegistries.ENTITY_TYPE.getId(
+                (net.minecraft.world.entity.EntityType<?>) vehicleType));
+        selectedBlockUniforms(values, client, level, snapshot);
+        putScalar(values, "textureReloadCount", irisCapturedFloat("getTextureReloadCount", 0.0));
         putScalar(values, "textureFilteringMode", 0);
         putScalar(values, "renderStage", 0);
         putScalar(values, "alphaTestRef", 0.1);
@@ -667,6 +716,9 @@ public final class NvidiumIrisUniformBridge {
         putScalar(values, "fogDensity", Math.max(0.0, fogDensity));
         putScalar(values, "fogStart", fogStart);
         putScalar(values, "fogEnd", fogEnd);
+        putScalar(values, "iris_FogStart", fogStart);
+        putScalar(values, "iris_FogEnd", fogEnd);
+        putScalar(values, "iris_FogDensity", Math.max(0.0, fogDensity));
         putScalar(values, "fogMode", fogDensity < 0.0 ? 9729.0 : fogDensity > 0.0 ? 2049.0 : 0.0);
         putScalar(values, "fogShape", fogDensity == 0.0 ? -1.0 : 1.0);
         putScalar(values, "alphaTestRef", irisCapturedFloat("getCurrentAlphaTest", 0.1));
@@ -677,6 +729,11 @@ public final class NvidiumIrisUniformBridge {
         putScalar(values, "textureFilteringMode", filtering);
         putScalar(values, "anisotropicFiltering", filtering == 2
                 ? invokeDouble(client.options, "maxAnisotropyValue", 0.0) : 0.0);
+        putScalar(values, "heavyFog", isHeavyFog() ? 1.0 : 0.0);
+        putScalar(values, "seaLevel", invokeDouble(level, "getSeaLevel", 63.0));
+        putScalar(values, "cloudTime", irisCapturedFloat("getCloudTime", 0.0));
+        double fadeMillis = optionDouble(client, "chunkSectionFadeInTime", 0.0) * 1000.0;
+        putScalar(values, "chunkFadeTimeInv", fadeMillis > 0.0 ? 1.0 / fadeMillis : 0.0);
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         putVector3(values, "currentDate", now.getYear(), now.getMonthValue(), now.getDayOfMonth());
@@ -718,6 +775,8 @@ public final class NvidiumIrisUniformBridge {
             putMatrix3Components(values, "iris_NormalMatrix", snapshot.normalMatrix());
             putMatrixComponents(values, "iris_ModelViewMatrix", snapshot.modelView(), 4);
             putMatrixComponents(values, "iris_ProjectionMatrix", snapshot.projection(), 4);
+            putMatrixComponents(values, "iris_ModelViewMat", snapshot.modelView(), 4);
+            putMatrixComponents(values, "iris_ProjMat", snapshot.projection(), 4);
             putMatrixComponents(values, "u_ModelViewProjectionMatrix",
                     modelViewProjection.get(new float[16]), 4);
             org.joml.Vector3f up = new org.joml.Matrix4f().set(snapshot.modelView())
@@ -752,6 +811,8 @@ public final class NvidiumIrisUniformBridge {
                     snapshot.cameraZ() - vehiclePosition[2]);
             putVector3(values, "skyColor", skyColor(level, snapshot));
             putVector3(values, "fogColor", fogColor(snapshot));
+            putVector4(values, "iris_FogColor", new double[]{values.get("fogColor.x"),
+                    values.get("fogColor.y"), values.get("fogColor.z"), 1.0});
             putVector4(values, "lightningBoltPosition", lightningBoltPosition(level, snapshot));
             putVector3(values, "endFlashPosition", endFlashPosition(level, snapshot));
             putVector3(values, "currentSelectedBlockPos", 0.0, 0.0, 0.0);
