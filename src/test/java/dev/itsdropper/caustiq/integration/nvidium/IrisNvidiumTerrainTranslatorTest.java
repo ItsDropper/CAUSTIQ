@@ -17,6 +17,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -223,11 +225,35 @@ class IrisNvidiumTerrainTranslatorTest {
         String root = System.getenv("NVIDIUM_SOURCE_DIR");
         Assumptions.assumeTrue(root != null && !root.isBlank(),
                 "Pinned Nvidium source checkout is supplied by CI only");
-        Path shaders = Path.of(root, "src/main/resources/assets/nvidium/shaders/terrain");
+        Path shaderRoot = Path.of(root, "src/main/resources/assets/nvidium/shaders");
         return Map.of(
-                "TASK", Files.readString(shaders.resolve("task.glsl")),
-                "MESH", Files.readString(shaders.resolve("mesh.glsl")),
-                "FRAGMENT", Files.readString(shaders.resolve("frag.frag")));
+                "TASK", expandNvidiumImports(Files.readString(shaderRoot.resolve("terrain/task.glsl")), shaderRoot, Set.of()),
+                "MESH", expandNvidiumImports(Files.readString(shaderRoot.resolve("terrain/mesh.glsl")), shaderRoot, Set.of()),
+                "FRAGMENT", expandNvidiumImports(Files.readString(shaderRoot.resolve("terrain/frag.frag")), shaderRoot, Set.of()));
+    }
+
+    private static String expandNvidiumImports(String source, Path shaderRoot, Set<String> ancestors)
+            throws Exception {
+        Pattern imports = Pattern.compile("(?m)^\\s*#import\\s*<nvidium:([^>]+)>\\s*$");
+        Matcher matcher = imports.matcher(source);
+        StringBuffer expanded = new StringBuffer();
+        while (matcher.find()) {
+            String resource = matcher.group(1);
+            if (ancestors.contains(resource)) {
+                throw new IllegalStateException("Cyclic Nvidium shader import: " + resource);
+            }
+            Path importedPath = shaderRoot.resolve(resource).normalize();
+            if (!importedPath.startsWith(shaderRoot) || !Files.isRegularFile(importedPath)) {
+                throw new IllegalStateException("Missing pinned Nvidium shader import: " + resource);
+            }
+            Set<String> nextAncestors = new java.util.LinkedHashSet<>(ancestors);
+            nextAncestors.add(resource);
+            String imported = expandNvidiumImports(
+                    Files.readString(importedPath), shaderRoot, Set.copyOf(nextAncestors));
+            matcher.appendReplacement(expanded, Matcher.quoteReplacement(imported));
+        }
+        matcher.appendTail(expanded);
+        return expanded.toString();
     }
 
     private static Map<String, String> nativeStages() {
