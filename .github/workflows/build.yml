@@ -235,7 +235,7 @@ jobs:
               "struct Vertex",
               "uint nvidiumMaterial;",
               "void caustiqIrisVertexMain()",
-              "void transformVertex",
+              "vec4 transformVertex(Vertex V)",
           ):
               if contract not in mesh:
                   raise SystemExit(f"Generated terrain mesh is missing required ABI/source contract: {contract}")
@@ -295,6 +295,7 @@ jobs:
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumGBufferTargets.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumShadowRenderer.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.class",
+                  "dev/itsdropper/caustiq/integration/nvidium/NvidiumVertexAbiState.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisTextureBridge.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisVertexContext.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumShaderProgramBridge.class",
