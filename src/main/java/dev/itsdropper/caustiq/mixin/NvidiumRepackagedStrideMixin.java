@@ -21,22 +21,22 @@ public abstract class NvidiumRepackagedStrideMixin {
         return NvidiumIrisChunkVertex.isEnabled() ? NvidiumIrisChunkVertex.STRIDE : original;
     }
 
-    // STRIDE is a compile-time constant in both upstream vertex formats, so javac
-    // inlines the multiplied quad sizes (80 and 64) into copyQuad. A field
-    // redirect cannot match bytecode that contains no GETSTATIC instruction.
-    @ModifyConstant(method = "copyQuad", constant = @Constant(intValue = 80),
+    // STRIDE is a compile-time constant in both upstream vertex formats. The
+    // multiplication is also folded by javac, but copyQuad stores the result
+    // in a long, so its bytecode constants are 80L and 64L (not int constants).
+    @ModifyConstant(method = "copyQuad", constant = @Constant(longValue = 80L),
             remap = false, require = 1)
-    private static int caustiq$copyExtendedSodiumQuadStride(int original) {
+    private static long caustiq$copyExtendedSodiumQuadStride(long original) {
         return NvidiumIrisChunkVertex.isEnabled()
-                ? NvidiumIrisChunkVertex.STRIDE * 4
+                ? (long) NvidiumIrisChunkVertex.STRIDE * 4L
                 : original;
     }
 
-    @ModifyConstant(method = "copyQuad", constant = @Constant(intValue = 64),
+    @ModifyConstant(method = "copyQuad", constant = @Constant(longValue = 64L),
             remap = false, require = 1)
-    private static int caustiq$copyExtendedNvidiumQuadStride(int original) {
+    private static long caustiq$copyExtendedNvidiumQuadStride(long original) {
         return NvidiumIrisChunkVertex.isEnabled()
-                ? NvidiumIrisChunkVertex.STRIDE * 4
+                ? (long) NvidiumIrisChunkVertex.STRIDE * 4L
                 : original;
     }
 }
