@@ -201,10 +201,10 @@ public final class NvidiumShadowRenderer {
             clearBuffer(state.regionVisibility);
             clearBuffer(state.sectionVisibility);
             clearUIntBuffer(state.statisticsBuffer);
-            GL42C.glMemoryBarrier(GL42C.GL_BUFFER_UPDATE_BARRIER_BIT | GL42C.GL_SHADER_STORAGE_BARRIER_BIT);
+            GL42C.glMemoryBarrier(GL42C.GL_BUFFER_UPDATE_BARRIER_BIT | GL43C.GL_SHADER_STORAGE_BARRIER_BIT);
 
             enableUnifiedBuffers();
-            NVUniformBufferUnifiedMemory.glBufferAddressRangeNV(
+            NVVertexBufferUnifiedMemory.glBufferAddressRangeNV(
                     NVUniformBufferUnifiedMemory.GL_UNIFORM_BUFFER_ADDRESS_NV, 0,
                     address(state.sceneUniform), state.sceneSize);
 
@@ -248,23 +248,23 @@ public final class NvidiumShadowRenderer {
     }
 
     private static void enableUnifiedBuffers() {
-        NVVertexBufferUnifiedMemory.glEnableClientState(
+        GL11C.glEnableClientState(
                 NVUniformBufferUnifiedMemory.GL_UNIFORM_BUFFER_UNIFIED_NV);
-        NVVertexBufferUnifiedMemory.glEnableClientState(
+        GL11C.glEnableClientState(
                 NVVertexBufferUnifiedMemory.GL_VERTEX_ATTRIB_ARRAY_UNIFIED_NV);
-        NVVertexBufferUnifiedMemory.glEnableClientState(
+        GL11C.glEnableClientState(
                 NVVertexBufferUnifiedMemory.GL_ELEMENT_ARRAY_UNIFIED_NV);
-        NVVertexBufferUnifiedMemory.glEnableClientState(GL_DRAW_INDIRECT_UNIFIED_NV);
+        GL11C.glEnableClientState(GL_DRAW_INDIRECT_UNIFIED_NV);
     }
 
     private static void disableUnifiedBuffers() {
-        NVVertexBufferUnifiedMemory.glDisableClientState(
+        GL11C.glDisableClientState(
                 NVUniformBufferUnifiedMemory.GL_UNIFORM_BUFFER_UNIFIED_NV);
-        NVVertexBufferUnifiedMemory.glDisableClientState(
+        GL11C.glDisableClientState(
                 NVVertexBufferUnifiedMemory.GL_VERTEX_ATTRIB_ARRAY_UNIFIED_NV);
-        NVVertexBufferUnifiedMemory.glDisableClientState(
+        GL11C.glDisableClientState(
                 NVVertexBufferUnifiedMemory.GL_ELEMENT_ARRAY_UNIFIED_NV);
-        NVVertexBufferUnifiedMemory.glDisableClientState(GL_DRAW_INDIRECT_UNIFIED_NV);
+        GL11C.glDisableClientState(GL_DRAW_INDIRECT_UNIFIED_NV);
     }
 
     private static void clearBuffer(Object buffer) throws ReflectiveOperationException {
@@ -531,14 +531,18 @@ public final class NvidiumShadowRenderer {
             float sunAngle = readSunAngle();
             Vector3f lightDirection = new Vector3f(
                     (float) Math.sin(sunAngle), (float) Math.cos(sunAngle), 0.25f).normalize();
+            // Keep the directional-light camera above the scene at night as
+            // well; the moon illuminates from the opposite hemisphere.
+            if (lightDirection.y < 0.0f) lightDirection.negate();
             Vector3f up = Math.abs(lightDirection.dot(0.0f, 1.0f, 0.0f)) > 0.97f
                     ? new Vector3f(0.0f, 0.0f, 1.0f) : new Vector3f(0.0f, 1.0f, 0.0f);
+            Vector3f lightEye = new Vector3f(lightDirection).mul(distance);
             Matrix4f view = new Matrix4f().lookAt(
+                    lightEye.x, lightEye.y, lightEye.z,
                     0.0f, 0.0f, 0.0f,
-                    -lightDirection.x, -lightDirection.y, -lightDirection.z,
                     up.x, up.y, up.z);
             Matrix4f projection = new Matrix4f().ortho(
-                    -distance, distance, -distance, distance, 0.1f, distance * 2.0f);
+                    -distance, distance, -distance, distance, 0.1f, distance * 4.0f);
             Matrix4f mvp = new Matrix4f(projection).mul(view).translate(delta);
             shadowModelView = view.get(new float[16]);
             shadowProjection = projection.get(new float[16]);
@@ -671,7 +675,7 @@ public final class NvidiumShadowRenderer {
 
         private void restoreNvidiumBindings() throws ReflectiveOperationException {
             Object nativeScene = readField(pipeline, "sceneUniform");
-            NVUniformBufferUnifiedMemory.glBufferAddressRangeNV(
+            NVVertexBufferUnifiedMemory.glBufferAddressRangeNV(
                     NVUniformBufferUnifiedMemory.GL_UNIFORM_BUFFER_ADDRESS_NV, 0,
                     address(nativeScene), sceneSize);
             int nativeRegionCount = ((Number) readField(pipeline, "prevRegionCount")).intValue();
@@ -734,8 +738,8 @@ public final class NvidiumShadowRenderer {
         GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
         GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_LINEAR);
         GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_LINEAR);
-        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, GL12C.GL_CLAMP_TO_BORDER);
-        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, GL11C.GL_CLAMP_TO_BORDER);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, 0x812D);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, 0x812D);
         GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL12C.GL_TEXTURE_BASE_LEVEL, 0);
         GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL12C.GL_TEXTURE_MAX_LEVEL, 0);
         try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -771,8 +775,7 @@ public final class NvidiumShadowRenderer {
             boolean depthTest, boolean blend, boolean cull, boolean scissor,
             boolean representative, int depthFunction, boolean depthMask,
             boolean[] colorMask, int activeTexture, int[] textureBindings, int[] samplerBindings,
-            int program, int vertexArray, float clearDepth,
-            boolean uniformUnified, boolean vertexUnified, boolean elementUnified, boolean indirectUnified) {
+            int program, int vertexArray, float clearDepth) {
         private static GlState capture() {
             int[] viewport = new int[4];
             try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -810,14 +813,7 @@ public final class NvidiumShadowRenderer {
                     active, textureBindings, samplerBindings,
                     GL11C.glGetInteger(GL20C.GL_CURRENT_PROGRAM),
                     GL11C.glGetInteger(GL30C.GL_VERTEX_ARRAY_BINDING),
-                    GL11C.glGetFloat(GL11C.GL_DEPTH_CLEAR_VALUE),
-                    NVVertexBufferUnifiedMemory.glIsEnabledClientState(
-                            NVUniformBufferUnifiedMemory.GL_UNIFORM_BUFFER_UNIFIED_NV),
-                    NVVertexBufferUnifiedMemory.glIsEnabledClientState(
-                            NVVertexBufferUnifiedMemory.GL_VERTEX_ATTRIB_ARRAY_UNIFIED_NV),
-                    NVVertexBufferUnifiedMemory.glIsEnabledClientState(
-                            NVVertexBufferUnifiedMemory.GL_ELEMENT_ARRAY_UNIFIED_NV),
-                    NVVertexBufferUnifiedMemory.glIsEnabledClientState(GL_DRAW_INDIRECT_UNIFIED_NV));
+                    GL11C.glGetFloat(GL11C.GL_DEPTH_CLEAR_VALUE));
         }
 
         private void restore() {
@@ -841,10 +837,11 @@ public final class NvidiumShadowRenderer {
                 GL33C.glBindSampler(i, samplerBindings[i]);
             }
             GlStateManager._activeTexture(activeTexture);
-            toggleClient(NVUniformBufferUnifiedMemory.GL_UNIFORM_BUFFER_UNIFIED_NV, uniformUnified, true);
-            toggleClient(NVVertexBufferUnifiedMemory.GL_VERTEX_ATTRIB_ARRAY_UNIFIED_NV, vertexUnified, false);
-            toggleClient(NVVertexBufferUnifiedMemory.GL_ELEMENT_ARRAY_UNIFIED_NV, elementUnified, false);
-            toggleClient(GL_DRAW_INDIRECT_UNIFIED_NV, indirectUnified, false);
+            // Nvidium's renderFrame contract leaves these client states disabled on return.
+            GL11C.glDisableClientState(NVUniformBufferUnifiedMemory.GL_UNIFORM_BUFFER_UNIFIED_NV);
+            GL11C.glDisableClientState(NVVertexBufferUnifiedMemory.GL_VERTEX_ATTRIB_ARRAY_UNIFIED_NV);
+            GL11C.glDisableClientState(NVVertexBufferUnifiedMemory.GL_ELEMENT_ARRAY_UNIFIED_NV);
+            GL11C.glDisableClientState(GL_DRAW_INDIRECT_UNIFIED_NV);
         }
 
         private static void toggle(int capability, boolean enabled) {
@@ -852,9 +849,6 @@ public final class NvidiumShadowRenderer {
             else GL11C.glDisable(capability);
         }
 
-        private static void toggleClient(int capability, boolean enabled, boolean uniform) {
-            if (enabled) NVVertexBufferUnifiedMemory.glEnableClientState(capability);
-            else NVVertexBufferUnifiedMemory.glDisableClientState(capability);
-        }
+
     }
 }
