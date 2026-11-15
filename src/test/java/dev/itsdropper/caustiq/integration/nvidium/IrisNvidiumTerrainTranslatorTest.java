@@ -80,7 +80,7 @@ class IrisNvidiumTerrainTranslatorTest {
             assertTrue(translated.get("MESH").contains("void caustiqIrisVertexMain()"));
             assertTrue(translated.get("FRAGMENT").contains("void caustiqIrisFragmentMain()"));
             assertTrue(translated.get("MESH").contains("OUT[id].scene_pos ="));
-            assertTrue(translated.get("FRAGMENT").contains("gbuffer_data_0"));
+            assertTrue(translated.get("FRAGMENT").contains("caustiqIrisOutput1"));
             assertEquals(List.of(1), translator.renderTargetIndices());
         }
     }
