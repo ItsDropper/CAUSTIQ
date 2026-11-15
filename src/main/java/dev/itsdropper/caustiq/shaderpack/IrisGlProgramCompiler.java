@@ -66,9 +66,12 @@ public final class IrisGlProgramCompiler {
                             + GL20C.glGetProgramInfoLog(linked));
                 }
                 int[] local = localSizes(compute);
+                boolean vectorGlobalInvocation = Pattern.compile(
+                        "\\bgl_GlobalInvocationID\\b(?!\\s*\\.[xyz])").matcher(compute).find();
                 return new IrisGlProgram(program.name(), linked, findSamplers(compute), findImages(compute),
                         true, local[0], local[1], local[2],
-                        compute.contains("gl_GlobalInvocationID.y"), compute.contains("gl_GlobalInvocationID.z"));
+                        vectorGlobalInvocation || compute.contains("gl_GlobalInvocationID.y"),
+                        vectorGlobalInvocation || compute.contains("gl_GlobalInvocationID.z"));
             } catch (IOException | RuntimeException exception) {
                 if (linked != 0) GL20C.glDeleteProgram(linked);
                 throw exception;
