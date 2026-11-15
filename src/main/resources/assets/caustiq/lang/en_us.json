@@ -16,6 +16,7 @@
   "caustiq.settings.no_options": "This pack does not declare configurable options.",
   "caustiq.settings.selected_pack": "Selected shader pack",
   "caustiq.settings.selected_pack_tooltip": "Choose the shader pack used by CAUSTIQ. Available packs are discovered in the shaderpacks folder.",
-  "caustiq.settings.refresh_tooltip": "Rescan the shaderpacks folder for installed packs.",
-  "caustiq.settings.no_packs": "No shader packs found"
+  "caustiq.settings.refresh_tooltip": "Rescan the shaderpacks folder. Reopen Sodium's settings page after the scan completes to refresh the available choices.",
+  "caustiq.settings.no_packs": "No shader packs found",
+  "caustiq.settings.select_pack": "Select shader pack"
 }

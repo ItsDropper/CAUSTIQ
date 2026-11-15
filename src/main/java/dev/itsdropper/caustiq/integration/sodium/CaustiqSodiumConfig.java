@@ -42,8 +42,7 @@ public final class CaustiqSodiumConfig implements ConfigEntryPoint {
                                         .setStorageHandler(() -> { })
                                         .setBinding(CaustiqSodiumConfig::selectPackAtIndex,
                                                 CaustiqSodiumConfig::selectedPackIndex)
-                                        .setRangeProvider(ignored -> new Range(0,
-                                                Math.max(0, availablePacks().size() - 1), 1),
+                                        .setRangeProvider(ignored -> new Range(0, availablePacks().size(), 1),
                                                 ConfigState.UPDATE_ON_REBUILD)
                                         .setValueFormatter(CaustiqSodiumConfig::formatPackIndex)
                                         .setApplyHook(ignored -> ShaderRuntime.requestReload())
@@ -73,22 +72,26 @@ public final class CaustiqSodiumConfig implements ConfigEntryPoint {
         String selectedId = CaustiqConfig.get().selectedPackId();
         List<ShaderPackDescriptor> packs = availablePacks();
         for (int i = 0; i < packs.size(); i++) {
-            if (packs.get(i).id().equals(selectedId)) return i;
+            if (packs.get(i).id().equals(selectedId)) return i + 1;
         }
         return 0;
     }
 
     private static void selectPackAtIndex(int index) {
         List<ShaderPackDescriptor> packs = availablePacks();
-        if (packs.isEmpty()) return;
-        int safeIndex = Math.clamp(index, 0, packs.size() - 1);
+        if (index <= 0 || packs.isEmpty()) {
+            CaustiqConfig.get().selectPack("");
+            return;
+        }
+        int safeIndex = Math.clamp(index - 1, 0, packs.size() - 1);
         CaustiqConfig.get().selectPack(packs.get(safeIndex).id());
     }
 
     private static Component formatPackIndex(int index) {
         List<ShaderPackDescriptor> packs = availablePacks();
+        if (index <= 0) return Component.translatable("caustiq.settings.select_pack");
         if (packs.isEmpty()) return Component.translatable("caustiq.settings.no_packs");
-        int safeIndex = Math.clamp(index, 0, packs.size() - 1);
+        int safeIndex = Math.clamp(index - 1, 0, packs.size() - 1);
         return Component.literal(packs.get(safeIndex).displayName());
     }
 }
