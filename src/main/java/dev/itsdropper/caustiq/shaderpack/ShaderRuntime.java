@@ -553,9 +553,11 @@ public final class ShaderRuntime {
                     "Built Iris pass schedule for '{}': {} ordered program pass(es), {} declared render target(s): {}.",
                     selected.displayName(), activePassPlan.passes().size(), activePassPlan.targets().size(),
                     activePassPlan.orderedProgramNames());
+            Set<String> enabledProgramNames = Set.copyOf(activePassPlan.orderedProgramNames());
             List<ShaderPackProgramCatalog.Program> discoveredPrograms = new ArrayList<>();
             List<String> invalidPrograms = new ArrayList<>();
             for (IrisShaderPackModel.Program program : selectedProgramSet.programs().values()) {
+                if (!enabledProgramNames.contains(program.name())) continue;
                 ShaderPackProgramCatalog.Group group = classifyProgram(program.name());
                 ShaderPackProgramCatalog.Program catalogProgram = new ShaderPackProgramCatalog.Program(
                         program.name(), group, 0, program.stages());
@@ -587,7 +589,8 @@ public final class ShaderRuntime {
                 closeSources();
                 return;
             }
-            IrisShaderPackModel.Program finalProgram = selectedProgramSet.programs().get("final");
+            IrisShaderPackModel.Program finalProgram = enabledProgramNames.contains("final")
+                    ? selectedProgramSet.programs().get("final") : null;
             if (finalProgram != null && (!finalProgram.hasVertexAndFragment()
                     || finalProgram.stages().size() != 2)) {
                 CaustiqClient.LOGGER.warn("Shader pack '{}' has an unsupported final program stage shape.",
