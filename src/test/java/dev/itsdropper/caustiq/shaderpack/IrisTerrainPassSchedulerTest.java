@@ -103,6 +103,41 @@ class IrisTerrainPassSchedulerTest {
         }
     }
 
+    @Test
+    void distinguishesScaledFullscreenTargetsFromScaledTerrainAttachments() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("ScaledPack/shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), "colortex1Scale=0.5\n");
+        writeProgram(shaders, "gbuffers_terrain", """
+                /* RENDERTARGETS: 0 */
+                out vec4 color;
+                void main(){ color=vec4(1.0); }
+                """);
+        writeProgram(shaders, "composite", """
+                /* RENDERTARGETS: 1 */
+                out vec4 color;
+                void main(){ color=vec4(0.5); }
+                """);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor("ScaledPack", 5))) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
+            assertFalse(plan.hasScaledTerrainWrites());
+            assertEquals(0.5f, plan.targets().get(1).scaleX());
+        }
+
+        Path terrainShaders = Files.createDirectories(temporaryDirectory.resolve("ScaledTerrainPack/shaders"));
+        Files.writeString(terrainShaders.resolve("shaders.properties"), "colortex1Scale=0.5\n");
+        writeProgram(terrainShaders, "gbuffers_terrain", """
+                /* RENDERTARGETS: 1 */
+                out vec4 color;
+                void main(){ color=vec4(1.0); }
+                """);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor("ScaledTerrainPack", 3))) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
+            assertTrue(plan.hasScaledTerrainWrites());
+        }
+    }
+
     private void writeProgram(Path directory, String name, String fragment) throws IOException {
         Files.writeString(directory.resolve(name + ".vsh"), """
                 #version 150

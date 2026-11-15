@@ -309,6 +309,19 @@ public final class IrisTerrainPassScheduler {
             passes = List.copyOf(passes);
         }
         public boolean isEmpty() { return passes.isEmpty(); }
+
+        /** True when Nvidium terrain would have to rasterize directly into a scaled attachment. */
+        public boolean hasScaledTerrainWrites() {
+            for (ScheduledPass scheduled : passes) {
+                if (scheduled.pass().group() != ShaderPackProgramCatalog.Group.GBUFFERS) continue;
+                for (int targetIndex : scheduled.pass().writes()) {
+                    RenderTarget target = targets.get(targetIndex);
+                    if (target != null && (target.scaleX() != 1.0f || target.scaleY() != 1.0f)) return true;
+                }
+            }
+            return false;
+        }
+
         public List<String> orderedProgramNames() {
             return passes.stream().map(scheduled -> scheduled.pass().name()).toList();
         }

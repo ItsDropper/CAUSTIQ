@@ -239,6 +239,11 @@ public final class ShaderRuntime {
             IrisTerrainPassScheduler.Plan dimensionPlan = preparedPackModel == null
                     ? null : new IrisTerrainPassScheduler().schedule(
                             preparedPackModel, dimensionId.isEmpty() ? null : dimensionId);
+            if (dimensionPlan != null && dimensionPlan.hasScaledTerrainWrites()) {
+                CaustiqClient.LOGGER.warn(
+                        "Shader pack terrain program writes a scaled colortex target. Nvidium terrain MRT remains full-resolution; refusing to install this terrain adapter.");
+                return false;
+            }
             NvidiumGBufferTargets.configureTargets(
                     dimensionPlan == null ? Map.of() : dimensionPlan.targets());
             NvidiumShaderProgramBridge.registerTerrainAdapter(

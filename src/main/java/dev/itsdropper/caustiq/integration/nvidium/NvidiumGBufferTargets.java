@@ -250,10 +250,6 @@ public final class NvidiumGBufferTargets {
             for (int i = 0; i < TARGETS.length; i++) {
                 int index = i + 1;
                 IrisTerrainPassScheduler.RenderTarget spec = targetSpecs.get(index);
-                if (spec != null && (spec.scaleX() != 1.0f || spec.scaleY() != 1.0f)) {
-                    throw new IllegalArgumentException("Scaled colortex" + index
-                            + " cannot be attached to Nvidium's fixed-size terrain framebuffer.");
-                }
                 FormatDescriptor format = format(spec == null ? "RGBA16F" : spec.format());
                 boolean nearest = spec != null && spec.nearest();
                 boolean mipmap = spec != null && spec.mipmap();
