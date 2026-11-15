@@ -207,9 +207,9 @@ public final class IrisTerrainPassScheduler {
         String drawBufferDirective = null;
         while (renderTargets.find()) renderTargetDirective = renderTargets.group(1);
         while (drawBuffers.find()) drawBufferDirective = drawBuffers.group(1);
-        if (renderTargetDirective != null && drawBufferDirective != null) {
-            throw new IllegalArgumentException("A fragment shader cannot declare both RENDERTARGETS and DRAWBUFFERS.");
-        }
+        // Shaderpacks commonly carry both directives for Iris/OptiFine compatibility.
+        // Iris' RENDERTARGETS is authoritative when present; DRAWBUFFERS is its
+        // legacy fallback, not a conflicting second output map.
         if (renderTargetDirective != null) {
             List<Integer> result = new ArrayList<>();
             for (String token : renderTargetDirective.trim().split("\\s*,\\s*")) {
