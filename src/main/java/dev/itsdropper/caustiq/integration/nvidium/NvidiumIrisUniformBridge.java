@@ -143,9 +143,16 @@ public final class NvidiumIrisUniformBridge {
         integer(program, "caustiqCurrentRenderedItemId", 0);
         vector4(program, "caustiqEntityColor", 1.0f, 1.0f, 1.0f, 1.0f);
         integer(program, "caustiqNoiseTexture", 2);
+        integer(program, "caustiqHeavyFog", isHeavyFog() ? 1 : 0);
         integer(program, "caustiqColortex1", 5);
         integer(program, "caustiqColortex2", 6);
         integer(program, "caustiqColortex4", 7);
+    }
+
+    /** Mirrors Iris IrisExclusiveUniforms.isHeavyFog(): boss-overlay world-fog request. */
+    private static boolean isHeavyFog() {
+        return Minecraft.getInstance().level != null
+                && Minecraft.getInstance().gui.getBossOverlay().shouldCreateWorldFog();
     }
 
     /** Smooth, clock-derived weights peaking at Minecraft dawn, noon, dusk and midnight. */
