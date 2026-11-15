@@ -42,6 +42,14 @@ class ShaderPackProgramCatalogTest {
     }
 
     @Test
+    void classifiesPhotonClrwlGbuffersProgramAsTerrain() {
+        assertEquals(ShaderPackProgramCatalog.Group.GBUFFERS,
+                ShaderPackProgramCatalog.Group.classify("clrwl_gbuffers"));
+        assertEquals(ShaderPackProgramCatalog.Group.GBUFFERS,
+                ShaderPackProgramCatalog.Group.classify("clrwl_gbuffers_terrain"));
+    }
+
+    @Test
     void recognizesStandaloneFinalPassAsCurrentSupportedShape() throws IOException {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("shaders"));
         Files.writeString(shaders.resolve("final.vsh"), "#version 150\nvoid main() {}");
