@@ -165,7 +165,7 @@ public final class NvidiumTerrainVaryingAdapter {
             boolean complete = meshMarked && fragmentMarked
                     && mesh.contains(MESH_VARYINGS) && fragment.contains(FRAGMENT_VARYINGS)
                     && mesh.contains(MESH_ASSIGNMENTS) && mesh.contains(NORMAL_HELPER)
-                    && mesh.contains("float((uint(v.color) >> 24u) & 0xFFu) * COLOR_SCALE")
+                    && mesh.contains("caustiqDecodeIrisColor(Vertex vertex)")
                     && mesh.contains(MESH_UNIFORM_ALIASES)
                     && mesh.contains(VERTEX_FORMAT_EXTENSION)
                     && fragment.contains(VERTEX_FORMAT_EXTENSION)
