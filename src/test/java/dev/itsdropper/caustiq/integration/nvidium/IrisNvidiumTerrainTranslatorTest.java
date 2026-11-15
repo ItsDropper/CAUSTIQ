@@ -519,6 +519,13 @@ class IrisNvidiumTerrainTranslatorTest {
             Path fragmentFile = output.resolve("photon-nvidium-terrain.frag");
             Files.writeString(meshFile, mesh);
             Files.writeString(fragmentFile, fragment);
+            Files.writeString(output.resolve("photon-nvidium-terrain.task"), combined.get("TASK"));
+            Files.writeString(output.resolve("nvidium-native.mesh"), nativeSources.get("MESH"));
+            Files.writeString(output.resolve("nvidium-native.frag"), nativeSources.get("FRAGMENT"));
+            Files.writeString(output.resolve("nvidium-extended.mesh"), extended.get("MESH"));
+            Files.writeString(output.resolve("nvidium-extended.frag"), extended.get("FRAGMENT"));
+            assertTrue(mesh.contains("#define USE_SODIUM_VERTEX_FORMAT"),
+                    "The generated shader must select the Sodium Vertex struct used by the 40-byte encoder.");
             assertTrue(mesh.contains("uint16_t *regionIndicies"),
                     "The pinned Nvidium mesh dialect must retain its buffer-reference pointer ABI.");
             assertTrue(mesh.contains("layout(triangles"),
