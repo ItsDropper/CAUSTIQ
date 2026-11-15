@@ -30,6 +30,24 @@ class IrisBlockPropertiesParserTest {
     }
 
     @Test
+    void selectsOnlyTheActiveMinecraftVersionBranch() {
+        String source = """
+                #if MC_VERSION >= 11300
+                block.10035=mossy_stone_brick_stairs stone_brick_stairs
+                #else
+                block.10033=stone_brick_stairs
+                #endif
+                """;
+
+        assertEquals(java.util.Map.of(
+                "minecraft:mossy_stone_brick_stairs", 10035,
+                "minecraft:stone_brick_stairs", 10035),
+                parser.parse(source, 12111));
+        assertEquals(java.util.Map.of("minecraft:stone_brick_stairs", 10033),
+                parser.parse(source, 11202));
+    }
+
+    @Test
     void rejectsMalformedAndConflictingMaterialMappings() {
         assertThrows(IllegalArgumentException.class,
                 () -> parser.parse("block.1=minecraft:oak_log:axis"));
