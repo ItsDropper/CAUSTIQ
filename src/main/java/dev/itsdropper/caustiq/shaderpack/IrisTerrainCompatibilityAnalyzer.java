@@ -65,9 +65,13 @@ public final class IrisTerrainCompatibilityAnalyzer {
             "previousCameraPosition");
     private static final Set<String> AVAILABLE_VERTEX_UNIFORMS = Set.of(
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection",
-            "gbufferProjectionInverse", "cameraPosition", "frameTimeCounter", "frameCounter");
+            "gbufferProjectionInverse", "cameraPosition", "frameTimeCounter", "frameCounter",
+            "near", "far", "atlasSize", "rainStrength", "wetness", "taa_offset", "light_dir",
+            "world_age", "worldTime", "worldDay", "time_sunrise", "time_noon", "time_sunset",
+            "time_midnight", "biome_temperature", "biome_humidity", "alphaTestRef",
+            "blockEntityId", "entityId", "currentRenderedItemId", "entityColor", "view_res", "view_pixel_size");
     private static final Set<String> AVAILABLE_SAMPLERS = Set.of(
-            "gtexture", "lightmap", "tex_diffuse", "tex_light");
+            "gtexture", "lightmap", "tex_diffuse", "tex_light", "noisetex");
 
 
     public Result analyze(String vertexSource, String fragmentSource) {
@@ -155,21 +159,16 @@ public final class IrisTerrainCompatibilityAnalyzer {
         Matcher fragmentData = FRAGMENT_DATA_INDEX.matcher(fragment);
         while (fragmentData.find()) {
             int index = Integer.parseInt(fragmentData.group(1));
-            if (index != 0) {
+            if (index > 7) {
                 issues.add(new Issue("MULTIPLE_RENDER_TARGETS", "gl_FragData[" + index + "]",
-                        "Nvidium's current terrain fragment pipeline only exposes the primary color target (index 0)."));
+                        "Nvidium's terrain G-buffer exposes fragment output locations 0 through 7."));
             }
         }
         if (DYNAMIC_FRAGMENT_DATA_INDEX.matcher(fragment).find()) {
             issues.add(new Issue("DYNAMIC_FRAGMENT_OUTPUT_INDEX", "gl_FragData",
                     "A dynamic fragment output index cannot be routed to Nvidium's single color attachment."));
         }
-        if (fragmentIdentifiers.contains("gl_FragDepth")) {
-            issues.add(new Issue("CUSTOM_FRAGMENT_DEPTH", "gl_FragDepth",
-                    "The Nvidium terrain pipeline does not currently preserve custom Iris fragment depth writes."));
-        }
-
-        return new Result(deduplicate(issues));
+                return new Result(deduplicate(issues));
     }
 
     private static void auditSamplers(String source, String stage, List<Issue> issues) {
@@ -218,9 +217,10 @@ public final class IrisTerrainCompatibilityAnalyzer {
             if (location.find()) {
                 int index = Integer.parseInt(location.group(1));
                 locations.add(index);
-                if (index != 0) {
+                if (index > 7) {
                     issues.add(new Issue("MULTIPLE_RENDER_TARGETS", matcher.group(3),
-                            "Nvidium's current terrain fragment pipeline only exposes the primary color target (location 0)."));
+                            "Nvidium's terrain G-buffer exposes color attachment locations 0 through 7; location "
+                                    + index + " is unavailable."));
                 }
             } else if (outputCount > 1) {
                 issues.add(new Issue("MULTIPLE_RENDER_TARGETS", matcher.group(3),
