@@ -322,8 +322,10 @@ public final class ShaderRuntime {
     }
 
     private static void executeScheduledIrisPasses() {
-        if (!FabricLoader.getInstance().isModLoaded("nvidium") || activePassPlan == null
-                || IRIS_GL_PROGRAMS.isEmpty()) return;
+        // Do not execute a partially linked schedule while the per-frame compile budget
+        // is still preparing later deferred/composite programs.
+        if (!discoveryFinished || !FabricLoader.getInstance().isModLoaded("nvidium")
+                || activePassPlan == null || IRIS_GL_PROGRAMS.isEmpty()) return;
         boolean hasWorldPasses = activePassPlan.passes().stream().anyMatch(scheduled ->
                 scheduled.pass().group() == ShaderPackProgramCatalog.Group.DEFERRED
                         || scheduled.pass().group() == ShaderPackProgramCatalog.Group.COMPOSITE);
