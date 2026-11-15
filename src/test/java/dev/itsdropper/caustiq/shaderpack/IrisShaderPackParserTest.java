@@ -151,7 +151,7 @@ class IrisShaderPackParserTest {
                 in vec3 scene_pos;
                 uniform sampler2D noisetex;
                 layout(location = 0) out vec4 gbuffer0;
-                layout(location = 1) out vec4 gbuffer1;
+                layout(location = 8) out vec4 gbuffer1;
                 void main() {
                     gbuffer0 = texture(noisetex, scene_pos.xy);
                     gbuffer1 = vec4(scene_pos, 1.0);
@@ -167,7 +167,8 @@ class IrisShaderPackParserTest {
             assertFalse(model.diagnostics().stream().anyMatch(issue -> issue.contains("mc_Entity")));
             assertFalse(model.diagnostics().stream().anyMatch(issue -> issue.contains("cameraPosition")));
             assertTrue(model.diagnostics().stream().anyMatch(issue -> issue.contains("MULTIPLE_RENDER_TARGETS")));
-            assertTrue(model.diagnostics().stream().anyMatch(issue -> issue.contains("noisetex")));
+            assertFalse(model.diagnostics().stream().anyMatch(issue -> issue.contains("noisetex")),
+                    "Nvidium binds the terrain noise sampler");
         }
     }
 
