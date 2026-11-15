@@ -209,14 +209,17 @@ public final class IrisExpression {
         }
 
         private double smooth(java.util.List<Double> args, int functionOffset) {
-            if (args.isEmpty() || args.size() > 3) {
-                throw failure("smooth expects 1 to 3 arguments");
+            if (args.isEmpty() || args.size() > 4) {
+                throw failure("smooth expects 1 to 4 arguments");
             }
-            double target = args.get(0);
-            if (args.size() == 1) return target;
-            double riseHalfLife = Math.max(0.0, args.get(1));
-            double fallHalfLife = args.size() == 3 ? Math.max(0.0, args.get(2)) : riseHalfLife;
-            String key = source + "#" + functionOffset;
+            if (args.size() == 1) return args.get(0);
+            boolean hasExplicitId = args.size() == 4;
+            double target = args.get(hasExplicitId ? 1 : 0);
+            double riseHalfLife = Math.max(0.0, args.get(hasExplicitId ? 2 : 1));
+            double fallHalfLife = args.size() >= 3
+                    ? Math.max(0.0, args.get(hasExplicitId ? 3 : 2)) : riseHalfLife;
+            String id = hasExplicitId ? Double.toString(args.get(0)) : "implicit";
+            String key = source + "#" + functionOffset + "#" + id;
             long now = System.nanoTime();
             SmoothState previous = SMOOTH_VALUES.get(key);
             if (previous == null || !Double.isFinite(previous.value())) {
