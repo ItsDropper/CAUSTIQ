@@ -104,6 +104,14 @@ public final class IrisTerrainPassScheduler {
             IrisShaderPackModel model, String dimensionKey) {
         if (dimensionKey != null && !dimensionKey.isBlank()) {
             String directory = model.dimensionMappings().get(dimensionKey);
+            if (directory == null) {
+                directory = switch (dimensionKey) {
+                    case "minecraft:overworld" -> "world0";
+                    case "minecraft:the_nether" -> "world-1";
+                    case "minecraft:the_end" -> "world1";
+                    default -> null;
+                };
+            }
             if (directory != null) {
                 IrisShaderPackModel.ProgramSet override = model.dimensionOverrides().get(directory);
                 if (override != null) return override;

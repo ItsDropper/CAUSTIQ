@@ -296,6 +296,8 @@ final class IrisImageResources implements AutoCloseable {
     private static Image create(String name, ImageSpec spec) {
         int target = spec.depth > 1 ? GL12C.GL_TEXTURE_3D : GL11C.GL_TEXTURE_2D;
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
+        int previousBinding = GL11C.glGetInteger(target == GL12C.GL_TEXTURE_3D
+                ? GL12C.GL_TEXTURE_BINDING_3D : GL11C.GL_TEXTURE_BINDING_2D);
         int texture = GL11C.glGenTextures();
         GL11C.glBindTexture(target, texture);
         int filter = spec.nearest ? GL11C.GL_NEAREST : GL11C.GL_LINEAR;
@@ -311,6 +313,7 @@ final class IrisImageResources implements AutoCloseable {
             GL11C.glTexImage2D(target, 0, spec.internalFormat, spec.width, spec.height,
                     0, spec.externalFormat, spec.dataType, (ByteBuffer) null);
         }
+        GL11C.glBindTexture(target, previousBinding);
         GL13C.glActiveTexture(previousActive);
         GL44C.glClearTexImage(texture, 0, spec.externalFormat, GL11C.GL_UNSIGNED_BYTE, ByteBuffer.allocateDirect(16));
         return new Image(name, spec.sampler, texture, target, spec.internalFormat, spec.externalFormat,

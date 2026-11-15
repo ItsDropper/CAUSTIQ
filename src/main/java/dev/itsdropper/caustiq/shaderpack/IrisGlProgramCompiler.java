@@ -142,7 +142,7 @@ public final class IrisGlProgramCompiler {
         }
         String withoutSupported = SAMPLER.matcher(source).replaceAll("");
         if (Pattern.compile("\\buniform\\s+\\w*sampler\\w*\\b").matcher(withoutSupported).find()) {
-            throw new IOException("Iris pass contains a sampler declaration that is not a supported single sampler2D binding.");
+            throw new IOException("Iris pass contains a sampler declaration with an unsupported sampler type.");
         }
         return Set.copyOf(samplers);
     }

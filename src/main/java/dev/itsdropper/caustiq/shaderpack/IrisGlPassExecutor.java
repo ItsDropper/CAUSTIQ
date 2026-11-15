@@ -173,7 +173,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                                             boolean[] alternateCurrent, boolean[] hasWritten,
                                             IrisShaderResources resources) {
         int unit = 0;
-        int maximum = GL11C.glGetInteger(GL43C.GL_MAX_COMPUTE_TEXTURE_IMAGE_UNITS);
+        int maximum = GL11C.glGetInteger(GL20C.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);
         for (String sampler : program.samplers()) {
             int location = GL20C.glGetUniformLocation(program.programId(), sampler);
             if (location < 0) continue;
