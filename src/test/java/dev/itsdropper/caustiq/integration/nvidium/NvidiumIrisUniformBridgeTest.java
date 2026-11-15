@@ -168,7 +168,7 @@ class NvidiumIrisUniformBridgeTest {
                 Map<String, double[]> evaluated = resources.evaluateUniformValues(base);
                 assertEquals(0.0, evaluated.get("isEyeInCave")[0], 1.0e-9);
                 assertEquals(1.0, evaluated.get("inDry")[0], 1.0e-9);
-                assertEquals(1.0, evaluated.get("moving")[0], 1.0e-9);
+                assertEquals(1.0, evaluated.get("starter")[0], 1.0e-9);
                 assertEquals(1.0, evaluated.get("inNetherWastes")[0], 1.0e-9);
                 assertEquals(0.0, evaluated.get("maxBlindnessDarkness")[0], 1.0e-9);
             }
@@ -180,17 +180,19 @@ class NvidiumIrisUniformBridgeTest {
         String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
         Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),
                 "CI supplies the pinned Photon shader-pack source tree.");
-        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("photon-expression-audit", "Photon",
-                Path.of(photonDirectory), "", ShaderPackSourceType.DIRECTORY,
-                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        java.util.Properties loaded = new java.util.Properties();
+        try (java.io.InputStream stream = Files.newInputStream(
+                Path.of(photonDirectory, "shaders", "shaders.properties"))) {
+            loaded.load(stream);
+        }
+        Map<String, String> properties = new HashMap<>();
+        for (String name : loaded.stringPropertyNames()) properties.put(name, loaded.getProperty(name));
         Map<String, String> defines = Map.of(
                 "MC_VERSION", "12111",
                 "MC_HAND_DEPTH", "0.125",
                 "COLORED_LIGHTS", "1",
                 "VOXEL_VOLUME_SIZE", "64");
-        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
-            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
-            try (IrisShaderResources resources = IrisShaderResources.load(model.properties(), sources, defines)) {
+        try (IrisShaderResources resources = IrisShaderResources.loadExpressions(properties, defines)) {
                 Map<String, Double> base = new HashMap<>();
                 NvidiumIrisUniformBridge.putIrisBuiltInDefaults(base);
                 base.put("viewWidth", 1920.0);
@@ -210,7 +212,6 @@ class NvidiumIrisUniformBridgeTest {
                 base.put("skyColor.b", 0.7);
                 Map<String, double[]> evaluated = resources.evaluateUniformValues(base);
                 assertFalse(evaluated.isEmpty(), "Pinned Photon must expose custom uniforms for expression evaluation.");
-            }
         }
     }
 
