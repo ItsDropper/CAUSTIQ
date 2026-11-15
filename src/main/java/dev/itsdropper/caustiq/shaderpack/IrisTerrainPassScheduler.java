@@ -266,7 +266,7 @@ public final class IrisTerrainPassScheduler {
             int index, String format, boolean clear, String clearColor,
             boolean mipmap, boolean persistent, float scaleX, float scaleY, boolean nearest) {
         public RenderTarget {
-            if (index < 0 || index > 15) throw new IllegalArgumentException("Iris colortex index out of range: " + index);
+            if (index < 0 || index > 31) throw new IllegalArgumentException("Iris colortex index out of range: " + index);
             if (format == null || format.isBlank()) format = "RGBA8";
             Objects.requireNonNull(clearColor, "clearColor");
         }
