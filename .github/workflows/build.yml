@@ -128,13 +128,26 @@ jobs:
         run: |
           set -euo pipefail
           compat_dir="build/nvidium-compat"
+          validation_dir="$RUNNER_TEMP/nvidium-glsl-validation"
+          mkdir -p "$validation_dir"
           for shader in photon-nvidium-terrain.mesh photon-nvidium-terrain.frag photon-nvidium-shadow.mesh photon-nvidium-shadow.frag; do
-            test -s "$compat_dir/$shader"
+            source="$compat_dir/$shader"
+            test -s "$source"
+            # glslang does not implement NV_bindless_texture. These terrain stages
+            # use ordinary sampler uniforms; remove only the unsupported capability
+            # declaration in a validation copy, then compile the remaining source.
+            if grep -Eq '^[[:space:]]*#[[:space:]]*extension[[:space:]]+GL_NV_bindless_texture[[:space:]]*:' "$source"; then
+              if grep -Eq '\\bsampler(1D|2D|3D|Cube|1DArray|2DArray|CubeArray)\\s*\\([[:space:]]*(u?int64_t|uint64_t)' "$source"; then
+                echo "Bindless sampler construction is used by $shader and cannot be validated by glslang." >&2
+                exit 1
+              fi
+            fi
+            sed -E '/^[[:space:]]*#[[:space:]]*extension[[:space:]]+GL_NV_bindless_texture[[:space:]]*:[[:space:]]*(require|enable)[[:space:]]*$/d' "$source" > "$validation_dir/$shader"
           done
-          glslangValidator -S mesh "$compat_dir/photon-nvidium-terrain.mesh"
-          glslangValidator -S frag "$compat_dir/photon-nvidium-terrain.frag"
-          glslangValidator -S mesh "$compat_dir/photon-nvidium-shadow.mesh"
-          glslangValidator -S frag "$compat_dir/photon-nvidium-shadow.frag"
+          glslangValidator -S mesh "$validation_dir/photon-nvidium-terrain.mesh"
+          glslangValidator -S frag "$validation_dir/photon-nvidium-terrain.frag"
+          glslangValidator -S mesh "$validation_dir/photon-nvidium-shadow.mesh"
+          glslangValidator -S frag "$validation_dir/photon-nvidium-shadow.frag"
 
       - name: Validate bundled GLSL
         shell: bash
