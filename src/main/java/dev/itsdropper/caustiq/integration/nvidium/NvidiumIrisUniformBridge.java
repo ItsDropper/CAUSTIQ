@@ -124,9 +124,13 @@ public final class NvidiumIrisUniformBridge {
         int worldTime = (int) Math.floorMod(invokeLong(level, "getDayTime", 0L), 24_000L);
         float dayProgress = worldTime / 24_000.0f;
         float sunAngle = invokeFloat(level, "getSunAngle", 1.0f, 0.0f);
+        var window = Minecraft.getInstance().getWindow();
+        float aspectRatio = window.getHeight() > 0
+                ? (float) window.getWidth() / (float) window.getHeight() : 1.0f;
 
         scalar(program, "caustiqNear", near);
         scalar(program, "caustiqFar", far);
+        scalar(program, "caustiqAspectRatio", aspectRatio);
         integer2(program, "caustiqAtlasSize", 0, 0);
         scalar(program, "caustiqRainStrength", rain);
         scalar(program, "caustiqWetness", wetness);
