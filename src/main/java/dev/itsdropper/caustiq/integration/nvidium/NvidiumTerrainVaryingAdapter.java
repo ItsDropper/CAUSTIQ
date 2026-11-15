@@ -33,7 +33,7 @@ public final class NvidiumTerrainVaryingAdapter {
             "    vec3 v_blockEntity;",
             "    vec3 v_normal;",
             "    vec4 v_tangent;",
-             "    flat uint v_materialFlags;");
+            "    flat uint v_materialFlags;");
     private static final String FRAGMENT_VARYINGS = MESH_VARYINGS;
     private static final String MESH_UNIFORM_ALIASES =
             NvidiumIrisTerrainAbi.vertexAliasDeclarations();
@@ -61,7 +61,7 @@ public final class NvidiumTerrainVaryingAdapter {
             "    OUT[id].v_blockEntity = caustiqDecodeBlockEntity(V.blockId);",
             "    OUT[id].v_normal = caustiqDecodeNormal(V);",
             "    OUT[id].v_tangent = caustiqDecodeTangent(V);",
-             "    OUT[id].v_materialFlags = V.nvidiumMaterial & 0xFFu;");
+            "    OUT[id].v_materialFlags = V.nvidiumMaterial & 0xFFu;");
     private static final String VERTEX_FORMAT_EXTENSION = String.join("\n",
             "    uint blockId;",
             "    uint normal;",
