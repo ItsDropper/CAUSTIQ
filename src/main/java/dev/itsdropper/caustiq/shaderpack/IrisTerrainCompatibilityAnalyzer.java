@@ -96,8 +96,10 @@ public final class IrisTerrainCompatibilityAnalyzer {
                         "Nvidium's packed terrain vertex does not preserve this Iris vertex attribute."));
             }
         }
+        String vertexUsage = UNIFORM.matcher(vertex).replaceAll("");
+        String fragmentUsage = UNIFORM.matcher(fragment).replaceAll("");
         for (String symbol : UNAVAILABLE_TRANSFORMS) {
-            if (vertexIdentifiers.contains(symbol) || fragmentIdentifiers.contains(symbol)) {
+            if (isReferenced(vertexUsage, symbol) || isReferenced(fragmentUsage, symbol)) {
                 issues.add(new Issue("UNAVAILABLE_TRANSFORM", symbol,
                         "Nvidium does not expose the equivalent Iris transform/camera uniform."));
             }

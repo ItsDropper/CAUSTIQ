@@ -28,7 +28,7 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 out vec4 tint;
                 void main() {
                     tint = gl_Color;
-                    scene_pos = (gbufferModelView * gl_Vertex).xyz + cameraPosition;
+                    scene_pos = (gbufferModelView * gl_Vertex).xyz + cameraPosition * customPackUniform;
                     gl_Position = gbufferProjection * vec4(scene_pos, 1.0);
                 }
                 """;
