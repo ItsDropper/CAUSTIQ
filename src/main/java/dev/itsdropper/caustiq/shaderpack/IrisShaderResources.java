@@ -263,6 +263,7 @@ public final class IrisShaderResources implements AutoCloseable {
                                                         java.util.function.Predicate<String> include) {
         Map<String, Double> context = new HashMap<>(optionDefines);
         context.putAll(baseVariables);
+        validateExpressionSymbols(context, include);
         Map<String, Double> evaluatedVariables = new HashMap<>();
         List<String> variableStack = new ArrayList<>();
         Map<String, double[]> result = new LinkedHashMap<>();
@@ -284,6 +285,59 @@ public final class IrisShaderResources implements AutoCloseable {
         if (uniforms.isEmpty()) return;
         evaluateUniformValues(baseVariables, name -> GL20C.glGetUniformLocation(program, name) >= 0)
                 .forEach((name, values) -> upload(program, name, uniforms.get(name).type(), values));
+    }
+
+    private void validateExpressionSymbols(Map<String, Double> context,
+                                            java.util.function.Predicate<String> include) {
+        java.util.Set<String> missing = new java.util.TreeSet<>();
+        java.util.Set<String> visited = new java.util.HashSet<>();
+        for (Map.Entry<String, TypedExpression> uniform : uniforms.entrySet()) {
+            if (include.test(uniform.getKey())) {
+                collectExpressionSymbols("uniform", uniform.getKey(), uniform.getValue(),
+                        context, visited, missing);
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException("Unknown Iris custom-uniform symbols: "
+                    + String.join(", ", missing));
+        }
+    }
+
+    private void collectExpressionSymbols(String kind, String name, TypedExpression expression,
+                                          Map<String, Double> context, java.util.Set<String> visited,
+                                          java.util.Set<String> missing) {
+        String marker = kind + ":" + name;
+        if (!visited.add(marker)) return;
+        for (String identifier : IrisExpression.identifiers(expression.expression())) {
+            if (context.containsKey(identifier)) continue;
+
+            int separator = identifier.lastIndexOf('.');
+            if (separator > 0) {
+                String vectorName = identifier.substring(0, separator);
+                TypedExpression vector = variables.get(vectorName);
+                if (vector != null && componentCount(vector.type()) > 1) {
+                    collectExpressionSymbols("variable", vectorName, vector, context, visited, missing);
+                    continue;
+                }
+                vector = uniforms.get(vectorName);
+                if (vector != null && componentCount(vector.type()) > 1) {
+                    collectExpressionSymbols("uniform", vectorName, vector, context, visited, missing);
+                    continue;
+                }
+            }
+
+            TypedExpression variable = variables.get(identifier);
+            if (variable != null) {
+                collectExpressionSymbols("variable", identifier, variable, context, visited, missing);
+                continue;
+            }
+            TypedExpression uniform = uniforms.get(identifier);
+            if (uniform != null) {
+                collectExpressionSymbols("uniform", identifier, uniform, context, visited, missing);
+                continue;
+            }
+            missing.add(identifier);
+        }
     }
 
     private double resolveVariable(String name, Map<String, Double> context,
