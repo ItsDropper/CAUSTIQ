@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -113,7 +114,7 @@ class IrisNvidiumTerrainTranslatorTest {
                 assertFalse(translator.renderTargetIndices().isEmpty(),
                         dimension + " has no routed fragment outputs");
                 if (dimension.equals("world0")) {
-                    assertEquals(List.of(1, 2), translator.renderTargetIndices());
+                    assertEquals(List.of(1), translator.renderTargetIndices());
                 }
             }
 
@@ -221,7 +222,45 @@ class IrisNvidiumTerrainTranslatorTest {
             assertTrue(combined.get("MESH").contains("caustiqIrisVertexMain"));
             assertTrue(combined.get("FRAGMENT").contains("caustiqIrisFragmentMain"));
             assertTrue(combined.get("MESH").contains("gl_MeshVerticesNV[id].gl_Position = caustiqIrisClipPosition;"));
-            assertTrue(combined.get("FRAGMENT").contains("caustiqIrisOutput1 = caustiqIrisFragData[1];"));
+            assertTrue(combined.get("FRAGMENT").contains("layout(location = 1) out vec4 caustiqIrisOutput1;"));
+            assertTrue(combined.get("FRAGMENT").contains("caustiqIrisOutput1 = pack_unorm_2x8"));
+            String outputDirectory = System.getenv("CAUSTIQ_COMPAT_OUTPUT_DIR");
+            String validator = System.getenv("GLSLANG_VALIDATOR");
+            Assumptions.assumeTrue(outputDirectory != null && validator != null,
+                    "GLSL integration compilation is enabled in CI");
+            Path output = Path.of(outputDirectory);
+            Files.createDirectories(output);
+            String mesh = prepareForGlslang(combined.get("MESH"));
+            String fragment = prepareForGlslang(combined.get("FRAGMENT"));
+            Path meshFile = output.resolve("photon-nvidium-terrain.mesh");
+            Path fragmentFile = output.resolve("photon-nvidium-terrain.frag");
+            Files.writeString(meshFile, mesh);
+            Files.writeString(fragmentFile, fragment);
+            compileGlsl(validator, "mesh", meshFile);
+            compileGlsl(validator, "frag", fragmentFile);
+        }
+    }
+
+    private static String prepareForGlslang(String source) {
+        String prepared = source
+                .replace("#extension GL_ARB_shading_language_include : enable", "")
+                .replaceAll("(?m)^\\s*#pragma optionNV[^\\r\\n]*\\R?", "")
+                .replaceAll("(?m)^\\s*#import <sodium:[^>]+>\\s*\\R?", "");
+        return prepared.replaceFirst("(?m)^(#version[^\\r\\n]*\\R)",
+                "$1#define USE_SODIUM_VERTEX_FORMAT 1\\n");
+    }
+
+    private static void compileGlsl(String validator, String stage, Path source) throws Exception {
+        Process process = new ProcessBuilder(validator, "-S", stage, source.toString())
+                .redirectErrorStream(true).start();
+        String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        if (!process.waitFor(60, TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            throw new IllegalStateException("glslangValidator timed out compiling " + stage + " stage.");
+        }
+        if (process.exitValue() != 0) {
+            throw new IllegalStateException("glslangValidator rejected the combined Photon/Nvidium "
+                    + stage + " stage:\\n" + output);
         }
     }
 
