@@ -108,7 +108,7 @@ public final class IrisGlslConditionalPreprocessor {
     /**
      * Removes GLSL comments without interpreting a slash-star sequence that
      * occurs inside a line comment as the start of a block comment. Photon
-     * uses the Iris-compatible //*, //*/ toggle idiom, which regex-based
+     * handles Iris-compatible slash-slash-star toggle comments, which regex-based
      * block-comment stripping corrupts.
      */
     public static String stripComments(String source) {
