@@ -42,6 +42,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         ensureResources(targetWidth, targetHeight);
 
         GlState previous = captureState();
+        boolean[] alternateCurrent = new boolean[MAX_COLOR_TARGET + 1];
         try {
             for (IrisTerrainPassScheduler.ScheduledPass scheduled : plan.passes()) {
                 IrisTerrainPassScheduler.Pass pass = scheduled.pass();
@@ -63,7 +64,14 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 if (program == null) {
                     throw new IllegalStateException("Scheduled Iris pass has no linked program: " + pass.name());
                 }
-                renderPass(pass, plan.targets(), program, mainTarget, targetWidth, targetHeight);
+                renderPass(pass, plan.targets(), program, mainTarget, targetWidth, targetHeight, alternateCurrent);
+            }
+            if (alternateCurrent[0]) {
+                RenderSystem.getDevice().createCommandEncoder().copyTextureToTexture(
+                        outputTarget.getColorTexture(),
+                        mainTarget.getColorTexture(),
+                        0, 0, 0, 0, 0,
+                        targetWidth, targetHeight);
             }
         } finally {
             restoreState(previous);
@@ -75,7 +83,8 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                             IrisGlProgram program,
                             RenderTarget mainTarget,
                             int targetWidth,
-                            int targetHeight) {
+                            int targetHeight,
+                            boolean[] alternateCurrent) {
         Set<Integer> writes = pass.writes().isEmpty() ? Set.of(0) : pass.writes();
         for (int location : writes) {
             if (location < 0 || location > MAX_COLOR_TARGET) {
@@ -99,6 +108,14 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             }
         }
 
+        for (int location : pass.reads()) {
+            if (location < 0 || location > MAX_COLOR_TARGET) {
+                throw new IllegalStateException("Iris pass '" + pass.name()
+                        + "' reads colortex" + location
+                        + "; this Nvidium path exposes colortex0-colortex7.");
+            }
+        }
+
         int maxLocation = writes.stream().mapToInt(Integer::intValue).max().orElse(0);
         int[] drawBuffers = new int[maxLocation + 1];
         for (int i = 0; i < drawBuffers.length; i++) drawBuffers[i] = GL11C.GL_NONE;
@@ -106,9 +123,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, framebuffer);
         for (int location = 0; location <= MAX_COLOR_TARGET; location++) {
             if (writes.contains(location)) {
-                int texture = location == 0
-                        ? textureId(outputTarget.getColorTexture())
-                        : NvidiumGBufferTargets.texture(location);
+                int texture = writeTexture(location, mainTarget, alternateCurrent);
                 if (texture == 0) {
                     throw new IllegalStateException("Iris pass '" + pass.name()
                             + "' has no allocated colortex" + location + " texture.");
@@ -136,23 +151,18 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         clearOutputs(writes, targets);
 
         GL20C.glUseProgram(program.programId());
-        bindSamplers(program, mainTarget);
+        bindSamplers(program, mainTarget, alternateCurrent);
         uploadScreenUniforms(program.programId(), targetWidth, targetHeight);
         NvidiumIrisUniformBridge.uploadProgram(program.programId());
         GL30C.glBindVertexArray(vertexArray);
         GL11C.glDrawArrays(GL11C.GL_TRIANGLES, 0, 3);
 
-        if (writes.contains(0)) {
-            RenderSystem.getDevice().createCommandEncoder().copyTextureToTexture(
-                    outputTarget.getColorTexture(),
-                    mainTarget.getColorTexture(),
-                    0, 0, 0, 0, 0,
-                    targetWidth, targetHeight);
-        }
         for (int location : writes) {
+            alternateCurrent[location] = !alternateCurrent[location];
             IrisTerrainPassScheduler.RenderTarget target = targets.get(location);
             if (location > 0 && target != null && target.mipmap()) {
-                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, NvidiumGBufferTargets.texture(location));
+                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D,
+                        currentTexture(location, mainTarget, alternateCurrent));
                 GL30C.glGenerateMipmap(GL11C.GL_TEXTURE_2D);
             }
         }
@@ -186,24 +196,60 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         return result;
     }
 
-    private static void bindSamplers(IrisGlProgram program, RenderTarget mainTarget) {
-        int mainTexture = textureId(mainTarget.getColorTexture());
+    private void bindSamplers(IrisGlProgram program, RenderTarget mainTarget,
+                              boolean[] alternateCurrent) {
         int unit = 0;
         for (String sampler : program.samplers()) {
-            int texture = switch (sampler) {
-                case "gcolor", "DiffuseSampler", "texture", "tex", "colortex0" -> mainTexture;
-                default -> {
-                    int index = Integer.parseInt(sampler.substring("colortex".length()));
-                    yield NvidiumGBufferTargets.texture(index);
-                }
-            };
             int location = GL20C.glGetUniformLocation(program.programId(), sampler);
             if (location < 0) continue;
+            int texture;
+            if (sampler.equals("gcolor") || sampler.equals("DiffuseSampler")
+                    || sampler.equals("texture") || sampler.equals("tex")
+                    || sampler.equals("colortex0")) {
+                texture = currentTexture(0, mainTarget, alternateCurrent);
+            } else if (sampler.startsWith("colortex")) {
+                int index;
+                try {
+                    index = Integer.parseInt(sampler.substring("colortex".length()));
+                } catch (NumberFormatException exception) {
+                    throw new IllegalStateException("Unsupported Iris sampler name: " + sampler, exception);
+                }
+                if (index < 1 || index > MAX_COLOR_TARGET) {
+                    throw new IllegalStateException("Iris sampler '" + sampler
+                            + "' is outside the Nvidium colortex0-colortex7 range.");
+                }
+                texture = currentTexture(index, mainTarget, alternateCurrent);
+            } else {
+                throw new IllegalStateException("Iris sampler '" + sampler
+                        + "' has no CAUSTIQ texture binding.");
+            }
             GL13C.glActiveTexture(GL13C.GL_TEXTURE0 + unit);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
             GL20C.glUniform1i(location, unit);
             unit++;
         }
+    }
+
+    private int writeTexture(int location, RenderTarget mainTarget, boolean[] alternateCurrent) {
+        if (location == 0) {
+            return alternateCurrent[0]
+                    ? textureId(mainTarget.getColorTexture())
+                    : textureId(outputTarget.getColorTexture());
+        }
+        return alternateCurrent[location]
+                ? NvidiumGBufferTargets.texture(location)
+                : NvidiumGBufferTargets.alternateTexture(location);
+    }
+
+    private int currentTexture(int location, RenderTarget mainTarget, boolean[] alternateCurrent) {
+        if (location == 0) {
+            return alternateCurrent[0]
+                    ? textureId(outputTarget.getColorTexture())
+                    : textureId(mainTarget.getColorTexture());
+        }
+        return alternateCurrent[location]
+                ? NvidiumGBufferTargets.alternateTexture(location)
+                : NvidiumGBufferTargets.texture(location);
     }
 
     private static void uploadScreenUniforms(int program, int width, int height) {
