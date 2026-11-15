@@ -11,6 +11,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
@@ -760,7 +761,7 @@ public final class NvidiumIrisUniformBridge {
             Object currentId = invokeCompatible(registry, "getId", currentBiome);
             int id = currentId instanceof Number number ? number.intValue() : 0;
             putScalar(values, "biome", id);
-            putScalar(values, "biome_category", biomeCategory(path));
+            putScalar(values, "biome_category", biomeCategory(biomeHolder, path));
             if (path.equals("pale_garden")) values.put("BIOME_PALE_GARDEN", (double) id);
             Object precipitation = precipitationAt(Minecraft.getInstance().level,
                     Minecraft.getInstance().player);
@@ -770,24 +771,33 @@ public final class NvidiumIrisUniformBridge {
         }
     }
 
-    private static int biomeCategory(String path) {
-        if (path.contains("nether")) return 16;
-        if (path.contains("end")) return 8;
-        if (path.contains("mushroom")) return 15;
-        if (path.contains("swamp")) return 14;
-        if (path.contains("river")) return 13;
-        if (path.contains("desert")) return 12;
-        if (path.contains("ocean")) return 11;
-        if (path.contains("beach") || path.contains("shore")) return 9;
-        if (path.contains("forest") || path.contains("grove")) return 10;
-        if (path.contains("snow") || path.contains("ice") || path.contains("frozen")) return 7;
-        if (path.contains("savanna")) return 6;
-        if (path.contains("plains")) return 5;
-        if (path.contains("badlands") || path.contains("mesa")) return 4;
-        if (path.contains("jungle") || path.contains("bamboo")) return 3;
-        if (path.contains("mountain") || path.contains("peak") || path.contains("slope")) return 2;
-        if (path.contains("taiga")) return 1;
-        return 0;
+    private static int biomeCategory(Object holder, String path) {
+        if (holderHasBiomeTag(holder, BiomeTags.WITHOUT_WANDERING_TRADER_SPAWNS)) return 0;
+        if (holderHasBiomeTag(holder, BiomeTags.HAS_VILLAGE_SNOWY)) return 7;
+        if (holderHasBiomeTag(holder, BiomeTags.IS_HILL)) return 2;
+        if (holderHasBiomeTag(holder, BiomeTags.IS_TAIGA)) return 1;
+        if (holderHasBiomeTag(holder, BiomeTags.IS_OCEAN)) return 11;
+        if (holderHasBiomeTag(holder, BiomeTags.IS_JUNGLE)) return 3;
+        if (holderHasBiomeTag(holder, BiomeTags.IS_FOREST)) return 10;
+        if (holderHasBiomeTag(holder, BiomeTags.IS_BADLANDS)) return 4;
+        if (holderHasBiomeTag(holder, BiomeTags.IS_NETHER)) return 16;
+        if (holderHasBiomeTag(holder, BiomeTags.IS_END)) return 8;
+        if (holderHasBiomeTag(holder, BiomeTags.IS_BEACH)) return 9;
+        if (holderHasBiomeTag(holder, BiomeTags.HAS_DESERT_PYRAMID)) return 12;
+        if (holderHasBiomeTag(holder, BiomeTags.IS_RIVER)) return 13;
+        if (holderHasBiomeTag(holder, BiomeTags.ALLOWS_SURFACE_SLIME_SPAWNS)) return 14;
+        if (holderHasBiomeTag(holder, BiomeTags.WITHOUT_ZOMBIE_SIEGES)) return 15;
+        if (holderHasBiomeTag(holder, BiomeTags.IS_MOUNTAIN)) return 17;
+        return path.contains("plains") ? 5 : 5;
+    }
+
+    private static boolean holderHasBiomeTag(Object holder, Object tag) {
+        try {
+            Object result = invokeCompatible(holder, "is", tag);
+            return result instanceof Boolean value && value;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return false;
+        }
     }
 
     private static Object currentBiome(Object level, Object player) {
@@ -804,7 +814,10 @@ public final class NvidiumIrisUniformBridge {
         if (level == null || player == null) return null;
         try {
             Object position = invokeObject(player, "blockPosition");
-            return invokeCompatible(level, "getPrecipitationAt", position);
+            Object holder = invokeCompatible(level, "getBiome", position);
+            Object biome = invokeObject(holder, "value");
+            Object seaLevel = invokeObject(level, "getSeaLevel");
+            return invokeCompatible(biome, "getPrecipitationAt", position, seaLevel);
         } catch (ReflectiveOperationException | RuntimeException ignored) {
             return null;
         }
