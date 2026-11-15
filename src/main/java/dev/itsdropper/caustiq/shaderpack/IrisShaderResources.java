@@ -41,20 +41,23 @@ public final class IrisShaderResources implements AutoCloseable {
     private int[] terrainTargets = new int[0];
     private final Map<String, TypedExpression> uniforms;
     private final Map<String, TypedExpression> variables;
+    private final Map<String, Double> optionDefines;
     private boolean closed;
 
     private IrisShaderResources(Map<String, TextureAsset> textures,
                                 Map<String, TypedExpression> uniforms,
                                 Map<String, TypedExpression> variables,
+                                Map<String, Double> optionDefines,
                                 IrisImageResources imageResources) {
         this.textureAssets = Map.copyOf(textures);
         this.uniforms = Map.copyOf(uniforms);
         this.variables = Map.copyOf(variables);
+        this.optionDefines = Map.copyOf(optionDefines);
         this.imageResources = imageResources;
     }
 
     public static IrisShaderResources empty() {
-        return new IrisShaderResources(Map.of(), Map.of(), Map.of(), IrisImageResources.empty());
+        return new IrisShaderResources(Map.of(), Map.of(), Map.of(), Map.of(), IrisImageResources.empty());
     }
 
     public static IrisShaderResources load(Map<String, String> properties, ShaderPackSources sources)
@@ -129,7 +132,32 @@ public final class IrisShaderResources implements AutoCloseable {
         try { propertiesSource = sources.read("shaders.properties"); }
         catch (IOException missing) { propertiesSource = ""; }
         IrisImageResources images = IrisImageResources.load(propertiesSource, resolveShaderPackDefines(sources, defines));
-        return new IrisShaderResources(textures, uniforms, variables, images);
+        return new IrisShaderResources(textures, uniforms, variables, numericOptionDefines(defines), images);
+    }
+
+    private static Map<String, Double> numericOptionDefines(Map<String, String> defines) {
+        Map<String, Double> values = new LinkedHashMap<>();
+        for (Map.Entry<String, String> define : defines.entrySet()) {
+            String raw = define.getValue() == null ? "" : define.getValue().trim();
+            if (raw.equalsIgnoreCase("true")) {
+                values.put(define.getKey(), 1.0);
+                continue;
+            }
+            if (raw.equalsIgnoreCase("false")) {
+                values.put(define.getKey(), 0.0);
+                continue;
+            }
+            String numeric = raw.replaceFirst("(?i)[uif]+$", "");
+            try {
+                double value = numeric.startsWith("0x") || numeric.startsWith("0X")
+                        ? Long.parseUnsignedLong(numeric.substring(2), 16)
+                        : Double.parseDouble(numeric);
+                if (Double.isFinite(value)) values.put(define.getKey(), value);
+            } catch (NumberFormatException ignored) {
+                // Non-numeric preprocessor options remain available to GLSL preprocessing only.
+            }
+        }
+        return Map.copyOf(values);
     }
 
     public java.util.Set<String> textureNames() { return textureAssets.keySet(); }
@@ -233,7 +261,8 @@ public final class IrisShaderResources implements AutoCloseable {
 
     private Map<String, double[]> evaluateUniformValues(Map<String, Double> baseVariables,
                                                         java.util.function.Predicate<String> include) {
-        Map<String, Double> context = new HashMap<>(baseVariables);
+        Map<String, Double> context = new HashMap<>(optionDefines);
+        context.putAll(baseVariables);
         Map<String, Double> evaluatedVariables = new HashMap<>();
         List<String> variableStack = new ArrayList<>();
         Map<String, double[]> result = new LinkedHashMap<>();

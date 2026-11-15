@@ -103,6 +103,29 @@ class IrisShaderResourcesTest {
         }
     }
 
+
+    @Test
+    void evaluatesSelectedNumericAndBooleanOptionDefinesInCustomUniformExpressions() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("OptionDefines/shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), """
+                variable.float.rainfall_factor=rainfall * (IS_WET ? 1.0 : 0.0)
+                uniform.float.rainfall_result=rainfall_factor + enabled_feature
+                uniform.float.wet_result=IS_WET
+                """);
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("option-defines", "OptionDefines",
+                temporaryDirectory.resolve("OptionDefines"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            try (IrisShaderResources resources = IrisShaderResources.load(model.properties(), sources,
+                    Map.of("rainfall", "0.75", "IS_WET", "true", "enabled_feature", "1"))) {
+                Map<String, double[]> values = resources.evaluateUniformValues(Map.of());
+                assertEquals(1.75, values.get("rainfall_result")[0], 1.0e-9);
+                assertEquals(1.0, values.get("wet_result")[0], 1.0e-9);
+            }
+        }
+    }
+
     @Test
     void loadsProgramScopedRawThreeDimensionalTextures() throws IOException {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("Scoped/shaders"));
