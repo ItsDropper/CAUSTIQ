@@ -12,7 +12,6 @@ import java.util.function.Predicate;
 /** Checks the required renderer stack; presence is not proof of pipeline compatibility. */
 public final class NvidiumCompatibility {
     private static final Logger LOGGER = LoggerFactory.getLogger("CAUSTIQ");
-    private static volatile boolean extendedVertexFormatCommitted;
 
     public enum Status { MISSING_SODIUM, MISSING_NVIDIUM, SODIUM_AND_NVIDIUM_PRESENT }
 
@@ -25,7 +24,6 @@ public final class NvidiumCompatibility {
      * selected as well.
      */
     public static boolean requestExtendedVertexFormat() {
-        extendedVertexFormatCommitted = false;
         if (!CaustiqConfig.get().enabled()) return false;
         try {
             Class<?> nvidium = Class.forName("me.cortex.nvidium.Nvidium");
@@ -64,7 +62,6 @@ public final class NvidiumCompatibility {
             }
             setSodiumVertexFormat(nvidium);
             NvidiumIrisChunkVertex.commit();
-            extendedVertexFormatCommitted = true;
             LOGGER.info("Committed CAUSTIQ Nvidium ABI {} (40-byte stride); Nvidium Sodium vertex format and shader define are enabled.",
                     NvidiumTerrainVaryingAdapter.PROFILE_ID);
             return true;
@@ -73,14 +70,6 @@ public final class NvidiumCompatibility {
             LOGGER.error("Failed to commit CAUSTIQ's Nvidium shader/vertex ABI. Nvidium will retain its native terrain format.", exception);
             return false;
         }
-    }
-
-    public static boolean isExtendedVertexFormatCommitted() {
-        return extendedVertexFormatCommitted;
-    }
-
-    static void setExtendedVertexFormatCommittedForTests(boolean committed) {
-        extendedVertexFormatCommitted = committed;
     }
 
     private static void setSodiumVertexFormat(Class<?> nvidium) throws ReflectiveOperationException {
