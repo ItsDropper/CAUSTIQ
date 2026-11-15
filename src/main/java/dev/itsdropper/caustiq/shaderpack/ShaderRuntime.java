@@ -186,7 +186,7 @@ public final class ShaderRuntime {
                 return;
             }
 
-            configureShadowRenderer(model);
+            configureShadowRenderer(model, null);
 
             Map<String, IrisNvidiumTerrainTranslator> translators = new LinkedHashMap<>();
             Map<String, IrisNvidiumTerrainTranslator> translucentTranslators = new LinkedHashMap<>();
@@ -318,6 +318,11 @@ public final class ShaderRuntime {
             }
             NvidiumGBufferTargets.configureTargets(
                     dimensionPlan == null ? Map.of() : dimensionPlan.targets());
+            // Re-select the dimension-specific shadow_solid/shadow_cutout/shadow_water
+            // programs before Nvidium recompiles its renderer for this dimension.
+            if (preparedPackModel != null) {
+                configureShadowRenderer(preparedPackModel, dimensionId.isEmpty() ? null : dimensionId);
+            }
             NvidiumShaderProgramBridge.registerTerrainAdapter(
                     translator::adapt, translator.renderTargetIndices());
             if (translucentTranslator != null) {
@@ -342,20 +347,23 @@ public final class ShaderRuntime {
         NvidiumGBufferTargets.destroy();
         preparedTerrainAdapterRegistered = false;
         activeTerrainDimensionKey = "";
+        NvidiumShadowRenderer.configure(false, 2048, 128.0f);
         NvidiumRenderBridge.reloadShaders();
     }
 
-    private static void configureShadowRenderer(IrisShaderPackModel model) {
+    private static void configureShadowRenderer(IrisShaderPackModel model, String dimensionId) {
         Map<String, String> optionDefines = new LinkedHashMap<>();
         for (ShaderPackMetadata.Option option : model.options().options()) {
             optionDefines.put(option.name(), CaustiqConfig.get().option(
                     CaustiqConfig.get().selectedPackId(), option.name(), option.defaultValue()));
         }
 
-        String solidProgram = selectShadowProgram(model, "shadow_solid", "shadow", "shadow_cutout");
-        String cutoutProgram = selectShadowProgram(model, "shadow_cutout", "shadow_solid", "shadow");
+        String solidProgram = selectShadowProgram(
+                model, dimensionId, "shadow_solid", "shadow", "shadow_cutout");
+        String cutoutProgram = selectShadowProgram(
+                model, dimensionId, "shadow_cutout", "shadow_solid", "shadow");
         String translucentProgram = selectShadowProgram(
-                model, "shadow_water", "shadow", "shadow_solid", "shadow_cutout");
+                model, dimensionId, "shadow_water", "shadow", "shadow_solid", "shadow_cutout");
         if (solidProgram == null) {
             NvidiumShadowRenderer.configure(false, 2048, 128.0f);
             CaustiqClient.LOGGER.info(
@@ -364,11 +372,12 @@ public final class ShaderRuntime {
         }
 
         try {
-            IrisNvidiumTerrainTranslator solid = IrisNvidiumTerrainTranslator.from(model, null, solidProgram, optionDefines);
+            IrisNvidiumTerrainTranslator solid = IrisNvidiumTerrainTranslator.from(
+                    model, dimensionId, solidProgram, optionDefines);
             IrisNvidiumTerrainTranslator cutout = IrisNvidiumTerrainTranslator.from(
-                    model, null, cutoutProgram == null ? solidProgram : cutoutProgram, optionDefines);
+                    model, dimensionId, cutoutProgram == null ? solidProgram : cutoutProgram, optionDefines);
             IrisNvidiumTerrainTranslator translucent = IrisNvidiumTerrainTranslator.from(
-                    model, null, translucentProgram == null ? solidProgram : translucentProgram, optionDefines);
+                    model, dimensionId, translucentProgram == null ? solidProgram : translucentProgram, optionDefines);
             NvidiumShaderProgramBridge.registerShadowTerrainAdapter(solid::adapt);
             NvidiumShaderProgramBridge.registerShadowCutoutTerrainAdapter(cutout::adapt);
             NvidiumShaderProgramBridge.registerShadowTranslucentTerrainAdapter(translucent::adapt);
@@ -393,8 +402,13 @@ public final class ShaderRuntime {
                 distance * distanceMultiplier);
     }
 
-    private static String selectShadowProgram(IrisShaderPackModel model, String... candidates) {
+    private static String selectShadowProgram(
+            IrisShaderPackModel model, String dimensionId, String... candidates) {
+        String directory = dimensionId == null || dimensionId.isBlank()
+                ? "" : builtInDimensionDirectory(dimensionId);
+        IrisShaderPackModel.ProgramSet dimensionSet = model.dimensionOverrides().get(directory);
         for (String candidate : candidates) {
+            if (dimensionSet != null && dimensionSet.programs().containsKey(candidate)) return candidate;
             if (model.base().programs().containsKey(candidate)) return candidate;
             if (model.dimensionOverrides().values().stream()
                     .anyMatch(programSet -> programSet.programs().containsKey(candidate))) return candidate;
