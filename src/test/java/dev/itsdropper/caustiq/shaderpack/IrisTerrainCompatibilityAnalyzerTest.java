@@ -132,6 +132,30 @@ class IrisTerrainCompatibilityAnalyzerTest {
     }
 
     @Test
+    void acceptsShadowMatricesAndNvidiumOwnedTerrainSamplers() {
+        String vertex = """
+                #version 400
+                uniform mat4 shadowModelView;
+                uniform mat4 shadowProjection;
+                void main() { gl_Position = shadowProjection * shadowModelView * gl_Vertex; }
+                """;
+        String fragment = """
+                #version 400
+                uniform sampler2D colortex7;
+                uniform sampler2D shadowtex1;
+                uniform sampler2D shadowcolor1;
+                layout(location = 0) out vec4 color;
+                void main() {
+                    color = texture(colortex7, vec2(0.5))
+                            + texture(shadowtex1, vec2(0.5))
+                            + texture(shadowcolor1, vec2(0.5));
+                }
+                """;
+        var result = analyzer.analyze(vertex, fragment);
+        assertTrue(result.compatible(), result.issues().toString());
+    }
+
+    @Test
     void rejectsMissingShaderStages() {
         assertThrows(IllegalArgumentException.class, () -> analyzer.analyze("", "void main(){}"));
     }

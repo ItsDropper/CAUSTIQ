@@ -70,7 +70,9 @@ public final class IrisTerrainCompatibilityAnalyzer {
             "time_midnight", "biome_temperature", "biome_humidity", "alphaTestRef",
             "blockEntityId", "entityId", "currentRenderedItemId", "entityColor", "view_res", "view_pixel_size");
     private static final Set<String> AVAILABLE_SAMPLERS = Set.of(
-            "gtexture", "lightmap", "tex_diffuse", "tex_light", "noisetex");
+            "gtexture", "lightmap", "tex_diffuse", "tex_light", "noisetex",
+            "colortex1", "colortex2", "colortex3", "colortex4", "colortex5", "colortex6", "colortex7",
+            "gaux1", "gaux2", "gaux3", "gaux4", "shadowtex0", "shadowtex1", "shadowcolor0", "shadowcolor1");
 
 
     public Result analyze(String vertexSource, String fragmentSource) {

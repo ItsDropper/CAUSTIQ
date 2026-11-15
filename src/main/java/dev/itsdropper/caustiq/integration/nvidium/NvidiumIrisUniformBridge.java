@@ -179,9 +179,13 @@ public final class NvidiumIrisUniformBridge {
         integer(program, "caustiqHeldBlockLightValue2", heldBlockLightValue(InteractionHand.OFF_HAND));
         integer(program, "caustiqHeldItemId", heldItemId(InteractionHand.MAIN_HAND));
         integer(program, "caustiqHeldItemId2", heldItemId(InteractionHand.OFF_HAND));
-        integer(program, "caustiqColortex1", 5);
-        integer(program, "caustiqColortex2", 6);
-        integer(program, "caustiqColortex4", 7);
+        for (int index = 1; index <= 7; index++) {
+            integer(program, "caustiqColortex" + index, 4 + index);
+        }
+        integer(program, "caustiqShadowtex0", 12);
+        integer(program, "caustiqShadowtex1", 13);
+        integer(program, "caustiqShadowcolor0", 14);
+        integer(program, "caustiqShadowcolor1", 15);
     }
 
     /** Returns the registry ID of the selected hand's item, matching Iris heldItemId uniforms. */
