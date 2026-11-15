@@ -116,6 +116,8 @@ class IrisTerrainCompatibilityAnalyzerTest {
                     "Photon's color-wheel gbuffers entry point must be recognized");
             assertTrue(overworld.programs().containsKey("shadow_block"),
                     "Photon's specialized shadow entry points must be recognized");
+            assertTrue(model.diagnostics().isEmpty(),
+                    "Pinned Photon must not be rejected by CAUSTIQ's parser audit: " + model.diagnostics());
             IrisNvidiumTerrainTranslator translator = assertDoesNotThrow(
                     () -> IrisNvidiumTerrainTranslator.from(model, null, "gbuffers_terrain",
                             java.util.Map.of("TAA", "false", "NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false")),
