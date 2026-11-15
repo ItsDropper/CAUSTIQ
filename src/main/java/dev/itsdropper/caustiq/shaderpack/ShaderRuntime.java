@@ -109,7 +109,7 @@ public final class ShaderRuntime {
         try {
             RenderTarget target = Minecraft.getInstance().getMainRenderTarget();
             irisShaderResources.uploadUniforms(program,
-                    NvidiumIrisUniformBridge.expressionVariables(target.width, target.height));
+                    NvidiumIrisUniformBridge.expressionVariables(target.width, target.height, selectedDefines));
         } catch (RuntimeException exception) {
             CaustiqClient.LOGGER.warn("Could not evaluate or upload custom Iris terrain uniforms: {}", exception.getMessage());
         }
