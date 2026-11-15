@@ -1,5 +1,7 @@
 package dev.itsdropper.caustiq.shaderpack;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -9,13 +11,24 @@ import java.util.regex.Pattern;
 /** Parses OptiFine/Iris block.properties IDs for mc_Entity terrain metadata. */
 public final class IrisBlockPropertiesParser {
     private static final Pattern ENTRY = Pattern.compile("^block\\.(-?\\d+)\\s*=\\s*(.*)$");
+    private static final Pattern VERSION_CONDITION = Pattern.compile(
+            "^#\\s*if\\s+MC_VERSION\\s*(>=|>|<=|<|==|!=)\\s*(\\d+)\\s*$");
 
+    /**
+     * Parses using the project's current Minecraft target. Kept for callers and
+     * tests that exercise the pinned 1.21.11 runtime.
+     */
     public Map<String, Integer> parse(String source) {
+        return parse(source, 12_111);
+    }
+
+    /** Parses only the block.properties preprocessor branch active for MC_VERSION. */
+    public Map<String, Integer> parse(String source, int mcVersion) {
         if (source == null || source.isBlank()) return Map.of();
         Map<String, Integer> result = new LinkedHashMap<>();
-        String[] lines = source.split("\\R");
-        for (int lineNumber = 0; lineNumber < lines.length; lineNumber++) {
-            String line = stripComment(lines[lineNumber]).trim();
+        var activeLines = activeLines(source, mcVersion);
+        for (int lineNumber = 0; lineNumber < activeLines.size(); lineNumber++) {
+            String line = stripComment(activeLines.get(lineNumber)).trim();
             if (line.isEmpty()) continue;
             Matcher entry = ENTRY.matcher(line);
             if (!entry.matches()) continue;
@@ -32,14 +45,68 @@ public final class IrisBlockPropertiesParser {
             for (String value : values) {
                 if (value.isBlank()) continue;
                 ParsedBlock block = parseBlock(value, lineNumber + 1);
-                if (block.properties().isEmpty()) {
-                    putUnique(result, block.identifier(), id, lineNumber + 1);
-                } else {
-                    putUnique(result, block.identifier() + formatProperties(block.properties()), id, lineNumber + 1);
-                }
+                String key = block.properties().isEmpty()
+                        ? block.identifier()
+                        : block.identifier() + formatProperties(block.properties());
+                putUnique(result, key, id, lineNumber + 1);
             }
         }
         return Map.copyOf(result);
+    }
+
+    private static java.util.List<String> activeLines(String source, int mcVersion) {
+        java.util.List<String> result = new java.util.ArrayList<>();
+        Deque<Conditional> stack = new ArrayDeque<>();
+        boolean active = true;
+        String[] lines = source.split("\\R");
+        for (int i = 0; i < lines.length; i++) {
+            String trimmed = lines[i].trim();
+            if (trimmed.startsWith("#if")) {
+                Matcher condition = VERSION_CONDITION.matcher(trimmed);
+                if (!condition.matches()) {
+                    throw new IllegalArgumentException("Unsupported block.properties conditional on line "
+                            + (i + 1) + ": " + trimmed);
+                }
+                boolean matches = evaluateVersionCondition(
+                        mcVersion, condition.group(1), Integer.parseInt(condition.group(2)));
+                stack.push(new Conditional(active, matches, false, i + 1));
+                active = active && matches;
+            } else if (trimmed.equals("#else")) {
+                if (stack.isEmpty()) {
+                    throw new IllegalArgumentException("Unexpected #else in block.properties on line " + (i + 1));
+                }
+                Conditional previous = stack.pop();
+                if (previous.elseSeen()) {
+                    throw new IllegalArgumentException("Duplicate #else in block.properties on line " + (i + 1));
+                }
+                stack.push(new Conditional(previous.parentActive(), previous.condition(), true, previous.line()));
+                active = previous.parentActive() && !previous.condition();
+            } else if (trimmed.equals("#endif")) {
+                if (stack.isEmpty()) {
+                    throw new IllegalArgumentException("Unexpected #endif in block.properties on line " + (i + 1));
+                }
+                active = stack.pop().parentActive();
+            } else if (active) {
+                result.add(lines[i]);
+            }
+        }
+        if (!stack.isEmpty()) {
+            Conditional unclosed = stack.peek();
+            throw new IllegalArgumentException("Unclosed #if in block.properties on line " + unclosed.line());
+        }
+        return result;
+    }
+
+    private static boolean evaluateVersionCondition(int version, String operator, int threshold) {
+        return switch (operator) {
+            case ">=" -> version >= threshold;
+            case ">" -> version > threshold;
+            case "<=" -> version <= threshold;
+            case "<" -> version < threshold;
+            case "==" -> version == threshold;
+            case "!=" -> version != threshold;
+            default -> throw new IllegalArgumentException("Unsupported MC_VERSION operator: " + operator);
+        };
     }
 
     private static ParsedBlock parseBlock(String token, int lineNumber) {
@@ -58,9 +125,6 @@ public final class IrisBlockPropertiesParser {
                     ? -1 : value.indexOf(':', namespaceSeparator + 1);
             if (selectorSeparator < 0 && namespaceSeparator >= 0
                     && value.substring(namespaceSeparator + 1).contains("=")) {
-                // OptiFine/Iris also accepts vanilla shorthand selectors such as
-                // oak_log:axis=y. A single colon followed by a property assignment
-                // is a selector, not a namespace separator.
                 selectorSeparator = namespaceSeparator;
             }
             if (selectorSeparator >= 0) {
@@ -109,5 +173,6 @@ public final class IrisBlockPropertiesParser {
         return end < 0 ? line : line.substring(0, end);
     }
 
+    private record Conditional(boolean parentActive, boolean condition, boolean elseSeen, int line) { }
     private record ParsedBlock(String identifier, Map<String, String> properties) { }
 }
