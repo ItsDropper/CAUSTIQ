@@ -120,6 +120,21 @@ public final class CaustiqCiShaderValidation {
     }
 
 
+    private static Set<String> findDeclaredMacros(ShaderPackSources sources) throws IOException {
+        Set<String> macros = new LinkedHashSet<>();
+        java.util.regex.Pattern define = java.util.regex.Pattern.compile(
+                "(?m)^\\\\s*#\\\\s*define\\\\s+([A-Za-z_][A-Za-z0-9_]*)\\\\b");
+        for (String path : sources.listShaderFiles()) {
+            String lower = path.toLowerCase(java.util.Locale.ROOT);
+            if (!(lower.endsWith(".glsl") || lower.endsWith(".vsh") || lower.endsWith(".fsh")
+                    || lower.endsWith(".csh") || lower.endsWith(".gsh")
+                    || lower.endsWith(".tcs") || lower.endsWith(".tes"))) continue;
+            java.util.regex.Matcher matcher = define.matcher(sources.read(path));
+            while (matcher.find()) macros.add(matcher.group(1));
+        }
+        return macros;
+    }
+
     private static boolean evaluateEnabled(String expression, Map<String, String> defines) {
         String value = expression.trim();
         while (value.startsWith("(") && value.endsWith(")")) {
@@ -198,6 +213,7 @@ public final class CaustiqCiShaderValidation {
                     .map(Map.Entry::getValue)
                     .forEach(programSets::add);
 
+            Set<String> declaredMacros = findDeclaredMacros(sources);
             IrisGlProgramCompiler compiler = new IrisGlProgramCompiler();
             List<String> failures = new ArrayList<>();
             int compiled = 0;
@@ -238,7 +254,15 @@ public final class CaustiqCiShaderValidation {
                     dimensionValues.put("SHADOW_VPS", "false");
                 }
                 Set<String> dimensionDefines = new LinkedHashSet<>();
-                dimensionValues.forEach((name, value) -> dimensionDefines.add(name + "=" + value));
+                dimensionValues.forEach((name, value) -> {
+                    if (declaredMacros.contains(name) || Set.of(
+                            "MC_VERSION", "MC_GL_VERSION", "IS_IRIS", "MC_HAND_DEPTH",
+                            "MC_RENDER_QUALITY", "MC_SHADOW_QUALITY", "WORLD_OVERWORLD",
+                            "OVERWORLD", "WORLD_NETHER", "NETHER", "WORLD_END", "END"
+                    ).contains(name)) {
+                        dimensionDefines.add(name + "=" + value);
+                    }
+                });
 
                 for (IrisShaderPackModel.Program sourceProgram : set.programs().values()) {
                     ShaderPackProgramCatalog.Group group =
