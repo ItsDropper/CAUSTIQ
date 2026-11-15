@@ -153,17 +153,18 @@ public final class NvidiumIrisUniformBridge {
         integer(program, "caustiqIsElytraFlying", isElytraFlying() ? 1 : 0);
         integer(program, "caustiqHeldBlockLightValue", heldBlockLightValue(InteractionHand.MAIN_HAND));
         integer(program, "caustiqHeldBlockLightValue2", heldBlockLightValue(InteractionHand.OFF_HAND));
-        integer(program, "caustiqHeldItemId", heldItemId());
+        integer(program, "caustiqHeldItemId", heldItemId(InteractionHand.MAIN_HAND));
+        integer(program, "caustiqHeldItemId2", heldItemId(InteractionHand.OFF_HAND));
         integer(program, "caustiqColortex1", 5);
         integer(program, "caustiqColortex2", 6);
         integer(program, "caustiqColortex4", 7);
     }
 
-    /** Returns the registry ID of the local player's main-hand item, matching Iris heldItemId. */
-    private static int heldItemId() {
+    /** Returns the registry ID of the selected hand's item, matching Iris heldItemId uniforms. */
+    private static int heldItemId(InteractionHand hand) {
         var player = Minecraft.getInstance().player;
         if (player == null) return 0;
-        ItemStack stack = player.getItemInHand(InteractionHand.MAIN_HAND);
+        ItemStack stack = player.getItemInHand(hand);
         return stack.isEmpty() ? 0 : BuiltInRegistries.ITEM.getId(stack.getItem());
     }
 
