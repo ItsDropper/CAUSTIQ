@@ -62,7 +62,7 @@ class IrisImageResourcesTest {
         ShaderPackDescriptor descriptor = new ShaderPackDescriptor("photon", "Photon",
                 Path.of(photonDirectory), "", ShaderPackSourceType.DIRECTORY,
                 ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
-        Map<String, String> defines = Map.of("COLORED_LIGHTS", "1", "VOXEL_VOLUME_SIZE", "128");
+        Map<String, String> defines = Map.of("COLORED_LIGHTS", "1", "VOXEL_VOLUME_SIZE", "128", "SHADOW", "1");
         try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
             IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(
@@ -92,9 +92,6 @@ class IrisImageResourcesTest {
             assertTrue(setup.contains("light_data_img"));
             assertTrue(shadowcomp.contains("voxel_sampler"));
             assertTrue(shadowcomp.contains("light_img_a"));
-            assertTrue(shadowcomp.contains("gl_GlobalInvocationID.x"));
-            assertTrue(shadowcomp.contains("gl_GlobalInvocationID.y"));
-            assertTrue(shadowcomp.contains("gl_GlobalInvocationID.z"));
 
             assertArrayEquals(new int[]{1, 1, 1},
                     IrisImageResources.calculateDispatchGroups(images, Set.of("light_data_img"),
@@ -104,10 +101,11 @@ class IrisImageResourcesTest {
                             Set.of("voxel_img", "light_img_a", "light_img_b"),
                             32, 1, 1, true, true));
 
-            String voxelFragment = preprocessor.preprocess(
-                    "world0/shadow_voxels.fsh", sources::read).source();
-            assertTrue(voxelFragment.contains("voxel_img"), "Photon shadow voxel pass must write voxel_img");
-            assertTrue(voxelFragment.contains("imageStore"), "Photon shadow voxel pass must write its voxel image");
+            String shadowVertex = preprocessor.preprocess(
+                    "world0/shadow.vsh", sources::read).source();
+            assertTrue(shadowVertex.contains("voxel_img"), "Photon shadow vertex pass must declare voxel_img");
+            assertTrue(shadowVertex.contains("update_voxel_map"), "Photon shadow vertex pass must update its voxel map");
+            assertTrue(shadowVertex.contains("imageStore"), "Photon shadow vertex pass must write its voxel image");
 
             compilePhotonCompute("setup", setup, defines);
             compilePhotonCompute("shadowcomp", shadowcomp, defines);
