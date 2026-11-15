@@ -191,20 +191,26 @@ class IrisNvidiumTerrainTranslatorTest {
                     NvidiumTerrainVaryingAdapter.adapt(pinnedNvidiumStages());
 
             for (String dimension : List.of("world0", "world-1", "world1")) {
-                for (String programName : List.of(
-                        "gbuffers_water", "shadow_solid", "shadow_cutout", "shadow_water")) {
-                    IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
-                            model, dimension, programName, options);
-                    Map<String, String> translated = translator.adapt(nativeStages);
-                    assertTrue(translated.get("MESH").contains("void caustiqIrisVertexMain()"),
-                            dimension + "/" + programName + " vertex stage was not translated");
-                    assertTrue(translated.get("FRAGMENT").contains("void caustiqIrisFragmentMain()"),
-                            dimension + "/" + programName + " fragment stage was not translated");
-                    assertFalse(translator.renderTargetIndices().isEmpty(),
-                            dimension + "/" + programName + " has no fragment output routing");
-                }
+                assertPhotonTerrainProgramTranslates(model, dimension, "gbuffers_water", options, nativeStages);
+            }
+            for (String programName : List.of("shadow_solid", "shadow_cutout", "shadow_water")) {
+                assertPhotonTerrainProgramTranslates(model, "world0", programName, options, nativeStages);
             }
         }
+    }
+
+    private static void assertPhotonTerrainProgramTranslates(
+            IrisShaderPackModel model, String dimension, String programName,
+            Map<String, String> options, Map<String, String> nativeStages) {
+        IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
+                model, dimension, programName, options);
+        Map<String, String> translated = translator.adapt(nativeStages);
+        assertTrue(translated.get("MESH").contains("void caustiqIrisVertexMain()"),
+                dimension + "/" + programName + " vertex stage was not translated");
+        assertTrue(translated.get("FRAGMENT").contains("void caustiqIrisFragmentMain()"),
+                dimension + "/" + programName + " fragment stage was not translated");
+        assertFalse(translator.renderTargetIndices().isEmpty(),
+                dimension + "/" + programName + " has no fragment output routing");
     }
 
     @Test
