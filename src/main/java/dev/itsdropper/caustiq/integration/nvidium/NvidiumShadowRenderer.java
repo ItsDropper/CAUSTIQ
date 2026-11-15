@@ -205,6 +205,10 @@ public final class NvidiumShadowRenderer {
             if (clear) {
                 GL11C.glClearDepth(1.0);
                 GL11C.glClear(GL11C.GL_DEPTH_BUFFER_BIT);
+                try (MemoryStack stack = MemoryStack.stackPush()) {
+                    FloatBuffer clearColor = stack.floats(1.0f, 1.0f, 1.0f, 1.0f);
+                    GL30C.glClearBufferfv(GL11C.GL_COLOR, 1, clearColor);
+                }
             }
 
             clearBuffer(state.regionVisibility);
