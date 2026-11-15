@@ -758,6 +758,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform int caustiqEntityId;
                 uniform int caustiqCurrentRenderedItemId;
                 uniform vec4 caustiqEntityColor;
+                uniform bool caustiqHeavyFog;
                 """;
     }
 

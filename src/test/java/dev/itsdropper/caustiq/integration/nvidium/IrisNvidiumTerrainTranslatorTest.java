@@ -134,6 +134,40 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesIrisHeavyFogBooleanToTheRuntimeUniform() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform bool heavyFog;
+                void main() {
+                    gl_FragColor = heavyFog ? vec4(1.0) : vec4(0.0);
+                }
+                """);
+
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform bool caustiqHeavyFog;"));
+        assertTrue(fragment.contains("caustiqHeavyFog ? vec4(1.0) : vec4(0.0)"));
+        assertFalse(fragment.contains("uniform bool heavyFog;"));
+    }
+
+    @Test
+    void rejectsIrisHeavyFogWithAnIncorrectUniformType() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                translator("""
+                        #version 150
+                        void main() { gl_Position = ftransform(); }
+                        """, """
+                        #version 150
+                        uniform float heavyFog;
+                        void main() { gl_FragColor = vec4(heavyFog); }
+                        """));
+        assertTrue(exception.getMessage().contains("heavyFog"));
+        assertTrue(exception.getMessage().contains("bool"));
+    }
+
+    @Test
     void translatesGlFragDataToNvidiumMrtLocations() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150
