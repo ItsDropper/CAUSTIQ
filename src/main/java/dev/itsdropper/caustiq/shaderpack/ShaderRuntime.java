@@ -496,14 +496,10 @@ public final class ShaderRuntime {
     }
 
     private static void rebuildTerrainSections() {
-        Object levelRenderer = Minecraft.getInstance().levelRenderer;
-        if (levelRenderer == null) return;
-        try {
-            levelRenderer.getClass().getMethod("allChanged").invoke(levelRenderer);
-            CaustiqClient.LOGGER.info("Requested terrain section rebuild after changing the shader pack block material map.");
-        } catch (ReflectiveOperationException exception) {
-            CaustiqClient.LOGGER.warn("Could not request a terrain section rebuild after changing block.properties IDs.", exception);
-        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.levelRenderer == null) return;
+        minecraft.levelRenderer.allChanged();
+        CaustiqClient.LOGGER.info("Requested terrain section rebuild after changing the shader pack block material map.");
     }
 
     private static int minecraftVersionCode() {
