@@ -305,6 +305,19 @@ public final class IrisShaderResources implements AutoCloseable {
                         context, evaluated, stack, true);
             }
         }
+        TypedExpression scalarUniform = uniforms.get(name);
+        if (scalarUniform != null && componentCount(scalarUniform.type()) == 1) {
+            String marker = "uniform:" + name;
+            if (stack.contains(marker)) {
+                throw new IllegalArgumentException("Cyclic Iris uniform dependency: "
+                        + String.join(" -> ", stack) + " -> " + marker);
+            }
+            stack.add(marker);
+            double value = IrisExpression.evaluate(scalarUniform.expression(), identifier ->
+                    resolveVariable(identifier, context, evaluated, stack));
+            stack.removeLast();
+            return value;
+        }
         return evaluateVariable(name, context, evaluated, stack);
     }
 
