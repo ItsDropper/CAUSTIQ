@@ -846,11 +846,16 @@ public final class IrisNvidiumTerrainTranslator {
 
     private static String removeUniformsAndAttributes(String source, boolean vertex) {
         String working = stripComments(source);
+        String uniformUsageSource = UNIFORM.matcher(working).replaceAll("");
         Matcher uniforms = UNIFORM.matcher(working);
         StringBuffer uniformOutput = new StringBuffer();
         while (uniforms.find()) {
             String type = uniforms.group(1);
             String name = uniforms.group(2);
+            if (!hasReachableReference(uniformUsageSource, name)) {
+                uniforms.appendReplacement(uniformOutput, "");
+                continue;
+            }
             String expected = expectedUniformType(name);
             if (expected == null) {
                 throw new IllegalArgumentException("Unsupported Iris terrain uniform '" + name + "' (" + type + ").");
