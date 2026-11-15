@@ -184,7 +184,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 throw new IllegalStateException("Iris compute program '" + program.name()
                         + "' exceeds GL_MAX_COMPUTE_TEXTURE_IMAGE_UNITS.");
             }
-            if (resources.bindTexture(sampler, unit, location)) {
+            if (resources.bindTexture(sampler, program.name(), unit, location)) {
                 unit++;
                 continue;
             }
@@ -364,7 +364,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 throw new IllegalStateException("Iris pass '" + program.name()
                         + "' exceeds the fragment-stage texture-unit limit.");
             }
-            if (resources.bindTexture(sampler, unit, location)) {
+            if (resources.bindTexture(sampler, program.name(), unit, location)) {
                 unit++;
                 continue;
             }
