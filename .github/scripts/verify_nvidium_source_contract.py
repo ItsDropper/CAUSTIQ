@@ -117,7 +117,8 @@ assert "caustiqDecodeNormal(Vertex vertex)" in adapter, "Packed Iris normal deco
 assert "caustiqDecodeTangent(Vertex vertex)" in adapter, "Packed Iris tangent decoder is missing"
 assert "caustiqDecodeMidUv(Vertex vertex)" in adapter, "Packed quad midpoint UV decoder is missing"
 assert "caustiqDecodeMidBlock(Vertex vertex)" in adapter, "Packed midpoint block decoder is missing"
-assert "caustiqDecodeBlockEntity(uint packed)" in adapter, "Packed mc_Entity decoder is missing"
+assert "caustiqDecodeBlockEntity(uint packedBlockEntityId)" in adapter, "Packed mc_Entity decoder is missing"
+assert not __import__("re").search(r"\\bpacked\\b", adapter), "GLSL reserved token packed must not be used as an identifier"
 assert "flat mat3 v_tbn;" in adapter and "OUT[id].v_tbn = caustiqDecodeTbn(V);" in adapter
 assert "uint nvidiumMaterial;" in adapter and "V.nvidiumMaterial" in adapter
 assert "OUT[id].v_renderPosition = (transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)).xyz;" in adapter
