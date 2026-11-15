@@ -579,7 +579,10 @@ public final class NvidiumShadowRenderer {
                 GL11C.glClear(GL11C.GL_DEPTH_BUFFER_BIT);
                 try (MemoryStack stack = MemoryStack.stackPush()) {
                     FloatBuffer clearColor = stack.floats(1.0f, 1.0f, 1.0f, 1.0f);
-                    GL30C.glClearBufferfv(GL11C.GL_COLOR, 1, clearColor);
+                    for (int attachment = 1; attachment <= 7; attachment++) {
+                        clearColor.rewind();
+                        GL30C.glClearBufferfv(GL11C.GL_COLOR, attachment, clearColor);
+                    }
                 }
             } finally {
                 previous.restore();
