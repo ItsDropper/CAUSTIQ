@@ -232,6 +232,68 @@ public final class NvidiumIrisUniformBridge {
     }
 
     /** Mirrors Minecraft's eight-step lunar phase, derived from the world's day time. */
+    private static double sodiumFogParameter(Minecraft client, String accessor, double fallback) {
+        Object parameters = invokeObject(client.gameRenderer, "sodium$getFogParameters");
+        return invokeDouble(parameters, accessor, fallback);
+    }
+
+    private static int textureFilteringMode(Minecraft client) {
+        Object option = invokeObject(client.options, "textureFiltering");
+        Object value = invokeObject(option, "get");
+        if (!(value instanceof Enum<?> mode)) return 0;
+        return switch (mode.name()) {
+            case "RGSS" -> 1;
+            case "ANISOTROPIC" -> 2;
+            default -> 0;
+        };
+    }
+
+    private static int irisColorSpace() {
+        try {
+            Class<?> settings = Class.forName("net.irisshaders.iris.gui.option.IrisVideoSettings");
+            Object colorSpace = settings.getField("colorSpace").get(null);
+            return colorSpace instanceof Enum<?> value ? value.ordinal() : 0;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return 0;
+        }
+    }
+
+    private static double[] fogColor(Snapshot snapshot) {
+        try {
+            Class<?> stateType = Class.forName("net.irisshaders.iris.uniforms.CapturedRenderingState");
+            Object state = stateType.getField("INSTANCE").get(null);
+            Object color = invokeObject(state, "getFogColor");
+            if (color != null) return vector3Array(color);
+        } catch (ReflectiveOperationException | RuntimeException ignored) { }
+        return new double[]{0.0, 0.0, 0.0};
+    }
+
+    private static double[] lightningBoltPosition(Object level, Snapshot snapshot) {
+        if (level == null || snapshot == null) return new double[]{0.0, 0.0, 0.0, 0.0};
+        Object entities = invokeObject(level, "entitiesForRendering");
+        if (!(entities instanceof Iterable<?> iterable)) return new double[]{0.0, 0.0, 0.0, 0.0};
+        for (Object entity : iterable) {
+            if (!entity.getClass().getSimpleName().contains("LightningBolt")) continue;
+            double[] position = entityPosition(entity);
+            return new double[]{position[0] - snapshot.cameraX(),
+                    position[1] - snapshot.cameraY(), position[2] - snapshot.cameraZ(), 1.0};
+        }
+        return new double[]{0.0, 0.0, 0.0, 0.0};
+    }
+
+    private static double[] endFlashPosition(Object level, Snapshot snapshot) {
+        if (level == null || snapshot == null) return new double[]{0.0, 0.0, 0.0};
+        Object state = invokeObject(level, "endFlashState");
+        if (state == null) return new double[]{0.0, 0.0, 0.0};
+        double yaw = invokeDouble(state, "getYAngle", 0.0);
+        double pitch = invokeDouble(state, "getXAngle", 0.0);
+        org.joml.Matrix4f matrix = new org.joml.Matrix4f().set(snapshot.modelView())
+                .rotateY((float) Math.toRadians(180.0 - yaw))
+                .rotateX((float) Math.toRadians(-90.0 - pitch));
+        org.joml.Vector3f position = matrix.transformPosition(0.0f, 100.0f, 0.0f, new org.joml.Vector3f());
+        return new double[]{position.x, position.y, position.z};
+    }
+
     private static double attributeNumber(Minecraft client, String name, double fallback) {
         Object value = environmentAttribute(client, name);
         if (value instanceof Number number) return number.doubleValue();
@@ -599,13 +661,22 @@ public final class NvidiumIrisUniformBridge {
         putScalar(values, "alphaTestRef", 0.1);
         putScalar(values, "fogMode", 0);
         putScalar(values, "fogShape", -1);
-        putScalar(values, "fogDensity", 0.0);
-        putScalar(values, "fogStart", 0.0);
-        putScalar(values, "fogEnd", far);
+        double fogDensity = irisCapturedFloat("getFogDensity", 0.0);
+        double fogStart = sodiumFogParameter(client, "environmentalStart", 0.0);
+        double fogEnd = sodiumFogParameter(client, "environmentalEnd", far);
+        putScalar(values, "fogDensity", Math.max(0.0, fogDensity));
+        putScalar(values, "fogStart", fogStart);
+        putScalar(values, "fogEnd", fogEnd);
+        putScalar(values, "fogMode", fogDensity < 0.0 ? 9729.0 : fogDensity > 0.0 ? 2049.0 : 0.0);
+        putScalar(values, "fogShape", fogDensity == 0.0 ? -1.0 : 1.0);
+        putScalar(values, "alphaTestRef", irisCapturedFloat("getCurrentAlphaTest", 0.1));
         putScalar(values, "centerDepthSmooth", 0.0);
         putScalar(values, "pi", Math.PI);
-        putScalar(values, "currentColorSpace", 0);
-        putScalar(values, "anisotropicFiltering", 0);
+        putScalar(values, "currentColorSpace", irisColorSpace());
+        int filtering = textureFilteringMode(client);
+        putScalar(values, "textureFilteringMode", filtering);
+        putScalar(values, "anisotropicFiltering", filtering == 2
+                ? invokeDouble(client.options, "maxAnisotropyValue", 0.0) : 0.0);
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         putVector3(values, "currentDate", now.getYear(), now.getMonthValue(), now.getDayOfMonth());
@@ -644,6 +715,11 @@ public final class NvidiumIrisUniformBridge {
             putMatrixComponents(values, "gl_ModelViewProjectionMatrix",
                     modelViewProjection.get(new float[16]), 4);
             putMatrix3Components(values, "gl_NormalMatrix", snapshot.normalMatrix());
+            putMatrix3Components(values, "iris_NormalMatrix", snapshot.normalMatrix());
+            putMatrixComponents(values, "iris_ModelViewMatrix", snapshot.modelView(), 4);
+            putMatrixComponents(values, "iris_ProjectionMatrix", snapshot.projection(), 4);
+            putMatrixComponents(values, "u_ModelViewProjectionMatrix",
+                    modelViewProjection.get(new float[16]), 4);
             org.joml.Vector3f up = new org.joml.Matrix4f().set(snapshot.modelView())
                     .rotateY((float) -Math.PI / 2.0f)
                     .transformDirection(0.0f, 100.0f, 0.0f, new org.joml.Vector3f());
@@ -675,9 +751,9 @@ public final class NvidiumIrisUniformBridge {
                     snapshot.cameraY() - vehiclePosition[1],
                     snapshot.cameraZ() - vehiclePosition[2]);
             putVector3(values, "skyColor", skyColor(level, snapshot));
-            putVector3(values, "fogColor", skyColor(level, snapshot));
-            putVector4(values, "lightningBoltPosition", 0.0, 0.0, 0.0, 0.0);
-            putVector3(values, "endFlashPosition", 0.0, 0.0, 0.0);
+            putVector3(values, "fogColor", fogColor(snapshot));
+            putVector4(values, "lightningBoltPosition", lightningBoltPosition(level, snapshot));
+            putVector3(values, "endFlashPosition", endFlashPosition(level, snapshot));
             putVector3(values, "currentSelectedBlockPos", 0.0, 0.0, 0.0);
             putVector3(values, "chunkOffset", 0.0, 0.0, 0.0);
             putVector4(values, "entityColor", 0.0, 0.0, 0.0, 0.0);
@@ -903,10 +979,18 @@ public final class NvidiumIrisUniformBridge {
         };
     }
 
-    private static int eyeBrightness(Object level, Object player, boolean sky) {
-        if (level == null || player == null) return 0;
+    private static int eyeBrightness(Object level, Object cameraEntity, boolean sky) {
+        if (level == null || cameraEntity == null) return 0;
         try {
-            Object position = invokeObject(player, "blockPosition");
+            Object position = invokeObject(cameraEntity, "blockPosition");
+            Object feet = invokeObject(cameraEntity, "position");
+            double x = component(feet, "x");
+            double y = invokeDouble(cameraEntity, "getEyeY", component(feet, "y"));
+            double z = component(feet, "z");
+            Class<?> blockPos = Class.forName("net.minecraft.core.BlockPos");
+            Object eyeBlockPosition = blockPos.getMethod("containing", double.class, double.class, double.class)
+                    .invoke(null, x, y, z);
+            if (eyeBlockPosition != null) position = eyeBlockPosition;
             Class<?> lightLayer = Class.forName("net.minecraft.world.level.LightLayer");
             Object layer = lightLayer.getField(sky ? "SKY" : "BLOCK").get(null);
             Object brightness = invokeCompatible(level, "getBrightness", layer, position);
