@@ -266,8 +266,20 @@ class IrisNvidiumTerrainTranslatorTest {
             throw new IllegalStateException("glslangValidator timed out compiling " + stage + " stage.");
         }
         if (process.exitValue() != 0) {
-            throw new IllegalStateException("glslangValidator rejected the combined Photon/Nvidium "
-                    + stage + " stage:\\n" + output);
+            StringBuilder diagnostic = new StringBuilder("glslangValidator rejected the combined Photon/Nvidium ")
+                    .append(stage).append(" stage:").append(System.lineSeparator()).append(output);
+            Matcher lineMatcher = Pattern.compile("ERROR: \\d+:(\\d+)").matcher(output);
+            if (lineMatcher.find()) {
+                int errorLine = Integer.parseInt(lineMatcher.group(1));
+                String[] sourceLines = Files.readString(source).split("\\R");
+                int first = Math.max(1, errorLine - 3);
+                int last = Math.min(sourceLines.length, errorLine + 3);
+                for (int line = first; line <= last; line++) {
+                    diagnostic.append(System.lineSeparator()).append(line).append(": ")
+                            .append(sourceLines[line - 1]);
+                }
+            }
+            throw new IllegalStateException(diagnostic.toString());
         }
     }
 
