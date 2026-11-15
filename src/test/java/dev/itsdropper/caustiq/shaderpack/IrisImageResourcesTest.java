@@ -1,6 +1,9 @@
 package dev.itsdropper.caustiq.shaderpack;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
+
+import java.nio.file.Path;
 
 import java.io.IOException;
 import java.util.Map;
@@ -44,6 +47,44 @@ class IrisImageResourcesTest {
         assertEquals("voxel_sampler", images.get("voxel_img").sampler());
         assertEquals(128, images.get("light_img_a").depth());
         assertEquals(128, images.get("light_img_b").depth());
+    }
+
+    @Test
+    void resolvesPinnedPhotonLpvComputeProgramsAndTheir3dImages() throws IOException {
+        String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
+        Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),
+                "Pinned Photon checkout is supplied by CI");
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("photon", "Photon",
+                Path.of(photonDirectory), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        Map<String, String> defines = Map.of("COLORED_LIGHTS", "1", "VOXEL_VOLUME_SIZE", "128");
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(
+                    model, "minecraft:overworld", defines);
+            assertTrue(plan.orderedProgramNames().contains("setup"), plan.orderedProgramNames().toString());
+            assertTrue(plan.orderedProgramNames().contains("shadowcomp"), plan.orderedProgramNames().toString());
+            assertTrue(plan.passes().stream().filter(pass ->
+                    pass.pass().name().equals("setup") || pass.pass().name().equals("shadowcomp"))
+                    .allMatch(pass -> pass.pass().compute()));
+
+            Map<String, IrisImageResources.ImageSpec> images =
+                    IrisImageResources.parse(sources.read("shaders.properties"), defines);
+            assertEquals(4, images.size(), images.keySet().toString());
+            assertEquals(48, images.get("light_data_img").width());
+            assertEquals(2, images.get("light_data_img").height());
+            assertEquals(128, images.get("voxel_img").depth());
+            assertEquals(128, images.get("light_img_a").depth());
+            assertEquals(128, images.get("light_img_b").depth());
+
+            GlslPreprocessor preprocessor = new GlslPreprocessor();
+            String setup = preprocessor.preprocess("world0/setup.csh", sources::read).source();
+            String shadowcomp = preprocessor.preprocess("world0/shadowcomp.csh", sources::read).source();
+            assertTrue(setup.contains("light_data_img"));
+            assertTrue(shadowcomp.contains("voxel_sampler"));
+            assertTrue(shadowcomp.contains("light_img_a"));
+            assertTrue(shadowcomp.contains("gl_GlobalInvocationID"));
+        }
     }
 
     @Test
