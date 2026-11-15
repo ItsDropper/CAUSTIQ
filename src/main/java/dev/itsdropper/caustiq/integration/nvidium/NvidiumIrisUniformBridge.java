@@ -8,7 +8,11 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL20C;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.BlockItemStateProperties;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -169,14 +173,20 @@ public final class NvidiumIrisUniformBridge {
             Object stack = player.getClass()
                     .getMethod("getItemInHand", InteractionHand.class)
                     .invoke(player, InteractionHand.MAIN_HAND);
-            if (stack == null) return 0;
-            Object item = stack.getClass().getMethod("getItem").invoke(stack);
+            if (!(stack instanceof ItemStack itemStack)) return 0;
+            Object item = itemStack.getItem();
             if (item == null) return 0;
             for (Method method : item.getClass().getMethods()) {
                 if (method.getName().equals("getLightEmission") && method.getParameterCount() == 2) {
-                    Object value = method.invoke(item, player, stack);
-                    return value instanceof Number number ? Math.max(0, number.intValue()) : 0;
+                    Object value = method.invoke(item, player, itemStack);
+                    if (value instanceof Number number) return Math.max(0, number.intValue());
                 }
+            }
+            if (item instanceof BlockItem blockItem) {
+                var state = blockItem.getBlock().defaultBlockState();
+                BlockItemStateProperties properties = itemStack.getComponents().get(DataComponents.BLOCK_STATE);
+                if (properties != null) state = properties.apply(state);
+                return state.getLightEmission();
             }
         } catch (ReflectiveOperationException | RuntimeException ignored) {
             // Without Iris' item-light provider, its documented default is no held-item light.

@@ -197,6 +197,7 @@ class NvidiumTerrainVaryingAdapterTest {
                 """;
         String fragment = """
                 #version 460
+                #extension GL_ARB_gpu_shader5 : require
                 struct Vertex {
                     uint hi;
                     uint lo;
