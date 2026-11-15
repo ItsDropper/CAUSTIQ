@@ -13,6 +13,8 @@ import java.util.Random;
 public final class NvidiumIrisTextureBridge {
     private static final int NOISE_SIZE = 512;
     private static int noiseTexture;
+    private static int fallbackDepthTexture;
+    private static int fallbackColorTexture;
     private static BindingState bindingState;
     private static IrisShaderResources customResources;
 
@@ -27,11 +29,23 @@ public final class NvidiumIrisTextureBridge {
         if (bindingState != null || customResources != null) restoreBindings();
         ensureTextures();
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
-        int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE5, GL13C.GL_TEXTURE6, GL13C.GL_TEXTURE7};
-        int[] textures = {noiseTexture,
-                NvidiumGBufferTargets.texture(1),
-                NvidiumGBufferTargets.texture(2),
-                NvidiumGBufferTargets.texture(4)};
+        int[] units = {
+                GL13C.GL_TEXTURE2,
+                GL13C.GL_TEXTURE5, GL13C.GL_TEXTURE6, GL13C.GL_TEXTURE7,
+                GL13C.GL_TEXTURE8, GL13C.GL_TEXTURE9, GL13C.GL_TEXTURE10, GL13C.GL_TEXTURE11,
+                GL13C.GL_TEXTURE12, GL13C.GL_TEXTURE13, GL13C.GL_TEXTURE14, GL13C.GL_TEXTURE15
+        };
+        int[] textures = {
+                noiseTexture,
+                NvidiumGBufferTargets.texture(1), NvidiumGBufferTargets.texture(2),
+                NvidiumGBufferTargets.texture(3), NvidiumGBufferTargets.texture(4),
+                NvidiumGBufferTargets.texture(5), NvidiumGBufferTargets.texture(6),
+                NvidiumGBufferTargets.texture(7),
+                shadowOrFallback(NvidiumShadowRenderer.shadowTexture()),
+                shadowOrFallback(NvidiumShadowRenderer.shadowTexture1()),
+                colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0)),
+                colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))
+        };
         int[] previousBindings = new int[units.length];
         for (int i = 0; i < units.length; i++) {
             GL13C.glActiveTexture(units[i]);
@@ -43,6 +57,14 @@ public final class NvidiumIrisTextureBridge {
         if (program != 0) {
             int noiseLocation = GL20C.glGetUniformLocation(program, "noisetex");
             if (noiseLocation >= 0) GL20C.glUniform1i(noiseLocation, 2);
+            int shadow0 = GL20C.glGetUniformLocation(program, "shadowtex0");
+            if (shadow0 >= 0) GL20C.glUniform1i(shadow0, 12);
+            int shadow1 = GL20C.glGetUniformLocation(program, "shadowtex1");
+            if (shadow1 >= 0) GL20C.glUniform1i(shadow1, 13);
+            int shadowColor0 = GL20C.glGetUniformLocation(program, "shadowcolor0");
+            if (shadowColor0 >= 0) GL20C.glUniform1i(shadowColor0, 14);
+            int shadowColor1 = GL20C.glGetUniformLocation(program, "shadowcolor1");
+            if (shadowColor1 >= 0) GL20C.glUniform1i(shadowColor1, 15);
         }
     }
 
@@ -51,9 +73,9 @@ public final class NvidiumIrisTextureBridge {
         if (bindingState != null || customResources != null) restoreBindings();
         ensureTextures();
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
-        int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE9, GL13C.GL_TEXTURE10};
-        int depth0 = NvidiumShadowRenderer.shadowTexture();
-        int depth1 = NvidiumShadowRenderer.shadowTexture1();
+        int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE12, GL13C.GL_TEXTURE13};
+        int depth0 = shadowOrFallback(NvidiumShadowRenderer.shadowTexture());
+        int depth1 = shadowOrFallback(NvidiumShadowRenderer.shadowTexture1());
         int[] textures = {noiseTexture, depth0, depth1};
         int[] previousBindings = new int[units.length];
         for (int i = 0; i < units.length; i++) {
@@ -67,9 +89,9 @@ public final class NvidiumIrisTextureBridge {
             int noise = GL20C.glGetUniformLocation(program, "noisetex");
             if (noise >= 0) GL20C.glUniform1i(noise, 2);
             int shadow0 = GL20C.glGetUniformLocation(program, "shadowtex0");
-            if (shadow0 >= 0) GL20C.glUniform1i(shadow0, 9);
+            if (shadow0 >= 0) GL20C.glUniform1i(shadow0, 12);
             int shadow1 = GL20C.glGetUniformLocation(program, "shadowtex1");
-            if (shadow1 >= 0) GL20C.glUniform1i(shadow1, 10);
+            if (shadow1 >= 0) GL20C.glUniform1i(shadow1, 13);
         }
     }
 
@@ -83,7 +105,7 @@ public final class NvidiumIrisTextureBridge {
     public static void bindCustomTextures(IrisShaderResources resources, int program) {
         if (customResources != null) customResources.restoreTerrainTextures();
         customResources = resources;
-        if (resources != null) resources.bindTerrainTextures(program, 8);
+        if (resources != null) resources.bindTerrainTextures(program, 16);
     }
 
     public static void restoreBindings() {
@@ -106,11 +128,47 @@ public final class NvidiumIrisTextureBridge {
     public static void destroy() {
         restoreBindings();
         if (noiseTexture != 0) GL11C.glDeleteTextures(noiseTexture);
+        if (fallbackDepthTexture != 0) GL11C.glDeleteTextures(fallbackDepthTexture);
+        if (fallbackColorTexture != 0) GL11C.glDeleteTextures(fallbackColorTexture);
         noiseTexture = 0;
+        fallbackDepthTexture = 0;
+        fallbackColorTexture = 0;
     }
 
     private static void ensureTextures() {
         if (noiseTexture == 0) noiseTexture = createNoiseTexture();
+        if (fallbackDepthTexture == 0) fallbackDepthTexture = createFallbackDepthTexture();
+        if (fallbackColorTexture == 0) {
+            ByteBuffer white = ByteBuffer.allocateDirect(4);
+            white.put((byte) 255).put((byte) 255).put((byte) 255).put((byte) 255).flip();
+            fallbackColorTexture = createTexture(1, 1, white);
+        }
+    }
+
+    private static int shadowOrFallback(int texture) {
+        return texture == 0 ? fallbackDepthTexture : texture;
+    }
+
+    private static int colorOrFallback(int texture) {
+        return texture == 0 ? fallbackColorTexture : texture;
+    }
+
+    private static int createFallbackDepthTexture() {
+        int activeTexture = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
+        int previousBinding = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
+        ByteBuffer depth = ByteBuffer.allocateDirect(Float.BYTES).order(java.nio.ByteOrder.nativeOrder());
+        depth.putFloat(1.0f).flip();
+        int texture = GL11C.glGenTextures();
+        GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_NEAREST);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_NEAREST);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, 0x812F);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, 0x812F);
+        GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_DEPTH_COMPONENT32F,
+                1, 1, 0, GL11C.GL_DEPTH_COMPONENT, GL11C.GL_FLOAT, depth);
+        GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousBinding);
+        GL13C.glActiveTexture(activeTexture);
+        return texture;
     }
 
     private static int createNoiseTexture() {
