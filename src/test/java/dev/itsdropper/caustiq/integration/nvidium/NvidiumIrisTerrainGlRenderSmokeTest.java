@@ -79,7 +79,7 @@ class NvidiumIrisTerrainGlRenderSmokeTest {
 
                 framebuffer = GL30C.glGenFramebuffers();
                 GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, framebuffer);
-                GL30C.glGenTextures(textures);
+                GL11C.glGenTextures(textures);
                 for (int index = 0; index < textures.length; index++) {
                     GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, textures[index]);
                     GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_NEAREST);
