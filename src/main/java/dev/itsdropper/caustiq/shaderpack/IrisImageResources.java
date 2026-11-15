@@ -9,6 +9,8 @@ import org.lwjgl.opengl.GL42C;
 import org.lwjgl.opengl.GL44C;
 
 import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
+import org.lwjgl.system.MemoryStack;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -104,9 +106,22 @@ final class IrisImageResources implements AutoCloseable {
     void clear(String name) {
         Image image = images.get(name);
         if (image != null) {
-            GL44C.glClearTexImage(image.texture, 0, image.externalFormat,
-                    GL11C.GL_UNSIGNED_BYTE, ByteBuffer.allocateDirect(16));
-        GL42C.glMemoryBarrier(GL42C.GL_TEXTURE_UPDATE_BARRIER_BIT | GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+            clearTexture(image.texture, image.internalFormat, image.externalFormat);
+            GL42C.glMemoryBarrier(GL42C.GL_TEXTURE_UPDATE_BARRIER_BIT | GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        }
+    }
+
+    private static void clearTexture(int texture, int internalFormat, int externalFormat) {
+        if (internalFormat == GL30C.GL_R8UI || internalFormat == GL11C.GL_RGBA8) {
+            GL44C.glClearTexImage(texture, 0, externalFormat, GL11C.GL_UNSIGNED_BYTE,
+                    ByteBuffer.allocateDirect(16));
+            return;
+        }
+        int components = externalFormat == GL11C.GL_RGBA || externalFormat == GL30C.GL_RGBA_INTEGER ? 4
+                : externalFormat == GL30C.GL_RG || externalFormat == GL30C.GL_RG_INTEGER ? 2 : 1;
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            FloatBuffer zero = stack.callocFloat(components);
+            GL44C.glClearTexImage(texture, 0, externalFormat, GL11C.GL_FLOAT, zero);
         }
     }
 
@@ -354,7 +369,7 @@ final class IrisImageResources implements AutoCloseable {
         }
         GL11C.glBindTexture(target, previousBinding);
         GL13C.glActiveTexture(previousActive);
-        GL44C.glClearTexImage(texture, 0, spec.externalFormat, GL11C.GL_UNSIGNED_BYTE, ByteBuffer.allocateDirect(16));
+        clearTexture(texture, spec.internalFormat, spec.externalFormat);
         return new Image(name, spec.sampler, texture, target, spec.internalFormat, spec.externalFormat,
                 spec.width, spec.height, spec.depth);
     }
