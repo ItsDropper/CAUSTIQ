@@ -816,9 +816,9 @@ public final class NvidiumIrisUniformBridge {
                     snapshot.cameraZ() - values.get("eyePosition.z"));
             putVector3(values, "playerLookVector", entityVector(cameraEntity, "getViewVector", 0.0f, 0.0f, -1.0f));
             putVector3(values, "playerBodyVector", entityVector(cameraEntity, "getForward", 0.0f, 0.0f, -1.0f));
-            Object vehicle = invokeObject(player, "getVehicle");
-            putVector3(values, "vehicleLookVector", entityVector(vehicle, "getForward", 0.0f, 0.0f, -1.0f));
-            double[] vehiclePosition = entityPosition(vehicle);
+            Object playerVehicle = invokeObject(player, "getVehicle");
+            putVector3(values, "vehicleLookVector", entityVector(playerVehicle, "getForward", 0.0f, 0.0f, -1.0f));
+            double[] vehiclePosition = entityPosition(playerVehicle);
             putVector3(values, "relativeVehiclePosition",
                     snapshot.cameraX() - vehiclePosition[0],
                     snapshot.cameraY() - vehiclePosition[1],
