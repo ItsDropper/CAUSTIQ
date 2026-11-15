@@ -1,5 +1,6 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
+import dev.itsdropper.caustiq.shaderpack.IrisGlslConditionalPreprocessor;
 import dev.itsdropper.caustiq.shaderpack.IrisShaderPackModel;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackProgramCatalog;
 
