@@ -77,7 +77,7 @@ class IrisShaderPackParserTest {
                     issue.contains("multi-render-target allocation and pass routing are not implemented")),
                     model.diagnostics().toString());
             assertTrue(model.diagnostics().stream().anyMatch(issue ->
-                    issue.contains("colortex0-colortex7") && issue.contains("colortex8Format")),
+                    issue.contains("colortex0-colortex7") && issue.contains("8Format=RGBA16F")),
                     model.diagnostics().toString());
             IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
             assertEquals(java.util.Set.of(1), plan.passes().get(0).pass().writes());
