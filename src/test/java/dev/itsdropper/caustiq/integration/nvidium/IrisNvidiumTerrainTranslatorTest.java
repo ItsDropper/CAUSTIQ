@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -88,7 +89,7 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
-    void translatesEveryPinnedPhotonDimensionAndHonorsPackFeatureOptionsWhenCiProvidesItsSource() throws Exception {
+    void translatesEveryPinnedPhotonDimensionAgainstTheActualPinnedNvidiumShaderStages() throws Exception {
         String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
         Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),
                 "Photon source checkout is supplied by CI only");
@@ -100,8 +101,8 @@ class IrisNvidiumTerrainTranslatorTest {
             for (String dimension : List.of("world0", "world-1", "world1")) {
                 IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
                         model, dimension, "gbuffers_terrain",
-                        Map.of("NORMAL_MAPPING", "1", "SPECULAR_MAPPING", "1"));
-                Map<String, String> translated = translator.adapt(nativeStages());
+                        Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false"));
+                Map<String, String> translated = translator.adapt(pinnedNvidiumStages());
                 assertTrue(translated.get("MESH").contains("void caustiqIrisVertexMain()"),
                         dimension + " vertex program was not translated");
                 assertTrue(translated.get("FRAGMENT").contains("void caustiqIrisFragmentMain()"),
@@ -190,6 +191,43 @@ class IrisNvidiumTerrainTranslatorTest {
                 Map.of(), Map.of("shaders/gbuffers_terrain.vsh", vertex,
                         "shaders/gbuffers_terrain.fsh", fragment), List.of());
         return IrisNvidiumTerrainTranslator.from(model);
+    }
+
+    @Test
+    void nativeVertexAbiAdapterAndIrisTranslatorComposeAgainstPinnedNvidiumSources() throws Exception {
+        Map<String, String> extended = NvidiumTerrainVaryingAdapter.adapt(pinnedNvidiumStages());
+        assertTrue(extended.get("MESH").contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4"));
+        assertTrue(extended.get("MESH").contains("OUT[id].v_tbn = caustiqDecodeTbn(V);"));
+        assertTrue(extended.get("FRAGMENT").contains("caustiqGBufferLightmap"));
+
+        String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
+        Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),
+                "Photon source checkout is supplied by CI only");
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("photon", "Photon",
+                Path.of(photonDirectory), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
+                    model, "world0", "gbuffers_terrain",
+                    Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false"));
+            Map<String, String> combined = translator.adapt(extended);
+            assertTrue(combined.get("MESH").contains("caustiqIrisVertexMain"));
+            assertTrue(combined.get("FRAGMENT").contains("caustiqIrisFragmentMain"));
+            assertTrue(combined.get("MESH").contains("gl_MeshVerticesNV[id].gl_Position = caustiqIrisClipPosition;"));
+            assertTrue(combined.get("FRAGMENT").contains("caustiqIrisOutput1 = caustiqIrisFragData[1];"));
+        }
+    }
+
+    private static Map<String, String> pinnedNvidiumStages() throws Exception {
+        String root = System.getenv("NVIDIUM_SOURCE_DIR");
+        Assumptions.assumeTrue(root != null && !root.isBlank(),
+                "Pinned Nvidium source checkout is supplied by CI only");
+        Path shaders = Path.of(root, "src/main/resources/assets/nvidium/shaders/terrain");
+        return Map.of(
+                "TASK", Files.readString(shaders.resolve("task.glsl")),
+                "MESH", Files.readString(shaders.resolve("mesh.glsl")),
+                "FRAGMENT", Files.readString(shaders.resolve("frag.frag")));
     }
 
     private static Map<String, String> nativeStages() {

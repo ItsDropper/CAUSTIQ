@@ -56,7 +56,7 @@ jobs:
           set -o pipefail
           ./gradlew build --stacktrace --info 2>&1 | tee build.log
 
-      - name: Verify Photon terrain audit executed (not skipped)
+      - name: Verify pinned Photon and Nvidium integration tests executed (not skipped)
         shell: bash
         run: |
           set -euo pipefail
@@ -64,7 +64,7 @@ jobs:
           import glob
           import xml.etree.ElementTree as ET
 
-          test_name = "auditsThePinnedRealPhotonTerrainProgramWhenCiProvidesItsSource"
+          test_name = "translatesEveryPinnedPhotonDimensionAgainstTheActualPinnedNvidiumShaderStages"
           matches = []
           for report in glob.glob("build/test-results/test/TEST-*.xml"):
               root = ET.parse(report).getroot()
@@ -76,7 +76,16 @@ jobs:
               raise SystemExit("Photon terrain audit was skipped instead of running against the pinned source.")
           if matches[0].find("failure") is not None or matches[0].find("error") is not None:
               raise SystemExit("Photon terrain audit failed.")
-          print("Verified the pinned Photon terrain compatibility audit executed successfully.")
+          combined_test = "nativeVertexAbiAdapterAndIrisTranslatorComposeAgainstPinnedNvidiumSources"
+          combined_matches = []
+          for report in glob.glob("build/test-results/test/TEST-*.xml"):
+              root = ET.parse(report).getroot()
+              combined_matches.extend(case for case in root.iter("testcase") if case.attrib.get("name", "").split("(")[0] == combined_test)
+          if len(combined_matches) != 1 or combined_matches[0].find("skipped") is not None:
+              raise SystemExit("Pinned Nvidium + Photon combined-source integration test did not execute.")
+          if combined_matches[0].find("failure") is not None or combined_matches[0].find("error") is not None:
+              raise SystemExit("Pinned Nvidium + Photon combined-source integration test failed.")
+          print("Verified pinned-source integration tests executed successfully.")
           PY
 
       - name: Validate bundled GLSL
