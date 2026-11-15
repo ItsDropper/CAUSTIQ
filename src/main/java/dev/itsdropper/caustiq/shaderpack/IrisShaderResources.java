@@ -60,6 +60,30 @@ public final class IrisShaderResources implements AutoCloseable {
         return new IrisShaderResources(Map.of(), Map.of(), Map.of(), Map.of(), IrisImageResources.empty());
     }
 
+    /** Loads only custom uniform/variable expressions, without decoding pack textures. */
+    public static IrisShaderResources loadExpressions(Map<String, String> properties,
+                                                       Map<String, String> defines) {
+        Map<String, TypedExpression> uniforms = new LinkedHashMap<>();
+        Map<String, TypedExpression> variables = new LinkedHashMap<>();
+        for (Map.Entry<String, String> property : properties.entrySet()) {
+            Matcher expression = EXPRESSION.matcher(property.getKey());
+            if (!expression.matches()) {
+                if (ANY_EXPRESSION.matcher(property.getKey()).matches()) {
+                    throw new IllegalArgumentException(
+                            "Unsupported Iris custom uniform/variable declaration: " + property.getKey());
+                }
+                continue;
+            }
+            String kind = expression.group(1);
+            String type = expression.group(2);
+            String name = expression.group(3);
+            TypedExpression parsed = new TypedExpression(type, property.getValue().trim());
+            (kind.equals("uniform") ? uniforms : variables).put(name, parsed);
+        }
+        return new IrisShaderResources(Map.of(), uniforms, variables,
+                numericOptionDefines(defines == null ? Map.of() : defines), IrisImageResources.empty());
+    }
+
     public static IrisShaderResources load(Map<String, String> properties, ShaderPackSources sources)
             throws IOException {
         return load(properties, sources, Map.of());
