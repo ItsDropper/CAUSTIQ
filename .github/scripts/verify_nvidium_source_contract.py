@@ -162,7 +162,10 @@ assert "injectedDefines.append(\"#define \" )" not in translator
 assert "CAUSTIQ_NVIDIUM_UNIFORM_ABI" in translator
 assert 'Map.entry("noisetex", "caustiqNoiseTexture")' in translator
 assert "layout(binding = 2) uniform sampler2D caustiqNoiseTexture;" in translator
-assert "NvidiumIrisTextureBridge.bindForTerrain()" in uniform_bridge
+assert "NvidiumIrisTextureBridge.bindForTerrain(program)" in uniform_bridge
+assert "NvidiumIrisTextureBridge.bindForShadow(program)" in uniform_bridge
+assert "bindTerrainCustomTextures(program, firstCustomTextureUnit)" in uniform_bridge
+assert "resources.bindTerrainTextures(program, firstTextureUnit, 12)" in texture_bridge
 assert 'Map.entry("isElytraFlying", "caustiqIsElytraFlying")' in translator
 assert 'Map.entry("isEyeInWater", "caustiqIsEyeInWater")' in translator
 assert "uniform int caustiqIsEyeInWater;" in translator
