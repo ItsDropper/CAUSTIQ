@@ -28,13 +28,19 @@ public final class NvidiumIrisVertexContext {
     private static BlockData createData(BlockState state, BlockPos position, boolean fluid) {
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(position, "position");
-        String key = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
-        Map<String, Integer> mappings = BLOCK_IDS.get();
-        int blockId = mappings.isEmpty()
-                ? BuiltInRegistries.BLOCK.getId(state.getBlock())
-                : mappings.getOrDefault(stateKey(state, key), mappings.getOrDefault(key, -1));
+        int blockId = blockIdForState(state);
         return new BlockData(blockId, fluid ? 1 : 0, state.getLightEmission(),
                 position.getX() & 15, position.getY() & 15, position.getZ() & 15);
+    }
+
+    /** Resolves a block's active shader-pack ID using the same mapping as terrain vertices. */
+    public static int blockIdForState(BlockState state) {
+        Objects.requireNonNull(state, "state");
+        String key = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+        Map<String, Integer> mappings = BLOCK_IDS.get();
+        return mappings.isEmpty()
+                ? BuiltInRegistries.BLOCK.getId(state.getBlock())
+                : mappings.getOrDefault(stateKey(state, key), mappings.getOrDefault(key, -1));
     }
 
     /** Replaces registry fallback IDs with the selected pack's block.properties IDs. */
