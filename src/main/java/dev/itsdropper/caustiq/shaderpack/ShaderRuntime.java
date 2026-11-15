@@ -196,7 +196,7 @@ public final class ShaderRuntime {
 
         Minecraft minecraft = Minecraft.getInstance();
         String dimensionId = minecraft.level == null
-                ? "" : minecraft.level.dimension().location().toString();
+                ? "" : minecraft.level.dimension().identifier().toString();
         String directory = dimensionId.isEmpty() ? ""
                 : preparedDimensionMappings.getOrDefault(
                         dimensionId, builtInDimensionDirectory(dimensionId));
@@ -373,7 +373,7 @@ public final class ShaderRuntime {
             IrisShaderPackModel packModel = selected.id().equals(preparedPackId) && preparedPackModel != null
                     ? preparedPackModel : new IrisShaderPackParser().parse(sources);
             String currentDimension = Minecraft.getInstance().level == null ? null
-                    : Minecraft.getInstance().level.dimension().location().toString();
+                    : Minecraft.getInstance().level.dimension().identifier().toString();
             activePassPlan = new IrisTerrainPassScheduler().schedule(packModel, currentDimension);
             NvidiumGBufferTargets.configureTargets(activePassPlan.targets());
             CaustiqClient.LOGGER.info(
