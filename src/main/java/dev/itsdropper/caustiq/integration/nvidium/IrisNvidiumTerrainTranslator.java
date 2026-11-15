@@ -50,6 +50,7 @@ public final class IrisNvidiumTerrainTranslator {
             "Position", "UV0", "UV2", "Color", "Normal");
     private static final Map<String, String> UNIFORM_ALIASES = Map.ofEntries(
             Map.entry("gtexture", "tex_diffuse"),
+            Map.entry("tex", "tex_diffuse"),
             Map.entry("lightmap", "tex_light"),
             Map.entry("gbufferModelView", "caustiqModelView"),
             Map.entry("gbufferModelViewInverse", "caustiqModelViewInverse"),
