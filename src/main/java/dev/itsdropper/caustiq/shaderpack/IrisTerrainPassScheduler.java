@@ -55,7 +55,8 @@ public final class IrisTerrainPassScheduler {
             collectTargets(vertex, reads);
             collectTargets(fragment, reads);
             collectTargets(compute, reads);
-            collectOutputs(fragment, writes);
+            Map<Integer, Integer> outputTargets = collectOutputs(fragment);
+            writes.addAll(outputTargets.values());
             if (program.hasCompute()) writes.addAll(parseImageBindings(compute));
 
             for (int target : writes) {
@@ -63,7 +64,7 @@ public final class IrisTerrainPassScheduler {
                     targets.put(target, RenderTarget.defaultTarget(target));
                 }
             }
-            passes.add(new Pass(program.name(), group, program.stages(), reads, writes,
+            passes.add(new Pass(program.name(), group, program.stages(), reads, writes, outputTargets,
                     program.hasCompute(), program.hasGeometryOrTessellation()));
         }
 
@@ -116,7 +117,7 @@ public final class IrisTerrainPassScheduler {
      * and legacy DRAWBUFFERS comments describe the mapping; layout(location) and
      * gl_FragData indices are only output slots, not colortex indices themselves.
      */
-    private static void collectOutputs(String source, Set<Integer> targets) {
+    private static Map<Integer, Integer> collectOutputs(String source) {
         Set<Integer> outputSlots = new LinkedHashSet<>();
         Matcher locations = OUTPUT_LOCATION.matcher(source);
         while (locations.find()) outputSlots.add(Integer.parseInt(locations.group(1)));
@@ -125,22 +126,25 @@ public final class IrisTerrainPassScheduler {
         Matcher legacy = FRAG_DATA.matcher(source);
         while (legacy.find()) outputSlots.add(Integer.parseInt(legacy.group(1)));
         if (outputSlots.isEmpty()) {
-            if (!source.isBlank()) targets.add(0);
-            return;
+            return source.isBlank() ? Map.of() : Map.of(0, 0);
         }
 
         List<Integer> targetMapping = parseOutputTargetMapping(source);
+        Map<Integer, Integer> result = new LinkedHashMap<>();
         for (int outputSlot : outputSlots) {
+            int target;
             if (targetMapping == null) {
-                targets.add(outputSlot);
+                target = outputSlot;
             } else {
                 if (outputSlot >= targetMapping.size()) {
                     throw new IllegalArgumentException("Fragment output slot " + outputSlot
                             + " has no entry in its Iris RENDERTARGETS/DRAWBUFFERS directive.");
                 }
-                targets.add(targetMapping.get(outputSlot));
+                target = targetMapping.get(outputSlot);
             }
+            result.put(outputSlot, target);
         }
+        return Map.copyOf(result);
     }
 
     private static List<Integer> parseOutputTargetMapping(String source) {
@@ -269,11 +273,28 @@ public final class IrisTerrainPassScheduler {
             String name, ShaderPackProgramCatalog.Group group,
             Map<ShaderPackProgramCatalog.Stage, String> stages,
             Set<Integer> reads, Set<Integer> writes,
+            Map<Integer, Integer> outputTargets,
             boolean compute, boolean geometryOrTessellation) {
         public Pass {
             stages = Map.copyOf(stages);
             reads = Set.copyOf(reads);
             writes = Set.copyOf(writes);
+            outputTargets = Map.copyOf(outputTargets);
+        }
+
+        /** Compatibility constructor for synthetic passes with identity output routing. */
+        public Pass(String name, ShaderPackProgramCatalog.Group group,
+                    Map<ShaderPackProgramCatalog.Stage, String> stages,
+                    Set<Integer> reads, Set<Integer> writes,
+                    boolean compute, boolean geometryOrTessellation) {
+            this(name, group, stages, reads, writes, identityOutputTargets(writes),
+                    compute, geometryOrTessellation);
+        }
+
+        private static Map<Integer, Integer> identityOutputTargets(Set<Integer> writes) {
+            Map<Integer, Integer> result = new LinkedHashMap<>();
+            for (int target : writes) result.put(target, target);
+            return Map.copyOf(result);
         }
     }
 
