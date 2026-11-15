@@ -13,6 +13,25 @@ public final class IrisExpression {
 
     private IrisExpression() { }
 
+    public static java.util.Set<String> identifiers(String source) {
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
+                "(?<![A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]*(?:\\[[0-9]+\\])?(?:\\.[A-Za-z0-9_]+)*)")
+                .matcher(source == null ? "" : source);
+        java.util.Set<String> identifiers = new java.util.LinkedHashSet<>();
+        while (matcher.find()) {
+            String identifier = matcher.group(1);
+            int next = matcher.end();
+            String expression = source == null ? "" : source;
+            while (next < expression.length() && Character.isWhitespace(expression.charAt(next))) next++;
+            if (next < expression.length() && expression.charAt(next) == '(') continue;
+            if (identifier.equalsIgnoreCase("true") || identifier.equalsIgnoreCase("false")
+                    || identifier.equalsIgnoreCase("pi") || identifier.equalsIgnoreCase("tau")
+                    || identifier.equalsIgnoreCase("e")) continue;
+            identifiers.add(identifier);
+        }
+        return java.util.Set.copyOf(identifiers);
+    }
+
     public static double evaluate(String source, Function<String, Double> variables) {
         Parser parser = new Parser(source, variables);
         double value = parser.conditional();
@@ -118,6 +137,7 @@ public final class IrisExpression {
             if (normalized.equals("false")) return 0.0;
             if (normalized.equals("pi")) return Math.PI;
             if (normalized.equals("tau")) return Math.PI * 2.0;
+            if (normalized.equals("e")) return Math.E;
             if (take("(")) {
                 int functionOffset = cursor;
                 java.util.ArrayList<Double> args = new java.util.ArrayList<>();
