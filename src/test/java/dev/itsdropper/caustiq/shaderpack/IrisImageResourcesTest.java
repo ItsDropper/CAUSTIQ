@@ -62,7 +62,9 @@ class IrisImageResourcesTest {
         ShaderPackDescriptor descriptor = new ShaderPackDescriptor("photon", "Photon",
                 Path.of(photonDirectory), "", ShaderPackSourceType.DIRECTORY,
                 ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
-        Map<String, String> defines = Map.of("COLORED_LIGHTS", "1", "VOXEL_VOLUME_SIZE", "128", "SHADOW", "1");
+        Map<String, String> defines = Map.of(
+                "COLORED_LIGHTS", "1", "VOXEL_VOLUME_SIZE", "128",
+                "SHADOW", "1", "MC_VERSION", "12111", "MC_HAND_DEPTH", "0.125");
         try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
             IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(
@@ -93,9 +95,13 @@ class IrisImageResourcesTest {
             GlslPreprocessor preprocessor = new GlslPreprocessor();
             String setup = preprocessor.preprocess("world0/setup.csh", sources::read).source();
             String shadowcomp = preprocessor.preprocess("world0/shadowcomp.csh", sources::read).source();
-            assertTrue(setup.contains("light_data_img"));
-            assertTrue(shadowcomp.contains("voxel_sampler"));
-            assertTrue(shadowcomp.contains("light_img_a"));
+            assertTrue(setup.contains("writeonly uniform image2D light_data_img"));
+            assertTrue(shadowcomp.contains("writeonly uniform image3D light_img_a"));
+            assertTrue(shadowcomp.contains("writeonly uniform image3D light_img_b"));
+            assertTrue(shadowcomp.contains("uniform sampler3D light_sampler_a"));
+            assertTrue(shadowcomp.contains("uniform sampler3D light_sampler_b"));
+            assertTrue(shadowcomp.contains("uniform usampler3D voxel_sampler"));
+            assertTrue(shadowcomp.contains("uniform sampler2D light_data_sampler"));
 
             assertArrayEquals(new int[]{1, 1, 1},
                     IrisImageResources.calculateDispatchGroups(images, Set.of("light_data_img"),
@@ -107,12 +113,14 @@ class IrisImageResourcesTest {
 
             String shadowVertex = preprocessor.preprocess(
                     "world0/shadow.vsh", sources::read).source();
-            assertTrue(shadowVertex.contains("voxel_img"), "Photon shadow vertex pass must declare voxel_img");
+            assertTrue(shadowVertex.contains("writeonly uniform uimage3D voxel_img"),
+                    "Photon shadow vertex pass must declare the write-only voxel image");
             assertTrue(shadowVertex.contains("update_voxel_map"), "Photon shadow vertex pass must update its voxel map");
             assertTrue(shadowVertex.contains("imageStore"), "Photon shadow vertex pass must write its voxel image");
 
             Map<String, String> computeDefines = Map.of(
-                    "COLORED_LIGHTS", "1", "VOXEL_VOLUME_SIZE", "128");
+                    "COLORED_LIGHTS", "1", "VOXEL_VOLUME_SIZE", "128",
+                    "MC_VERSION", "12111", "MC_HAND_DEPTH", "0.125");
             compilePhotonCompute("setup", setup, computeDefines);
             compilePhotonCompute("shadowcomp", shadowcomp, computeDefines);
         }
