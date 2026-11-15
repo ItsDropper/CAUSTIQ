@@ -17,10 +17,11 @@ class IrisGlProgramCompilerTest {
     }
 
     @Test
-    void runtimeHandDepthDefineOverridesPackProvidedValue() {
-        Set<String> defines = IrisGlProgramCompiler.runtimeDefines(Set.of("MC_HAND_DEPTH=0.0"));
+    void preservesPackHandDepthDefineWithoutAddingAConflictingRuntimeDefault() {
+        Set<String> defines = IrisGlProgramCompiler.runtimeDefines(Set.of("MC_HAND_DEPTH=0.125"));
 
         assertEquals(1, defines.stream().filter(value -> value.startsWith("MC_HAND_DEPTH=")).count());
-        assertTrue(defines.contains("MC_HAND_DEPTH=1.0"));
+        assertTrue(defines.contains("MC_HAND_DEPTH=0.125"));
+        assertTrue(!defines.contains("MC_HAND_DEPTH=1.0"));
     }
 }
