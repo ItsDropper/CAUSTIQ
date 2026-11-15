@@ -285,11 +285,7 @@ public final class IrisNvidiumTerrainTranslator {
             int target = Integer.parseInt(token);
             boolean shadowProgram = programName.equalsIgnoreCase("shadow")
                     || programName.toLowerCase(java.util.Locale.ROOT).startsWith("shadow_");
-            if (shadowProgram && target != 0) {
-                throw new IllegalArgumentException("The isolated Nvidium shadow framebuffer currently exposes only shadowcolor0; got shadowcolor"
-                        + target + ".");
-            }
-            if (target < (shadowProgram ? 0 : 1) || target > 7) {
+            if (target < (shadowProgram ? 0 : 1) || target > (shadowProgram ? 6 : 7)) {
                 throw new IllegalArgumentException("Nvidium reserves colortex0 for its native forward color and supports terrain MRT outputs to colortex1 through colortex7; got colortex"
                         + target + ".");
             }

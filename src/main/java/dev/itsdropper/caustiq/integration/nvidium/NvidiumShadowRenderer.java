@@ -131,9 +131,12 @@ public final class NvidiumShadowRenderer {
     }
 
     /** Iris shadowcolor0 attachment written by the shadow terrain fragment program. */
-    public static int shadowColorTexture() {
+    public static int shadowColorTexture() { return shadowColorTexture(0); }
+
+    public static int shadowColorTexture(int index) {
         State state = activeState;
-        return state == null || !state.depthValid ? 0 : state.shadowColorTexture;
+        if (index < 0 || index >= 7) return 0;
+        return state == null || !state.depthValid ? 0 : state.shadowColorTextures[index];
     }
 
     /** Separate translucent shadow depth map (Iris shadowtex1). */
@@ -214,7 +217,10 @@ public final class NvidiumShadowRenderer {
                 GL11C.glClear(GL11C.GL_DEPTH_BUFFER_BIT);
                 try (MemoryStack stack = MemoryStack.stackPush()) {
                     FloatBuffer clearColor = stack.floats(1.0f, 1.0f, 1.0f, 1.0f);
-                    GL30C.glClearBufferfv(GL11C.GL_COLOR, 1, clearColor);
+                    for (int attachment = 1; attachment <= 7; attachment++) {
+                        clearColor.rewind();
+                        GL30C.glClearBufferfv(GL11C.GL_COLOR, attachment, clearColor);
+                    }
                 }
             }
 
@@ -432,7 +438,7 @@ public final class NvidiumShadowRenderer {
         private final int maxRegions;
         private final boolean compiledForFog;
         private final int depthTexture;
-        private final int shadowColorTexture;
+        private final int[] shadowColorTextures;
         private final int framebuffer;
         private final int translucentDepthTexture;
         private final int translucentFramebuffer;
@@ -469,8 +475,8 @@ public final class NvidiumShadowRenderer {
 
             int[] targets = createDepthTarget(DEFAULT_RESOLUTION);
             this.depthTexture = targets[0];
-            this.shadowColorTexture = targets[1];
-            this.framebuffer = targets[2];
+            this.shadowColorTextures = java.util.Arrays.copyOfRange(targets, 1, 8);
+            this.framebuffer = targets[8];
             int[] translucentTargets = createDepthOnlyTarget(DEFAULT_RESOLUTION);
             this.translucentDepthTexture = translucentTargets[0];
             this.translucentFramebuffer = translucentTargets[1];
@@ -525,10 +531,12 @@ public final class NvidiumShadowRenderer {
             GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_DEPTH_COMPONENT32F,
                     requested, requested, 0, GL11C.GL_DEPTH_COMPONENT, GL11C.GL_FLOAT,
                     (ByteBuffer) null);
-            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, shadowColorTexture);
-            GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_RGBA16F,
-                    requested, requested, 0, GL11C.GL_RGBA, GL11C.GL_FLOAT,
-                    (ByteBuffer) null);
+            for (int colorTexture : shadowColorTextures) {
+                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, colorTexture);
+                GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_RGBA16F,
+                        requested, requested, 0, GL11C.GL_RGBA, GL11C.GL_FLOAT,
+                        (ByteBuffer) null);
+            }
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, translucentDepthTexture);
             GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_DEPTH_COMPONENT32F,
                     requested, requested, 0, GL11C.GL_DEPTH_COMPONENT, GL11C.GL_FLOAT,
@@ -543,7 +551,7 @@ public final class NvidiumShadowRenderer {
 
         private void bindDepthTarget() {
             GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, framebuffer);
-            GL20C.glDrawBuffers(new int[]{GL11C.GL_NONE, GL30C.GL_COLOR_ATTACHMENT1});
+            GL20C.glDrawBuffers(shadowDrawBuffers());
         }
 
         private void clearTranslucentDepth() {
@@ -799,9 +807,11 @@ public final class NvidiumShadowRenderer {
                 GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, framebuffer);
                 GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
                         GL11C.GL_TEXTURE_2D, depthTexture, 0);
-                GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_COLOR_ATTACHMENT1,
-                        GL11C.GL_TEXTURE_2D, shadowColorTexture, 0);
-                GL20C.glDrawBuffers(new int[]{GL11C.GL_NONE, GL30C.GL_COLOR_ATTACHMENT1});
+                for (int i = 0; i < shadowColorTextures.length; i++) {
+                    GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_COLOR_ATTACHMENT1 + i,
+                            GL11C.GL_TEXTURE_2D, shadowColorTextures[i], 0);
+                }
+                GL20C.glDrawBuffers(shadowDrawBuffers());
                 GL11C.glReadBuffer(GL11C.GL_NONE);
                 int status = GL30C.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER);
                 if (status != GL30C.GL_FRAMEBUFFER_COMPLETE) {
@@ -828,7 +838,7 @@ public final class NvidiumShadowRenderer {
             GL30C.glDeleteFramebuffers(framebuffer);
             GL30C.glDeleteFramebuffers(translucentFramebuffer);
             GL11C.glDeleteTextures(depthTexture);
-            GL11C.glDeleteTextures(shadowColorTexture);
+            for (int colorTexture : shadowColorTextures) GL11C.glDeleteTextures(colorTexture);
             GL11C.glDeleteTextures(translucentDepthTexture);
             depthValid = false;
         }
@@ -873,43 +883,40 @@ public final class NvidiumShadowRenderer {
         return new int[]{texture, framebuffer};
     }
 
+    private static int[] shadowDrawBuffers() {
+        int[] buffers = new int[8];
+        buffers[0] = GL11C.GL_NONE;
+        for (int i = 1; i < buffers.length; i++) buffers[i] = GL30C.GL_COLOR_ATTACHMENT0 + i;
+        return buffers;
+    }
+
     private static int[] createDepthTarget(int resolution) {
         int previousActiveTexture = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
         int previousTexture = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
         int previousDrawFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
         int previousReadFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
-        int texture = GL11C.glGenTextures();
-        GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
-        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_LINEAR);
-        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_LINEAR);
-        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, 0x812D);
-        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, 0x812D);
-        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL12C.GL_TEXTURE_BASE_LEVEL, 0);
-        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL12C.GL_TEXTURE_MAX_LEVEL, 0);
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            FloatBuffer border = stack.floats(1.0f, 1.0f, 1.0f, 1.0f);
-            GL11C.glTexParameterfv(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_BORDER_COLOR, border);
-        }
+        int depth = GL11C.glGenTextures();
+        GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, depth);
+        configureShadowTexture();
         GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_DEPTH_COMPONENT32F,
-                resolution, resolution, 0, GL11C.GL_DEPTH_COMPONENT, GL11C.GL_FLOAT,
-                (ByteBuffer) null);
-
-        int colorTexture = GL11C.glGenTextures();
-        GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, colorTexture);
-        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_LINEAR);
-        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_LINEAR);
-        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, 0x812D);
-        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, 0x812D);
-        GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_RGBA16F,
-                resolution, resolution, 0, GL11C.GL_RGBA, GL11C.GL_FLOAT, (ByteBuffer) null);
-
+                resolution, resolution, 0, GL11C.GL_DEPTH_COMPONENT, GL11C.GL_FLOAT, (ByteBuffer) null);
+        int[] colors = new int[7];
+        for (int i = 0; i < colors.length; i++) {
+            colors[i] = GL11C.glGenTextures();
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, colors[i]);
+            configureShadowTexture();
+            GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_RGBA16F,
+                    resolution, resolution, 0, GL11C.GL_RGBA, GL11C.GL_FLOAT, (ByteBuffer) null);
+        }
         int framebuffer = GL30C.glGenFramebuffers();
         GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, framebuffer);
         GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
-                GL11C.GL_TEXTURE_2D, texture, 0);
-        GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_COLOR_ATTACHMENT1,
-                GL11C.GL_TEXTURE_2D, colorTexture, 0);
-        GL20C.glDrawBuffers(new int[]{GL11C.GL_NONE, GL30C.GL_COLOR_ATTACHMENT1});
+                GL11C.GL_TEXTURE_2D, depth, 0);
+        for (int i = 0; i < colors.length; i++) {
+            GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_COLOR_ATTACHMENT1 + i,
+                    GL11C.GL_TEXTURE_2D, colors[i], 0);
+        }
+        GL20C.glDrawBuffers(shadowDrawBuffers());
         GL11C.glReadBuffer(GL11C.GL_NONE);
         int status = GL30C.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER);
         GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
@@ -918,12 +925,20 @@ public final class NvidiumShadowRenderer {
         GL13C.glActiveTexture(previousActiveTexture);
         if (status != GL30C.GL_FRAMEBUFFER_COMPLETE) {
             GL30C.glDeleteFramebuffers(framebuffer);
-            GL11C.glDeleteTextures(texture);
-            GL11C.glDeleteTextures(colorTexture);
-            throw new IllegalStateException("Could not create Nvidium shadow target: 0x"
-                    + Integer.toHexString(status));
+            GL11C.glDeleteTextures(depth);
+            for (int color : colors) GL11C.glDeleteTextures(color);
+            throw new IllegalStateException("Could not create Nvidium shadow target: 0x" + Integer.toHexString(status));
         }
-        return new int[]{texture, colorTexture, framebuffer};
+        return new int[]{depth, colors[0], colors[1], colors[2], colors[3], colors[4], colors[5], colors[6], framebuffer};
+    }
+
+    private static void configureShadowTexture() {
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_LINEAR);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_LINEAR);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, 0x812D);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, 0x812D);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL12C.GL_TEXTURE_BASE_LEVEL, 0);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL12C.GL_TEXTURE_MAX_LEVEL, 0);
     }
 
     private record GlState(
