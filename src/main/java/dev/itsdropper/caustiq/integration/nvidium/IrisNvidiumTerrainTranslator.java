@@ -701,14 +701,15 @@ public final class IrisNvidiumTerrainTranslator {
         translated = replaceIdentifier(translated, "at_midTexCoord", "caustiqDecodeMidUv(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "iris_Normal", "caustiqDecodeNormal(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "at_tangent", "caustiqDecodeTangent(caustiqCurrentVertex)");
-        translated = replaceIdentifier(translated, "vaPosition", "decodeVertexPosition(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "vaPosition", "(decodeVertexPosition(caustiqCurrentVertex) + origin)");
         translated = replaceIdentifier(translated, "vaUV0", "decodeVertexUV(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "vaUV2", "decodeLightUV(caustiqCurrentVertex) * 256.0");
-        translated = replaceIdentifier(translated, "vaColor", "decodeVertexColour(caustiqCurrentVertex)");
-        translated = replaceIdentifier(translated, "Position", "decodeVertexPosition(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "vaColor", "caustiqDecodeIrisColor(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "vaNormal", "caustiqDecodeNormal(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "Position", "(decodeVertexPosition(caustiqCurrentVertex) + origin)");
         translated = replaceIdentifier(translated, "UV0", "decodeVertexUV(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "UV2", "decodeLightUV(caustiqCurrentVertex) * 256.0");
-        translated = replaceIdentifier(translated, "Color", "decodeVertexColour(caustiqCurrentVertex)");
+        translated = replaceIdentifier(translated, "Color", "caustiqDecodeIrisColor(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "Normal", "caustiqDecodeNormal(caustiqCurrentVertex)");
         translated = translated.replaceAll("\\bftransform\\s*\\(\\s*\\)",
                 "(caustiqProjection * caustiqModelView * (transformMat * vec4(decodeVertexPosition(caustiqCurrentVertex) + origin, 1.0)))");
