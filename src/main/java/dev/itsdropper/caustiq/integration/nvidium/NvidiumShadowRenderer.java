@@ -720,9 +720,15 @@ public final class NvidiumShadowRenderer {
         }
 
         private int[] atlasSize() {
-            TextureAtlas atlas = (TextureAtlas) Minecraft.getInstance().getTextureManager()
-                    .getTexture(TextureAtlas.LOCATION_BLOCKS);
-            return new int[]{atlas.getWidth(), atlas.getHeight()};
+            try {
+                Object atlas = Minecraft.getInstance().getTextureManager()
+                        .getTexture(TextureAtlas.LOCATION_BLOCKS);
+                return new int[]{
+                        ((Number) readField(atlas, "width")).intValue(),
+                        ((Number) readField(atlas, "height")).intValue()};
+            } catch (ReflectiveOperationException | RuntimeException ignored) {
+                return new int[]{1024, 1024};
+            }
         }
 
         private int subTexelPrecisionBits() {
