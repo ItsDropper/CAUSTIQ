@@ -223,6 +223,8 @@ public final class ShaderRuntime {
                 CaustiqClient.LOGGER.warn(
                         "Shader pack '{}' has no gbuffers_terrain program that the current Nvidium ABI can translate.",
                         selected.displayName());
+                NvidiumShadowRenderer.configure(false, 2048, 128.0f);
+                NvidiumShaderProgramBridge.unregisterTerrainAdapter();
                 return;
             }
 
@@ -245,6 +247,7 @@ public final class ShaderRuntime {
             irisShaderResources.close();
             irisShaderResources = IrisShaderResources.empty();
             NvidiumShaderProgramBridge.unregisterTerrainAdapter();
+            NvidiumShadowRenderer.configure(false, 2048, 128.0f);
             preparedPackModel = null;
             preparedPackId = "";
             preparedTerrainTranslators = Map.of();
@@ -341,7 +344,10 @@ public final class ShaderRuntime {
     }
 
     private static void deactivateTerrainAdapter() {
-        if (!preparedTerrainAdapterRegistered) return;
+        if (!preparedTerrainAdapterRegistered) {
+            NvidiumShadowRenderer.configure(false, 2048, 128.0f);
+            return;
+        }
         NvidiumShaderProgramBridge.unregisterTerrainAdapter();
         NvidiumGBufferTargets.resetOutputRouting();
         NvidiumGBufferTargets.destroy();
