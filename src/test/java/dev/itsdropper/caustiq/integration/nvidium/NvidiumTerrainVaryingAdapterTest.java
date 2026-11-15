@@ -104,10 +104,8 @@ class NvidiumTerrainVaryingAdapterTest {
         String sodiumFormat = Files.readString(shaderRoot.resolve("vertex_format/sodium_vertex_format.glsl"));
         Map<String, String> sources = Map.of(
                 "TASK", Files.readString(shaderRoot.resolve("task.glsl")),
-                "MESH", (scene + "\\n" + sodiumFormat + "\\n" + vertexFormat + "\\n" + Files.readString(shaderRoot.resolve("mesh.glsl")))
-                        .replace("#version 460", "#version 460\n#define USE_SODIUM_VERTEX_FORMAT"),
-                "FRAGMENT", (scene + "\\n" + sodiumFormat + "\\n" + vertexFormat + "\\n" + Files.readString(shaderRoot.resolve("frag.frag")))
-                        .replace("#version 460", "#version 460\n#define USE_SODIUM_VERTEX_FORMAT"));
+                "MESH", "#define USE_SODIUM_VERTEX_FORMAT\n" + scene + "\n" + sodiumFormat + "\n" + vertexFormat + "\n" + Files.readString(shaderRoot.resolve("mesh.glsl")),
+                "FRAGMENT", "#define USE_SODIUM_VERTEX_FORMAT\n" + scene + "\n" + sodiumFormat + "\n" + vertexFormat + "\n" + Files.readString(shaderRoot.resolve("frag.frag")));
 
         Map<String, String> adapted = NvidiumTerrainVaryingAdapter.adapt(sources);
         assertTrue(adapted.get("MESH").contains("caustiqDecodeTangent(V)"));
