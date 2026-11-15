@@ -36,7 +36,7 @@ public final class IrisShaderPackParser {
             "RG8", "RG16F", "RG32F", "R8", "R16F", "R32F",
             "RGB10_A2", "R11F_G11F_B10F");
     private static final Pattern COLOR_TARGET_PROPERTY = Pattern.compile(
-            "^([0-9]+)(Format|Scale|ScaleX|ScaleY)$", Pattern.CASE_INSENSITIVE);
+            "^([0-9]+)(Format|Clear|ClearColor|Mipmap|Persistent|Scale|ScaleX|ScaleY|Nearest)$", Pattern.CASE_INSENSITIVE);
 
     public IrisShaderPackModel parse(ShaderPackSources sources) throws IOException {
         String propertiesSource = readText(sources, "shaders.properties");
