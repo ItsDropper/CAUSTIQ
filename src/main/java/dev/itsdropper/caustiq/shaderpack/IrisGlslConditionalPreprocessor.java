@@ -30,13 +30,14 @@ public final class IrisGlslConditionalPreprocessor {
                 .replace("\\" + "\n", " ")
                 .replace("\\" + "\r", " ");
         String[] lines = normalized.split("\\R", -1);
+        String[] directiveLines = maskComments(normalized).split("\\R", -1);
         StringBuilder output = new StringBuilder(source.length());
         Deque<Conditional> stack = new ArrayDeque<>();
         boolean active = true;
 
         for (int lineNumber = 0; lineNumber < lines.length; lineNumber++) {
             String line = lines[lineNumber];
-            Matcher directive = DIRECTIVE.matcher(line);
+            Matcher directive = DIRECTIVE.matcher(directiveLines[lineNumber]);
             if (!directive.matches()) {
                 if (active) output.append(line).append('\n');
                 continue;
@@ -96,6 +97,69 @@ public final class IrisGlslConditionalPreprocessor {
             throw new IllegalArgumentException("Unclosed GLSL conditional block in translated terrain stage.");
         }
         return output.toString();
+    }
+
+    /**
+     * GLSL directives inside comments are ordinary comment text. Mask comments
+     * before recognizing directives while preserving line breaks and source
+     * offsets; active non-directive lines are still emitted from the original
+     * source so comments remain intact in the resulting shader.
+     */
+    private static String maskComments(String source) {
+        char[] masked = source.toCharArray();
+        boolean blockComment = false;
+        boolean lineComment = false;
+        boolean quoted = false;
+        char quote = 0;
+        boolean escaped = false;
+
+        for (int index = 0; index < masked.length; index++) {
+            char current = source.charAt(index);
+            char next = index + 1 < source.length() ? source.charAt(index + 1) : '\\0';
+
+            if (lineComment) {
+                if (current == '\\n' || current == '\\r') {
+                    lineComment = false;
+                } else {
+                    masked[index] = ' ';
+                }
+                continue;
+            }
+            if (blockComment) {
+                if (current == '*' && next == '/') {
+                    masked[index] = ' ';
+                    masked[index + 1] = ' ';
+                    index++;
+                    blockComment = false;
+                } else if (current != '\\n' && current != '\\r') {
+                    masked[index] = ' ';
+                }
+                continue;
+            }
+            if (quoted) {
+                if (escaped) escaped = false;
+                else if (current == '\\\\') escaped = true;
+                else if (current == quote) quoted = false;
+                continue;
+            }
+            if (current == '"' || current == '\\'') {
+                quoted = true;
+                quote = current;
+                continue;
+            }
+            if (current == '/' && next == '*') {
+                masked[index] = ' ';
+                masked[index + 1] = ' ';
+                index++;
+                blockComment = true;
+            } else if (current == '/' && next == '/') {
+                masked[index] = ' ';
+                masked[index + 1] = ' ';
+                index++;
+                lineComment = true;
+            }
+        }
+        return new String(masked);
     }
 
     private static boolean evaluateCondition(
