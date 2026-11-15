@@ -114,6 +114,36 @@ public final class CaustiqCiShaderValidation {
         }
     }
 
+
+    private static boolean evaluateEnabled(String expression, Map<String, String> defines) {
+        String value = expression.trim();
+        while (value.startsWith("(") && value.endsWith(")")) {
+            value = value.substring(1, value.length() - 1).trim();
+        }
+        int split = topLevelOperator(value, "||");
+        if (split >= 0) return evaluateEnabled(value.substring(0, split), defines)
+                || evaluateEnabled(value.substring(split + 2), defines);
+        split = topLevelOperator(value, "&&");
+        if (split >= 0) return evaluateEnabled(value.substring(0, split), defines)
+                && evaluateEnabled(value.substring(split + 2), defines);
+        if (value.startsWith("!")) return !evaluateEnabled(value.substring(1), defines);
+        if (value.equalsIgnoreCase("true") || value.equals("1")) return true;
+        if (value.equalsIgnoreCase("false") || value.equals("0") || value.isBlank()) return false;
+        String option = defines.get(value);
+        return option != null && !option.equalsIgnoreCase("false") && !option.equals("0");
+    }
+
+    private static int topLevelOperator(String expression, String operator) {
+        int depth = 0;
+        for (int index = 0; index <= expression.length() - operator.length(); index++) {
+            char current = expression.charAt(index);
+            if (current == '(') depth++;
+            else if (current == ')') depth--;
+            if (depth == 0 && expression.startsWith(operator, index)) return index;
+        }
+        return -1;
+    }
+
     static int validate(Path shaderPackPath) throws IOException {
         Path packPath = shaderPackPath.toAbsolutePath().normalize();
         if (!java.nio.file.Files.isDirectory(packPath)) {
@@ -130,17 +160,16 @@ public final class CaustiqCiShaderValidation {
 
         try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
-            Set<String> defines = new LinkedHashSet<>();
+            Map<String, String> optionValues = new java.util.LinkedHashMap<>();
             for (ShaderPackMetadata.Option option : model.options().options()) {
-                defines.add(option.name() + "=" + option.defaultValue());
+                optionValues.put(option.name(), option.defaultValue());
             }
-            defines.addAll(Set.of(
-                    "MC_VERSION=12111",
-                    "MC_GL_VERSION=460",
-                    "IS_IRIS=1",
-                    "WORLD_OVERWORLD=1",
-                    "OVERWORLD=1"
-            ));
+            optionValues.put("MC_VERSION", "12111");
+            optionValues.put("MC_GL_VERSION", "450");
+            optionValues.put("IS_IRIS", "1");
+            optionValues.put("MC_HAND_DEPTH", "1.0");
+            optionValues.put("MC_RENDER_QUALITY", "1.0");
+            optionValues.put("MC_SHADOW_QUALITY", "1.0");
 
             List<IrisShaderPackModel.ProgramSet> programSets = new ArrayList<>();
             programSets.add(model.base());
@@ -152,23 +181,40 @@ public final class CaustiqCiShaderValidation {
             IrisGlProgramCompiler compiler = new IrisGlProgramCompiler();
             List<String> failures = new ArrayList<>();
             int compiled = 0;
+            Set<ShaderPackProgramCatalog.Group> fullscreenGroups = Set.of(
+                    ShaderPackProgramCatalog.Group.SETUP,
+                    ShaderPackProgramCatalog.Group.BEGIN,
+                    ShaderPackProgramCatalog.Group.PREPARE,
+                    ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE,
+                    ShaderPackProgramCatalog.Group.DEFERRED,
+                    ShaderPackProgramCatalog.Group.COMPOSITE,
+                    ShaderPackProgramCatalog.Group.FINAL);
             for (IrisShaderPackModel.ProgramSet set : programSets) {
-                Set<String> dimensionDefines = new LinkedHashSet<>(defines);
-                dimensionDefines.remove("WORLD_OVERWORLD=1");
-                dimensionDefines.remove("OVERWORLD=1");
-                if (set.directory().equals("world-1")) {
-                    dimensionDefines.add("WORLD_NETHER=1");
-                    dimensionDefines.add("NETHER=1");
-                } else if (set.directory().equals("world1")) {
-                    dimensionDefines.add("WORLD_END=1");
-                    dimensionDefines.add("END=1");
-                } else {
-                    dimensionDefines.add("WORLD_OVERWORLD=1");
-                    dimensionDefines.add("OVERWORLD=1");
-                }
+                Map<String, String> dimensionValues = new java.util.LinkedHashMap<>(optionValues);
+                dimensionValues.put("WORLD_OVERWORLD", set.directory().equals("world-1") || set.directory().equals("world1") ? "0" : "1");
+                dimensionValues.put("OVERWORLD", dimensionValues.get("WORLD_OVERWORLD"));
+                dimensionValues.put("WORLD_NETHER", set.directory().equals("world-1") ? "1" : "0");
+                dimensionValues.put("NETHER", dimensionValues.get("WORLD_NETHER"));
+                dimensionValues.put("WORLD_END", set.directory().equals("world1") ? "1" : "0");
+                dimensionValues.put("END", dimensionValues.get("WORLD_END"));
+                Set<String> dimensionDefines = new LinkedHashSet<>();
+                dimensionValues.forEach((name, value) -> dimensionDefines.add(name + "=" + value));
+
                 for (IrisShaderPackModel.Program sourceProgram : set.programs().values()) {
                     ShaderPackProgramCatalog.Group group =
                             ShaderPackProgramCatalog.Group.classify(sourceProgram.name());
+                    if (!fullscreenGroups.contains(group)) continue;
+
+                    String enabled = model.conditionalPrograms().get(
+                            set.directory().isBlank() ? sourceProgram.name()
+                                    : set.directory() + "/" + sourceProgram.name());
+                    if (enabled == null) enabled = model.conditionalPrograms().get(sourceProgram.name());
+                    if (enabled != null && !evaluateEnabled(enabled, dimensionValues)) {
+                        CaustiqClient.LOGGER.info("Photon CI skipped disabled program '{}' in {} (condition: {}).",
+                                sourceProgram.name(), set.directory(), enabled);
+                        continue;
+                    }
+
                     ShaderPackProgramCatalog.Program program = new ShaderPackProgramCatalog.Program(
                             sourceProgram.name(), group, 0, sourceProgram.stages());
                     boolean computeOnly = program.hasCompute() && program.stages().size() == 1;
@@ -184,7 +230,7 @@ public final class CaustiqCiShaderValidation {
                     }
                     try (IrisGlProgram ignored = compiler.compile(program, sources::read, dimensionDefines)) {
                         compiled++;
-                        CaustiqClient.LOGGER.info("Photon CI linked {}/{} program '{}'.",
+                        CaustiqClient.LOGGER.info("Photon CI linked {}/{} fullscreen/compute program '{}'.",
                                 set.directory().isBlank() ? "base" : set.directory(), compiled, program.name());
                     } catch (IOException | RuntimeException exception) {
                         failures.add(set.directory() + "/" + program.name() + ": " + exception.getMessage());
