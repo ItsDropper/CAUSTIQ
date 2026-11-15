@@ -175,43 +175,50 @@ public final class IrisNvidiumTerrainTranslator {
     }
 
     public static IrisNvidiumTerrainTranslator from(IrisShaderPackModel model) {
-        return from(model, null);
+        return from(model, null, "gbuffers_terrain");
     }
 
-    /** Selects the dimension-specific terrain program, preferring the pack's world0 set for the default world. */
     public static IrisNvidiumTerrainTranslator from(IrisShaderPackModel model, String dimensionKey) {
+        return from(model, dimensionKey, "gbuffers_terrain");
+    }
+
+    /** Selects a named Iris terrain program from the active dimension's program set. */
+    public static IrisNvidiumTerrainTranslator from(
+            IrisShaderPackModel model, String dimensionKey, String programName) {
         Objects.requireNonNull(model, "model");
+        Objects.requireNonNull(programName, "programName");
         IrisShaderPackModel.ProgramSet programSet = model.base();
         if (dimensionKey != null && !dimensionKey.isBlank()) {
             String directory = model.dimensionMappings().getOrDefault(dimensionKey, dimensionKey);
             IrisShaderPackModel.ProgramSet override = model.dimensionOverrides().get(directory);
-            if (override != null && override.programs().containsKey("gbuffers_terrain")) {
+            if (override != null && override.programs().containsKey(programName)) {
                 programSet = override;
             }
         }
-        if (!programSet.programs().containsKey("gbuffers_terrain")) {
+        if (!programSet.programs().containsKey(programName)) {
             IrisShaderPackModel.ProgramSet overworld = model.dimensionOverrides().get("world0");
-            if (overworld != null && overworld.programs().containsKey("gbuffers_terrain")) {
+            if (overworld != null && overworld.programs().containsKey(programName)) {
                 programSet = overworld;
             } else {
                 programSet = model.dimensionOverrides().values().stream()
-                        .filter(candidate -> candidate.programs().containsKey("gbuffers_terrain"))
+                        .filter(candidate -> candidate.programs().containsKey(programName))
                         .findFirst().orElse(programSet);
             }
         }
-        IrisShaderPackModel.Program program = programSet.programs().get("gbuffers_terrain");
+        IrisShaderPackModel.Program program = programSet.programs().get(programName);
         if (program == null) {
-            throw new IllegalArgumentException("The shader pack has no gbuffers_terrain program in its base or dimension program sets.");
+            throw new IllegalArgumentException("The shader pack has no " + programName
+                    + " program in its base or dimension program sets.");
         }
         if (!program.hasVertexAndFragment() || program.hasGeometryOrTessellation()) {
-            throw new IllegalArgumentException("gbuffers_terrain must contain a vertex and fragment stage only.");
+            throw new IllegalArgumentException(programName + " must contain a vertex and fragment stage only.");
         }
         String vertexPath = program.stages().get(ShaderPackProgramCatalog.Stage.VERTEX);
         String fragmentPath = program.stages().get(ShaderPackProgramCatalog.Stage.FRAGMENT);
         String vertex = model.preprocessedSources().get(vertexPath);
         String fragment = model.preprocessedSources().get(fragmentPath);
         if (vertex == null || fragment == null) {
-            throw new IllegalArgumentException("gbuffers_terrain references a missing preprocessed shader stage.");
+            throw new IllegalArgumentException(programName + " references a missing preprocessed shader stage.");
         }
         return new IrisNvidiumTerrainTranslator(vertex, fragment);
     }
