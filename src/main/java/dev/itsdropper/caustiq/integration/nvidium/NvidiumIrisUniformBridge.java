@@ -494,31 +494,32 @@ public final class NvidiumIrisUniformBridge {
         putScalar(values, "isRightHanded", isRightHanded(client) ? 1.0 : 0.0);
         putScalar(values, "firstPersonCamera", isFirstPerson(client) ? 1.0 : 0.0);
         putScalar(values, "hideGUI", optionBoolean(client, "hideGui", false) ? 1.0 : 0.0);
-        putScalar(values, "is_sneaking", invokeBoolean(player, "isShiftKeyDown", false) ? 1.0 : 0.0);
+        putScalar(values, "is_sneaking", invokeBoolean(player, "isCrouching", false) ? 1.0 : 0.0);
         putScalar(values, "is_sprinting", invokeBoolean(player, "isSprinting", false) ? 1.0 : 0.0);
         putScalar(values, "is_on_ground", invokeBoolean(player, "onGround", false) ? 1.0 : 0.0);
         putScalar(values, "is_burning", invokeBoolean(player, "isOnFire", false) ? 1.0 : 0.0);
-        putScalar(values, "is_hurt", invokeBoolean(player, "isHurt", false) ? 1.0 : 0.0);
+        putScalar(values, "is_hurt", invokeIntField(player, "hurtTime", 0) > 0 ? 1.0 : 0.0);
         putScalar(values, "is_invisible", invokeBoolean(player, "isInvisible", false) ? 1.0 : 0.0);
         putScalar(values, "isElytraFlying", isElytraFlying() ? 1.0 : 0.0);
         putScalar(values, "isRiding", invokeBoolean(player, "isPassenger", false) ? 1.0 : 0.0);
-        putScalar(values, "feetInWater", invokeBoolean(player, "isInWater", false) ? 1.0 : 0.0);
+        putScalar(values, "feetInWater", invokeBoolean(player, "isInShallowWater", false) ? 1.0 : 0.0);
         putScalar(values, "vehicleInWater", vehicleInWater(player) ? 1.0 : 0.0);
 
+        boolean survival = isSurvivalPlayer(client);
         double health = invokeDouble(player, "getHealth", 20.0);
         double maxHealth = invokeDouble(player, "getMaxHealth", 20.0);
         double armor = invokeDouble(player, "getArmorValue", 0.0);
         double hunger = invokeDouble(invokeObject(player, "getFoodData"), "getFoodLevel", 20.0);
         double air = invokeDouble(player, "getAirSupply", 300.0);
         double maxAir = invokeDouble(player, "getMaxAirSupply", 300.0);
-        putScalar(values, "currentPlayerHealth", maxHealth <= 0 ? 0 : health / maxHealth);
-        putScalar(values, "maxPlayerHealth", maxHealth);
-        putScalar(values, "currentPlayerArmor", armor / 20.0);
-        putScalar(values, "maxPlayerArmor", 20.0);
-        putScalar(values, "currentPlayerHunger", hunger / 20.0);
+        putScalar(values, "currentPlayerHealth", survival && maxHealth > 0 ? health / maxHealth : -1.0);
+        putScalar(values, "maxPlayerHealth", survival ? maxHealth : -1.0);
+        putScalar(values, "currentPlayerArmor", survival ? armor / 50.0 : -1.0);
+        putScalar(values, "maxPlayerArmor", 50.0);
+        putScalar(values, "currentPlayerHunger", survival ? hunger / 20.0 : -1.0);
         putScalar(values, "maxPlayerHunger", 20.0);
-        putScalar(values, "currentPlayerAir", maxAir <= 0 ? 0 : air / maxAir);
-        putScalar(values, "maxPlayerAir", maxAir);
+        putScalar(values, "currentPlayerAir", survival && maxAir > 0 ? air / maxAir : -1.0);
+        putScalar(values, "maxPlayerAir", survival ? maxAir : -1.0);
         putScalar(values, "health", health);
         putScalar(values, "maxHealth", maxHealth);
         putScalar(values, "isInWater", invokeBoolean(player, "isInWater", false) ? 1.0 : 0.0);
@@ -529,16 +530,16 @@ public final class NvidiumIrisUniformBridge {
                 biomeFloat(level, "getDownfall"));
         putBiomeIdentity(values, biome);
         putDimensionUniforms(values, level);
-        putVector2(values, "eyeBrightness", eyeBrightness(level, player, false),
-                eyeBrightness(level, player, true));
-        putVector2(values, "eyeBrightnessSmooth", eyeBrightness(level, player, false),
-                eyeBrightness(level, player, true));
-        putScalar(values, "blindness", effectPresent(player, "blindness") ? 1.0 : 0.0);
-        putScalar(values, "darknessFactor", effectPresent(player, "darkness") ? 1.0 : 0.0);
-        putScalar(values, "darknessLightFactor", effectPresent(player, "darkness") ? 1.0 : 0.0);
-        putScalar(values, "nightVision", effectPresent(player, "night_vision") ? 1.0 : 0.0);
-        putScalar(values, "playerMood", 0.0);
-        putScalar(values, "constantMood", 0.0);
+        putVector2(values, "eyeBrightness", eyeBrightness(level, cameraEntity, false),
+                eyeBrightness(level, cameraEntity, true));
+        putVector2(values, "eyeBrightnessSmooth", eyeBrightness(level, cameraEntity, false),
+                eyeBrightness(level, cameraEntity, true));
+        putScalar(values, "blindness", blindnessFactor(cameraEntity));
+        putScalar(values, "darknessFactor", darknessFactor(cameraEntity));
+        putScalar(values, "darknessLightFactor", irisCapturedFloat("getDarknessLightFactor", 0.0));
+        putScalar(values, "nightVision", nightVisionFactor(client, cameraEntity));
+        putScalar(values, "playerMood", invokeDouble(cameraEntity, "getCurrentMood", 0.0));
+        putScalar(values, "constantMood", invokeDouble(cameraEntity, "getCurrentConstantMood", 0.0));
 
         int[] atlas = blockAtlasSize();
         putVector2(values, "atlasSize", atlas[0], atlas[1]);
