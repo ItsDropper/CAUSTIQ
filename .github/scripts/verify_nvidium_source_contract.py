@@ -216,15 +216,25 @@ format_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/Nvidi
 compatibility = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumCompatibility.java").read_text(encoding="utf-8")
 stride_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumRepackagedStrideMixin.java").read_text(encoding="utf-8")
 assert "NvidiumIrisChunkVertex.INSTANCE" in format_mixin
-assert "NvidiumIrisChunkVertex.isRequested()" in format_mixin
+assert "NvidiumIrisChunkVertex.isCommitted()" in format_mixin
 assert 'method = "<init>", at = @At("HEAD")' in format_mixin
 assert "enableExtendedVertexFormat()" in format_mixin
 assert "requestExtendedVertexFormat()" in compatibility
 assert "NvidiumIrisChunkVertex.disable()" in compatibility
 assert "CaustiqConfig.get().enabled()" in compatibility
 assert "IS_COMPATIBLE" in compatibility and "FORCE_DISABLE" in compatibility
+assert "setSodiumVertexFormat(nvidium)" in compatibility
+assert "formatField.setBoolean(config, true)" in compatibility
+assert "NvidiumIrisChunkVertex.commit()" in compatibility
+assert "use_sodium_vertex_format=true" in compatibility
+assert "isCommitted()" in (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
+assert "SODIUM_VERTEX_FORMAT_DEFINE" in adapter
+bridge = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumShaderProgramBridge.java").read_text(encoding="utf-8")
+assert 'dumpShaderSources("before-adaptation", original)' in bridge
+assert 'dumpShaderSources("compiled", transformed)' in bridge
+assert "caustiq.dumpNvidiumShaders" in bridge
 assert "NvidiumIrisChunkVertex.STRIDE" in stride_mixin
-assert "NvidiumIrisChunkVertex.isRequested()" in stride_mixin
+assert "NvidiumIrisChunkVertex.isCommitted()" in stride_mixin
 assert "@ModifyConstant(" in stride_mixin, "copyQuad stride constants must be modified after javac inlines the static final fields"
 assert "@Constant(longValue = 80L)" in stride_mixin and "@Constant(longValue = 64L)" in stride_mixin
 assert "NvidiumIrisChunkVertex.STRIDE * 4L" in stride_mixin, "copyQuad must copy four extended 40-byte vertices"
