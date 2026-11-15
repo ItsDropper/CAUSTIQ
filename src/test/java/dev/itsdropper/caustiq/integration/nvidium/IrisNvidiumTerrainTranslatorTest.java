@@ -101,8 +101,8 @@ class IrisNvidiumTerrainTranslatorTest {
                             model.base().programs().keySet().stream(),
                             model.dimensionOverrides().values().stream()
                                     .flatMap(programSet -> programSet.programs().keySet().stream()))
-                    .filter(name -> ShaderPackProgramCatalog.Group.classify(name)
-                            == ShaderPackProgramCatalog.Group.SHADOW)
+                    .filter(name -> name.equalsIgnoreCase("shadow")
+                            || name.toLowerCase(java.util.Locale.ROOT).startsWith("shadow_"))
                     .findFirst().orElseThrow(() -> new AssertionError(
                             "Photon source fixture must expose an Iris shadow terrain program"));
             IrisNvidiumTerrainTranslator shadowTranslator = IrisNvidiumTerrainTranslator.from(
