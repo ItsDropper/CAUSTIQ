@@ -374,6 +374,10 @@ public final class NvidiumIrisUniformBridge {
         return Math.floorMod(dayTime, 24_000L);
     }
 
+    private static int moonPhase(Object level) {
+        return moonPhase(Minecraft.getInstance(), level);
+    }
+
     private static int moonPhase(Minecraft client, Object level) {
         Object value = environmentAttribute(client, "MOON_PHASE");
         Object index = invokeObject(value, "index");
@@ -602,7 +606,7 @@ public final class NvidiumIrisUniformBridge {
         float rain = clamp01(invokeFloat(level, "getRainLevel", 1.0f, 0.0f));
         float thunder = clamp01(invokeFloat(level, "getThunderLevel", 1.0f, 0.0f));
         float near = 0.05f;
-        float far = Math.max(16.0f, invokeDouble(client.options, "getEffectiveRenderDistance", 32.0) * 16.0);
+        double far = Math.max(16.0, invokeDouble(client.options, "getEffectiveRenderDistance", 32.0) * 16.0);
 
         putScalar(values, "frameCounter", snapshot == null ? FRAME_COUNTER.get() : snapshot.frameCounter());
         putScalar(values, "frameTime", snapshot == null ? 1.0 / 60.0 : snapshot.frameTime());
