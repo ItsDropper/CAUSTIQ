@@ -47,6 +47,7 @@ public final class IrisGlProgramCompiler {
                 || program.stages().containsKey(ShaderPackProgramCatalog.Stage.TESSELLATION_EVALUATION)) {
             throw new IOException("Program '" + program.name() + "' contains an unsupported geometry/tessellation stage.");
         }
+        Set<String> compilationDefines = runtimeDefines(defines);
         GlslPreprocessor preprocessor = new GlslPreprocessor();
         if (program.hasCompute()) {
             if (program.stages().size() != 1) {
@@ -54,7 +55,7 @@ public final class IrisGlProgramCompiler {
             }
             String compute = preprocessor.preprocess(
                     program.stages().get(ShaderPackProgramCatalog.Stage.COMPUTE), sourceProvider).source();
-            compute = injectDefines(removePackOptionDefinitions(compute, defines), defines);
+            compute = injectDefines(removePackOptionDefinitions(compute, compilationDefines), compilationDefines);
             int shader = compileShader(GL43C.GL_COMPUTE_SHADER, compute, program.name() + " compute");
             int linked = 0;
             try {
@@ -92,8 +93,8 @@ public final class IrisGlProgramCompiler {
             vertex = translateVertex(vertexSource, texCoordIndices(fragment));
         }
         fragment = translateFragment(fragment);
-        vertex = injectDefines(removePackOptionDefinitions(vertex, defines), defines);
-        fragment = injectDefines(removePackOptionDefinitions(fragment, defines), defines);
+        vertex = injectDefines(removePackOptionDefinitions(vertex, compilationDefines), compilationDefines);
+        fragment = injectDefines(removePackOptionDefinitions(fragment, compilationDefines), compilationDefines);
 
         int vertexShader = compileShader(GL20C.GL_VERTEX_SHADER, vertex, program.name() + " vertex");
         int fragmentShader = 0;
@@ -301,6 +302,12 @@ public final class IrisGlProgramCompiler {
             adjusted = adjusted.replaceAll(pattern, "");
         }
         return adjusted;
+    }
+
+    static Set<String> runtimeDefines(Set<String> packDefines) {
+        Set<String> result = new LinkedHashSet<>(packDefines == null ? Set.of() : packDefines);
+        result.add("MC_HAND_DEPTH=1.0");
+        return Set.copyOf(result);
     }
 
     private static String injectDefines(String source, Set<String> defines) {
