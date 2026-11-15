@@ -18,7 +18,7 @@ public abstract class NvidiumRepackagedStrideMixin {
     @ModifyVariable(method = "repackage", at = @At("STORE"), ordinal = 0,
             remap = false, require = 1)
     private static int caustiq$useExtendedVertexStride(int original) {
-        return NvidiumIrisChunkVertex.isRequested() ? NvidiumIrisChunkVertex.STRIDE : original;
+        return NvidiumIrisChunkVertex.isCommitted() ? NvidiumIrisChunkVertex.STRIDE : original;
     }
 
     // STRIDE is a compile-time constant in both upstream vertex formats. The
