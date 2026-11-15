@@ -171,9 +171,11 @@ public final class IrisTerrainCompatibilityAnalyzer {
     }
 
     private static void auditSamplers(String source, String stage, List<Issue> issues) {
+        String usageSource = SAMPLER.matcher(source).replaceAll("");
         Matcher samplers = SAMPLER.matcher(source);
         while (samplers.find()) {
             String sampler = samplers.group(2);
+            if (!hasReachableReference(usageSource, sampler)) continue;
             if (!AVAILABLE_SAMPLERS.contains(sampler)) {
                 issues.add(new Issue("UNBOUND_SAMPLER", sampler,
                         "The sampler has no binding in Nvidium's current terrain stage ABI."));
@@ -182,10 +184,12 @@ public final class IrisTerrainCompatibilityAnalyzer {
     }
 
     private static void auditUniforms(String source, String stage, List<Issue> issues) {
+        String usageSource = UNIFORM.matcher(source).replaceAll("");
         Matcher uniforms = UNIFORM.matcher(source);
         while (uniforms.find()) {
             String type = uniforms.group(1);
             String name = uniforms.group(2);
+            if (!hasReachableReference(usageSource, name)) continue;
             if (type.startsWith("sampler") || type.startsWith("isampler")
                     || type.startsWith("usampler") || type.startsWith("image")) {
                 continue;

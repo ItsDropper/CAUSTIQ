@@ -10,18 +10,20 @@ public final class IrisGlProgram implements AutoCloseable {
     private final String name;
     private final int programId;
     private final Set<String> samplers;
+    private final Set<String> comparisonSamplers;
     private final Set<String> images;
     private final boolean compute;
     private final int localSizeX, localSizeY, localSizeZ;
     private final boolean usesGlobalY, usesGlobalZ;
     private boolean closed;
 
-    IrisGlProgram(String name, int programId, Set<String> samplers, Set<String> images,
-                  boolean compute, int localSizeX, int localSizeY, int localSizeZ,
+    IrisGlProgram(String name, int programId, Set<String> samplers, Set<String> comparisonSamplers,
+                  Set<String> images, boolean compute, int localSizeX, int localSizeY, int localSizeZ,
                   boolean usesGlobalY, boolean usesGlobalZ) {
         this.name = Objects.requireNonNull(name, "name");
         this.programId = programId;
         this.samplers = Set.copyOf(samplers);
+        this.comparisonSamplers = Set.copyOf(comparisonSamplers);
         this.images = Set.copyOf(images);
         this.compute = compute;
         this.localSizeX = localSizeX;
@@ -37,6 +39,7 @@ public final class IrisGlProgram implements AutoCloseable {
         return programId;
     }
     public Set<String> samplers() { return samplers; }
+    public Set<String> comparisonSamplers() { return comparisonSamplers; }
     public Set<String> images() { return images; }
     public boolean compute() { return compute; }
     public int localSizeX() { return localSizeX; }

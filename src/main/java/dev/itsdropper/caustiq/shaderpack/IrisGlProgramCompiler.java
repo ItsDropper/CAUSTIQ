@@ -69,7 +69,8 @@ public final class IrisGlProgramCompiler {
                 int[] local = localSizes(compute);
                 boolean vectorGlobalInvocation = Pattern.compile(
                         "\\bgl_GlobalInvocationID\\b(?!\\s*\\.[xyz])").matcher(compute).find();
-                return new IrisGlProgram(program.name(), linked, findSamplers(compute), findImages(compute),
+                return new IrisGlProgram(program.name(), linked, findSamplers(compute),
+                        findComparisonSamplers(compute), findImages(compute),
                         true, local[0], local[1], local[2],
                         vectorGlobalInvocation || compute.contains("gl_GlobalInvocationID.y"),
                         vectorGlobalInvocation || compute.contains("gl_GlobalInvocationID.z"));
@@ -109,7 +110,8 @@ public final class IrisGlProgramCompiler {
                 throw new IOException("Iris program '" + program.name() + "' failed to link:\n"
                         + GL20C.glGetProgramInfoLog(linkedProgram));
             }
-            return new IrisGlProgram(program.name(), linkedProgram, findSamplers(fragment), Set.of(), false, 1, 1, 1, false, false);
+            return new IrisGlProgram(program.name(), linkedProgram, findSamplers(fragment),
+                    findComparisonSamplers(fragment), Set.of(), false, 1, 1, 1, false, false);
         } catch (IOException | RuntimeException exception) {
             if (linkedProgram != 0) GL20C.glDeleteProgram(linkedProgram);
             throw exception;
@@ -131,22 +133,31 @@ public final class IrisGlProgramCompiler {
         return shader;
     }
 
-    private static Set<String> findSamplers(String source) throws IOException {
+    static Set<String> findSamplers(String source) throws IOException {
         Set<String> samplers = new LinkedHashSet<>();
         Matcher matcher = SAMPLER.matcher(source);
         while (matcher.find()) {
             String samplerType = matcher.group(1);
             String name = matcher.group(2);
-            if (!samplerType.equals("sampler2D") && !samplerType.equals("sampler3D")
-                    && !samplerType.equals("usampler3D")) {
+            if (!samplerType.equals("sampler2D") && !samplerType.equals("sampler2DShadow")
+                    && !samplerType.equals("sampler3D") && !samplerType.equals("usampler3D")) {
                 throw new IOException("Iris sampler '" + name + "' uses unsupported type " + samplerType
-                        + "; this executor supports sampler2D, sampler3D and usampler3D.");
+                        + "; this executor supports sampler2D, sampler2DShadow, sampler3D and usampler3D.");
             }
             samplers.add(name);
         }
         String withoutSupported = SAMPLER.matcher(source).replaceAll("");
         if (Pattern.compile("\\buniform\\s+\\w*sampler\\w*\\b").matcher(withoutSupported).find()) {
             throw new IOException("Iris pass contains a sampler declaration with an unsupported sampler type.");
+        }
+        return Set.copyOf(samplers);
+    }
+
+    static Set<String> findComparisonSamplers(String source) {
+        Set<String> samplers = new LinkedHashSet<>();
+        Matcher matcher = SAMPLER.matcher(source);
+        while (matcher.find()) {
+            if (matcher.group(1).equals("sampler2DShadow")) samplers.add(matcher.group(2));
         }
         return Set.copyOf(samplers);
     }

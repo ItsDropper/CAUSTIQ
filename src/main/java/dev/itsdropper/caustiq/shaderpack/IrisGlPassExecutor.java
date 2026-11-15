@@ -12,6 +12,7 @@ import org.lwjgl.opengl.GL12C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL30C;
+import org.lwjgl.opengl.GL33C;
 import org.lwjgl.opengl.GL42C;
 import org.lwjgl.opengl.GL43C;
 import org.lwjgl.system.MemoryStack;
@@ -35,6 +36,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
     private static final int MAX_TERRAIN_TARGET = NvidiumGBufferTargets.MAX_ATTACHMENT;
     private int framebuffer;
     private int vertexArray;
+    private int shadowComparisonSampler;
     private TextureTarget outputTarget;
     private final int[][] customTargets = new int[MAX_COLOR_TARGET + 1][2];
     private final int[][] customWidths = new int[MAX_COLOR_TARGET + 1][2];
@@ -408,6 +410,16 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             }
             GL13C.glActiveTexture(GL13C.GL_TEXTURE0 + unit);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
+            if (program.comparisonSamplers().contains(sampler)) {
+                if (shadowComparisonSampler == 0) {
+                    shadowComparisonSampler = GL33C.glGenSamplers();
+                    GL33C.glSamplerParameteri(shadowComparisonSampler, 0x884C, 0x884E);
+                    GL33C.glSamplerParameteri(shadowComparisonSampler, 0x884D, GL11C.GL_LEQUAL);
+                }
+                GL33C.glBindSampler(unit, shadowComparisonSampler);
+            } else {
+                GL33C.glBindSampler(unit, 0);
+            }
             GL20C.glUniform1i(location, unit);
             unit++;
         }
@@ -573,11 +585,32 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         }
     }
 
-    private static void clearCustomTexture(int texture, FormatDescriptor format, float[] color) {
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            FloatBuffer value = stack.mallocFloat(4);
-            value.put(color).flip();
-            org.lwjgl.opengl.GL44C.glClearTexImage(texture, 0, format.externalFormat(), GL11C.GL_FLOAT, value);
+    private void clearCustomTexture(int texture, FormatDescriptor format, float[] color) {
+        int previousFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
+        int drawBufferCount = GL11C.glGetInteger(GL20C.GL_MAX_DRAW_BUFFERS);
+        int[] previousDrawBuffers = new int[drawBufferCount];
+        for (int i = 0; i < drawBufferCount; i++) {
+            previousDrawBuffers[i] = GL11C.glGetInteger(GL20C.GL_DRAW_BUFFER0 + i);
+        }
+        try {
+            GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, framebuffer);
+            GL30C.glFramebufferTexture2D(GL30C.GL_DRAW_FRAMEBUFFER, GL30C.GL_COLOR_ATTACHMENT0,
+                    GL11C.GL_TEXTURE_2D, texture, 0);
+            GL11C.glDrawBuffer(GL30C.GL_COLOR_ATTACHMENT0);
+            int status = GL30C.glCheckFramebufferStatus(GL30C.GL_DRAW_FRAMEBUFFER);
+            if (status != GL30C.GL_FRAMEBUFFER_COMPLETE) {
+                throw new IllegalStateException("Unable to clear Iris colortex texture; temporary framebuffer is incomplete (0x"
+                        + Integer.toHexString(status) + ").");
+            }
+            try (MemoryStack stack = MemoryStack.stackPush()) {
+                FloatBuffer value = stack.mallocFloat(4);
+                value.put(color).flip();
+                GL30C.glClearBufferfv(GL11C.GL_COLOR, 0, value);
+            }
+        } finally {
+            GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousFramebuffer);
+            if (previousFramebuffer == 0) GL11C.glDrawBuffer(previousDrawBuffers[0]);
+            else GL20C.glDrawBuffers(previousDrawBuffers);
         }
     }
 
@@ -612,10 +645,12 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         int textureUnits = GL11C.glGetInteger(GL20C.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);
         int[] textureBindings = new int[textureUnits];
         int[] textureBindings3D = new int[textureUnits];
+        int[] samplerBindings = new int[textureUnits];
         for (int i = 0; i < textureUnits; i++) {
             GL13C.glActiveTexture(GL13C.GL_TEXTURE0 + i);
             textureBindings[i] = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
             textureBindings3D[i] = GL11C.glGetInteger(GL12C.GL_TEXTURE_BINDING_3D);
+            samplerBindings[i] = GL30C.glGetIntegeri(GL33C.GL_SAMPLER_BINDING, i);
         }
         GL13C.glActiveTexture(activeTexture);
         int[] viewport = new int[4];
@@ -625,7 +660,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             values.get(viewport);
         }
         return new GlState(drawFramebuffer, readFramebuffer, program, vertexArray, activeTexture,
-                readBuffer, drawBuffers, textureBindings, textureBindings3D, viewport,
+                readBuffer, drawBuffers, textureBindings, textureBindings3D, samplerBindings, viewport,
                 GL11C.glIsEnabled(GL11C.GL_DEPTH_TEST),
                 GL11C.glIsEnabled(GL11C.GL_BLEND),
                 GL11C.glIsEnabled(GL11C.GL_CULL_FACE),
@@ -644,6 +679,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             GL13C.glActiveTexture(GL13C.GL_TEXTURE0 + i);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, state.textureBindings()[i]);
             GL11C.glBindTexture(GL12C.GL_TEXTURE_3D, state.textureBindings3D()[i]);
+            GL33C.glBindSampler(i, state.samplerBindings()[i]);
         }
         GL13C.glActiveTexture(state.activeTexture());
         setEnabled(GL11C.GL_DEPTH_TEST, state.depthTest());
@@ -661,8 +697,10 @@ public final class IrisGlPassExecutor implements AutoCloseable {
     public void close() {
         if (framebuffer != 0) GL30C.glDeleteFramebuffers(framebuffer);
         if (vertexArray != 0) GL30C.glDeleteVertexArrays(vertexArray);
+        if (shadowComparisonSampler != 0) GL33C.glDeleteSamplers(shadowComparisonSampler);
         framebuffer = 0;
         vertexArray = 0;
+        shadowComparisonSampler = 0;
         if (outputTarget != null) outputTarget.destroyBuffers();
         outputTarget = null;
         for (int index = 1; index <= MAX_COLOR_TARGET; index++) destroyCustomTargets(index);
@@ -676,6 +714,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
 
     private record GlState(int drawFramebuffer, int readFramebuffer, int program, int vertexArray,
                            int activeTexture, int readBuffer, int[] drawBuffers, int[] textureBindings,
-                           int[] textureBindings3D, int[] viewport, boolean depthTest, boolean blend, boolean cullFace,
+                           int[] textureBindings3D, int[] samplerBindings, int[] viewport,
+                           boolean depthTest, boolean blend, boolean cullFace,
                            boolean scissorTest) { }
 }

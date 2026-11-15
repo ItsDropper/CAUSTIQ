@@ -9,6 +9,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IrisGlProgramCompilerTest {
     @Test
+    void recognizesShadowComparisonSamplersWithoutDowngradingTheirType() throws Exception {
+        String source = """
+                uniform sampler2DShadow shadowtex1;
+                uniform sampler2D colorTexture;
+                void main() {
+                    float shadow = texture(shadowtex1, vec3(0.5, 0.5, 0.25));
+                }
+                """;
+        assertEquals(Set.of("shadowtex1", "colorTexture"),
+                IrisGlProgramCompiler.findSamplers(source));
+        assertEquals(Set.of("shadowtex1"),
+                IrisGlProgramCompiler.findComparisonSamplers(source));
+    }
+
+    @Test
     void suppliesIrisHandDepthDefineToFullscreenPasses() {
         Set<String> defines = IrisGlProgramCompiler.runtimeDefines(Set.of("SHADOWS=1"));
 

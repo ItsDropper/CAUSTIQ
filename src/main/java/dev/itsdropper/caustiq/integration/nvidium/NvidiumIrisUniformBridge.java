@@ -443,6 +443,19 @@ public final class NvidiumIrisUniformBridge {
         values.put("isInLava", invokeBoolean(player, "isInLava", false) ? 1.0 : 0.0);
         values.put("isSprinting", invokeBoolean(player, "isSprinting", false) ? 1.0 : 0.0);
         if (snapshot != null) {
+            putMatrixComponents(values, "gbufferProjection", snapshot.projection(), 4);
+            putMatrixComponents(values, "gbufferModelView", snapshot.modelView(), 4);
+            putMatrixComponents(values, "gbufferProjectionInverse", snapshot.projectionInverse(), 4);
+            putMatrixComponents(values, "gbufferModelViewInverse", snapshot.modelViewInverse(), 4);
+            putMatrixComponents(values, "gl_ProjectionMatrix", snapshot.projection(), 4);
+            putMatrixComponents(values, "gl_ModelViewMatrix", snapshot.modelView(), 4);
+            putMatrixComponents(values, "gl_ProjectionMatrixInverse", snapshot.projectionInverse(), 4);
+            putMatrixComponents(values, "gl_ModelViewMatrixInverse", snapshot.modelViewInverse(), 4);
+            Snapshot previous = PREVIOUS.get() == null ? snapshot : PREVIOUS.get();
+            putMatrixComponents(values, "gbufferPreviousModelView", previous.modelView(), 4);
+            putMatrixComponents(values, "gbufferPreviousModelViewInverse", previous.modelViewInverse(), 4);
+            putMatrixComponents(values, "gbufferPreviousProjection", previous.projection(), 4);
+            putMatrixComponents(values, "gbufferPreviousProjectionInverse", previous.projectionInverse(), 4);
             values.put("cameraPositionX", (double) snapshot.cameraX());
             values.put("cameraPositionY", (double) snapshot.cameraY());
             values.put("cameraPositionZ", (double) snapshot.cameraZ());
@@ -453,6 +466,16 @@ public final class NvidiumIrisUniformBridge {
             values.put("far", (double) projectionDistance(snapshot.projection(), true));
         }
         return java.util.Map.copyOf(values);
+    }
+
+    static void putMatrixComponents(java.util.Map<String, Double> values,
+                                    String name, float[] matrix, int dimension) {
+        for (int column = 0; column < dimension; column++) {
+            for (int row = 0; row < dimension; row++) {
+                values.put(name + "." + column + "." + row,
+                        (double) matrix[column * dimension + row]);
+            }
+        }
     }
 
     static Snapshot snapshot() { return CURRENT.get(); }
