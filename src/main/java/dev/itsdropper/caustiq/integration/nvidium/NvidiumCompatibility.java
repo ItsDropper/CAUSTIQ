@@ -79,6 +79,10 @@ public final class NvidiumCompatibility {
         return extendedVertexFormatCommitted;
     }
 
+    static void setExtendedVertexFormatCommittedForTests(boolean committed) {
+        extendedVertexFormatCommitted = committed;
+    }
+
     private static void setSodiumVertexFormat(Class<?> nvidium) throws ReflectiveOperationException {
         Object config = nvidium.getField("config").get(null);
         Field formatField = config.getClass().getField("use_sodium_vertex_format");
