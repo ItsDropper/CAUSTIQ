@@ -151,7 +151,7 @@ public final class NvidiumIrisTextureBridge {
     public static void bindCustomTextures(IrisShaderResources resources, int program, int firstTextureUnit) {
         if (customResources != null) customResources.restoreTerrainTextures();
         customResources = resources;
-        if (resources != null) resources.bindTerrainTextures(program, firstTextureUnit);
+        if (resources != null) resources.bindTerrainTextures(program, firstTextureUnit, 12);
     }
 
     public static void restoreBindings() {

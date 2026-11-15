@@ -203,13 +203,18 @@ public final class IrisShaderResources implements AutoCloseable {
 
     /** Binds all declared custom sampler2D textures to free units for Nvidium's terrain program. */
     public void bindTerrainTextures(int program, int firstUnit) {
+        bindTerrainTextures(program, firstUnit, Integer.MAX_VALUE);
+    }
+
+    /** Binds custom textures without crossing the caller's reserved texture-unit range. */
+    public void bindTerrainTextures(int program, int firstUnit, int endUnitExclusive) {
         restoreTerrainTextures();
         terrainActiveTexture = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
         java.util.ArrayList<Integer> units = new java.util.ArrayList<>();
         java.util.ArrayList<Integer> bindings = new java.util.ArrayList<>();
         java.util.ArrayList<Integer> terrainTargetList = new java.util.ArrayList<>();
         int unit = firstUnit;
-        int maximum = GL11C.glGetInteger(GL20C.GL_MAX_TEXTURE_IMAGE_UNITS);
+        int maximum = Math.min(GL11C.glGetInteger(GL20C.GL_MAX_TEXTURE_IMAGE_UNITS), endUnitExclusive);
         for (Map.Entry<String, TextureAsset> entry : textureAssets.entrySet()) {
             String key = entry.getKey();
             if (key.contains("::") && !key.startsWith("gbuffers_terrain::")) continue;
