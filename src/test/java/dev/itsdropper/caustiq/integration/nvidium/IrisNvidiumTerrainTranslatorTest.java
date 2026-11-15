@@ -173,6 +173,40 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesPhotonWaterAndAllTerrainShadowVariantsForEveryDimension() throws Exception {
+        String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
+        Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),
+                "Photon source checkout is supplied by CI only");
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("photon", "Photon",
+                Path.of(photonDirectory), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            Map<String, String> options = new LinkedHashMap<>();
+            model.options().options().forEach(option -> options.put(option.name(), option.defaultValue()));
+            options.put("NORMAL_MAPPING", "false");
+            options.put("SPECULAR_MAPPING", "false");
+            options.put("TAA", "false");
+
+            for (String dimension : List.of("world0", "world-1", "world1")) {
+                for (String programName : List.of(
+                        "gbuffers_water", "shadow_solid", "shadow_cutout", "shadow_water")) {
+                    IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
+                            model, dimension, programName, options);
+                    Map<String, String> translated = translator.adapt(
+                            NvidiumTerrainVaryingAdapter.adapt(pinnedNvidiumStages()));
+                    assertTrue(translated.get("MESH").contains("void caustiqIrisVertexMain()"),
+                            dimension + "/" + programName + " vertex stage was not translated");
+                    assertTrue(translated.get("FRAGMENT").contains("void caustiqIrisFragmentMain()"),
+                            dimension + "/" + programName + " fragment stage was not translated");
+                    assertFalse(translator.renderTargetIndices().isEmpty(),
+                            dimension + "/" + programName + " has no fragment output routing");
+                }
+            }
+        }
+    }
+
+    @Test
     void translatesWorldTimeAsTheIrisIntegerClockValue() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150
