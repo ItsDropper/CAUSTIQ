@@ -41,7 +41,7 @@ public final class NvidiumIrisTerrainAbi {
                     "decodeVertexColour(V).rgb",
                     "Packed vertex tint plus preserved vanilla AO in alpha; the native multiplier consumes the same alpha.")),
             Map.entry("modernVertexColor", new Semantic("vaColor", Availability.DERIVED,
-                    "decodeVertexColour(V).rgb", "Modern Iris alias for packed vertex tint.")),
+                    "caustiqDecodeIrisColor(V)", "Modern Iris alias for packed vertex tint and original alpha.")),
             Map.entry("lightmapCoordinate", new Semantic("lmcoord", Availability.EXACT,
                     "decodeLightUV(V)",
                     "Packed block/sky light coordinates in Nvidium's normalized lightmap convention.")),
