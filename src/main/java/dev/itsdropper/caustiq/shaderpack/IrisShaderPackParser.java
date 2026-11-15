@@ -25,8 +25,9 @@ public final class IrisShaderPackParser {
     private static final int MAX_PROPERTIES_BYTES = 1024 * 1024;
     private static final Pattern DIMENSION_DIRECTORY = Pattern.compile("world-?[0-9]+|dh_[a-z0-9_]+", Pattern.CASE_INSENSITIVE);
     private static final Pattern PROGRAM_NAME = Pattern.compile(
-            "(?:gbuffers_[a-z0-9_]+|shadow(?:comp)?[0-9]*|begin[0-9]*|prepare[0-9]*|setup|" +
-                    "deferred[0-9]*|composite[0-9]*|final|dh_[a-z0-9_]+|world)",
+            "(?:gbuffers_[a-z0-9_]+|clrwl_[a-z0-9_]+|shadow(?:comp)?[0-9]*|shadow_[a-z0-9_]+|" +
+                    "begin[0-9]*|prepare[0-9]*|setup|deferred[0-9]*(?:_[a-z0-9_]+)?|" +
+                    "composite[0-9]*|final|dh_[a-z0-9_]+|world)",
             Pattern.CASE_INSENSITIVE);
     private static final Set<String> STAGE_EXTENSIONS = Set.of(".vsh", ".fsh", ".gsh", ".csh", ".tcs", ".tes");
     private static final Set<String> NVIDIUM_COLOR_FORMATS = Set.of(
