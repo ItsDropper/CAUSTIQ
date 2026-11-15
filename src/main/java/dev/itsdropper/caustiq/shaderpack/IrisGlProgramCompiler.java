@@ -306,7 +306,9 @@ public final class IrisGlProgramCompiler {
 
     static Set<String> runtimeDefines(Set<String> packDefines) {
         Set<String> result = new LinkedHashSet<>(packDefines == null ? Set.of() : packDefines);
-        result.add("MC_HAND_DEPTH=1.0");
+        boolean handDepthProvided = result.stream().anyMatch(value ->
+                value != null && value.split("=", 2)[0].trim().equals("MC_HAND_DEPTH"));
+        if (!handDepthProvided) result.add("MC_HAND_DEPTH=1.0");
         return Set.copyOf(result);
     }
 
