@@ -73,7 +73,7 @@ public final class NvidiumGBufferTargets {
     }
 
     /** Called at the Nvidium primary terrain rasterizer boundary, on the render thread. */
-    public static boolean begin() {
+    public static boolean begin(boolean clearAttachments) {
         if (activeState != null) end();
         int framebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
         if (framebuffer == 0) return false;
