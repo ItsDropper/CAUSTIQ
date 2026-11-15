@@ -861,7 +861,7 @@ public final class NvidiumIrisUniformBridge {
             if (effect == null) effect = holder;
             try {
                 Object key = BuiltInRegistries.MOB_EFFECT.getKey((net.minecraft.world.effect.MobEffect) effect);
-                if (key != null && key.getPath().equals(effectPath)) return true;
+                if (key != null && effectPath.equals(invokeObject(key, "getPath"))) return true;
             } catch (RuntimeException ignored) { }
         }
         return false;
