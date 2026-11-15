@@ -214,7 +214,7 @@ public final class IrisGlProgramCompiler {
             throw new IOException("Iris full-screen vertex shader uses an unsupported legacy vertex input.");
         }
         working = EXTENSION.matcher(working).replaceAll("");
-        String translated = "#version 460 core\n" + declarations + working;
+        String translated = "#version 430 core\n" + declarations + working;
         return initializeTexCoordOutputs(translated, texCoords);
     }
 
@@ -278,7 +278,7 @@ public final class IrisGlProgramCompiler {
             throw new IOException("Iris fragment shader contains an unsupported legacy fragment output.");
         }
         working = EXTENSION.matcher(working).replaceAll("");
-        return "#version 460 core\n" + declarations + working;
+        return "#version 430 core\n" + declarations + working;
     }
 
     private static Set<Integer> texCoordIndices(String source) throws IOException {
@@ -329,7 +329,7 @@ public final class IrisGlProgramCompiler {
     }
 
     private static String normalizeComputeVersion(String source) {
-        Pattern version = Pattern.compile("(?m)^\\\\s*#\\\\s*version\\\\s+(\\\\d+)(?:\\\\s+(?:core|compatibility))?\\\\s*$");
+        Pattern version = Pattern.compile("(?m)^\\s*#\\s*version\\s+(\\d+)(?:\\s+(?:core|compatibility))?\\s*$");
         Matcher matcher = version.matcher(source);
         if (!matcher.find()) return source;
         int declaredVersion = Integer.parseInt(matcher.group(1));
