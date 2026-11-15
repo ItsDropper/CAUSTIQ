@@ -207,6 +207,23 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesPhotonSunDirectionToTheRuntimeViewSpaceUniform() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform vec3 sun_dir;
+                void main() {
+                    gl_FragColor = vec4(normalize(sun_dir), 1.0);
+                }
+                """);
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform vec3 caustiqSunDirection;"));
+        assertTrue(fragment.contains("normalize(caustiqSunDirection)"));
+    }
+
+    @Test
     void translatesWorldTimeAsTheIrisIntegerClockValue() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150

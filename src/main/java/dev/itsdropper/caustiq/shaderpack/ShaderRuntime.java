@@ -128,6 +128,11 @@ public final class ShaderRuntime {
 
     public static IrisTerrainPassScheduler.Plan activePassPlan() { return activePassPlan; }
 
+    /** Selected shader-pack define exposed to render-time built-in uniform providers. */
+    public static String selectedDefine(String name, String fallback) {
+        return selectedDefines.getOrDefault(name, fallback);
+    }
+
     /**
      * Parses the selected pack and installs its terrain translator before
      * Nvidium constructs its world renderer. Nvidium's Iris opt-out is checked

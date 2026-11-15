@@ -145,6 +145,15 @@ public final class NvidiumIrisUniformBridge {
         int worldTime = (int) Math.floorMod(invokeLong(level, "getDayTime", 0L), 24_000L);
         float dayProgress = worldTime / 24_000.0f;
         float sunAngle = invokeFloat(level, "getSunAngle", 1.0f, 0.0f);
+        Minecraft client = Minecraft.getInstance();
+        double sunDegrees = attributeNumber(client, "SUN_ANGLE", Math.toDegrees(sunAngle));
+        double moonDegrees = attributeNumber(client, "MOON_ANGLE", sunDegrees + 180.0);
+        boolean isDay = normalizeDegrees(sunDegrees + 90.0) < 180.0;
+        float sunPathRotation = parseFloat(ShaderRuntime.selectedDefine("sunPathRotation", "0.0"), 0.0f);
+        org.joml.Vector3f sunDirection = celestialDirection(
+                snapshot.modelView(), sunDegrees, sunPathRotation);
+        org.joml.Vector3f lightDirection = celestialDirection(
+                snapshot.modelView(), isDay ? sunDegrees : moonDegrees, sunPathRotation);
         var window = Minecraft.getInstance().getWindow();
         float aspectRatio = window.getHeight() > 0
                 ? (float) window.getWidth() / (float) window.getHeight() : 1.0f;
@@ -158,7 +167,9 @@ public final class NvidiumIrisUniformBridge {
         scalar(program, "caustiqWetness", wetness);
         vector2(program, "caustiqTaaOffset", 0.0f, 0.0f);
         vector3(program, "caustiqLightDirection",
-                (float) Math.sin(sunAngle), (float) Math.cos(sunAngle), 0.0f);
+                lightDirection.x, lightDirection.y, lightDirection.z);
+        vector3(program, "caustiqSunDirection",
+                sunDirection.x, sunDirection.y, sunDirection.z);
         scalar(program, "caustiqWorldAge", worldAge);
         integer(program, "caustiqWorldTime", worldTime);
         integer(program, "caustiqWorldDay", (int) Math.floorDiv(invokeLong(level, "getDayTime", 0L), 24_000L));
@@ -1437,6 +1448,16 @@ public final class NvidiumIrisUniformBridge {
     static void putSunPositionComponents(java.util.Map<String, Double> values,
                                          float[] modelView, float sunAngle) {
         putCelestialPositionComponents(values, "sunPosition", modelView, sunAngle, 100.0f, 0.0f);
+    }
+
+    private static org.joml.Vector3f celestialDirection(
+            float[] modelView, double angleDegrees, float sunPathRotationDegrees) {
+        org.joml.Matrix4f celestial = new org.joml.Matrix4f()
+                .rotationY((float) -Math.PI / 2.0f)
+                .rotateZ((float) Math.toRadians(sunPathRotationDegrees))
+                .rotateX((float) Math.toRadians(angleDegrees));
+        return new org.joml.Matrix4f().set(modelView).mul(celestial)
+                .transformDirection(0.0f, 1.0f, 0.0f, new org.joml.Vector3f()).normalize();
     }
 
     private static void putCelestialPositionComponents(java.util.Map<String, Double> values,

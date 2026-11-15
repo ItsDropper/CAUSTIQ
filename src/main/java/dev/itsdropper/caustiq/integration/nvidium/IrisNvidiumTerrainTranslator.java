@@ -129,6 +129,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("wetness", "caustiqWetness"),
             Map.entry("taa_offset", "caustiqTaaOffset"),
             Map.entry("light_dir", "caustiqLightDirection"),
+            Map.entry("sun_dir", "caustiqSunDirection"),
             Map.entry("world_age", "caustiqWorldAge"),
             Map.entry("day_factor", "caustiqDayFactor"),
             Map.entry("worldTime", "caustiqWorldTime"),
@@ -962,6 +963,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform float caustiqRainStrength;
                 uniform float caustiqWetness;
                 uniform vec3 caustiqLightDirection;
+                uniform vec3 caustiqSunDirection;
                 uniform float caustiqWorldAge;
                 uniform float caustiqDayFactor;
                 uniform int caustiqWorldTime;
@@ -999,7 +1001,7 @@ public final class IrisNvidiumTerrainTranslator {
                     "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse",
                     "dhProjection", "dhProjectionInverse", "dhPreviousProjection", "dhModelView",
                     "dhModelViewInverse", "vxProj", "vxProjInv", "vxProjPrev" -> "mat4";
-            case "cameraPosition", "fogColor", "light_dir", "eyePosition" -> "vec3";
+            case "cameraPosition", "fogColor", "light_dir", "sun_dir", "eyePosition" -> "vec3";
             case "heavyFog", "isElytraFlying" -> "bool";
             case "isEyeInWater", "moonPhase", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2" -> "int";
             case "frameTimeCounter", "viewWidth", "viewHeight", "near", "far", "rainStrength",
