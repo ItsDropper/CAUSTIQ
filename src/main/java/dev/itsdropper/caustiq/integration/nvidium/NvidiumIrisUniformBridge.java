@@ -713,6 +713,12 @@ public final class NvidiumIrisUniformBridge {
         values.put("PPT_RAIN", 1.0);
         values.put("PPT_SNOW", 2.0);
         values.put("BIOME_PALE_GARDEN", -1.0);
+        values.put("BIOME_NETHER_WASTES", -1.0);
+        values.put("BIOME_CRIMSON_FOREST", -1.0);
+        values.put("BIOME_WARPED_FOREST", -1.0);
+        values.put("BIOME_BASALT_DELTAS", -1.0);
+        values.put("BIOME_SOUL_SAND_VALLEY", -1.0);
+        values.put("BIOME_SULFUR_CAVES", -1.0);
         values.put("IS_IRIS", 1.0);
         values.put("MC_VERSION", 12111.0);
     }
