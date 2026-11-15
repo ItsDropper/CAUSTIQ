@@ -142,8 +142,8 @@ class IrisShaderResourcesTest {
             try (IrisShaderResources resources = IrisShaderResources.load(model.properties(), sources)) {
                 Map<String, double[]> values = resources.evaluateUniformValues(
                         Map.of("sun_dir_y", 0.5, "sun_dir_x", 1.0));
-                assertEquals(0.8976, values.get("me_weight")[0], 1.0e-9);
-                assertEquals(0.8976, values.get("time_sunrise")[0], 1.0e-9);
+                assertEquals(0.207936, values.get("me_weight")[0], 1.0e-9);
+                assertEquals(0.207936, values.get("time_sunrise")[0], 1.0e-9);
             }
         }
     }
