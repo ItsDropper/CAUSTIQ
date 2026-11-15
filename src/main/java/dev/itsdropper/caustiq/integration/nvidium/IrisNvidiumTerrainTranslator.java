@@ -40,6 +40,11 @@ public final class IrisNvidiumTerrainTranslator {
     private static final Pattern FRAG_DATA_INDEX = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]");
     private static final Pattern RENDERTARGETS = Pattern.compile(
             "(?s)/\\*\\s*RENDERTARGETS\\s*:\\s*([0-9,\\s]+)\\s*\\*/");
+    private static final Set<String> UNSUPPORTED_RUNTIME_UNIFORMS = Set.of(
+            "normals", "specular", "depthtex1", "colortex15",
+            "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans",
+            "taa_offset", "biome_temperature", "biome_humidity",
+            "time_sunrise", "time_noon", "time_sunset", "time_midnight");
     private static final Set<String> SUPPORTED_ATTRIBUTES = Set.of(
             "mc_Entity", "at_midBlock", "mc_midTexCoord", "at_midTexCoord",
             "iris_Normal", "at_tangent", "vaPosition", "vaUV0", "vaUV2", "vaColor",
@@ -594,6 +599,12 @@ public final class IrisNvidiumTerrainTranslator {
         }
         uniforms.appendTail(uniformOutput);
         working = uniformOutput.toString();
+        for (String unavailable : UNSUPPORTED_RUNTIME_UNIFORMS) {
+            if (Pattern.compile("\\\\b" + Pattern.quote(unavailable) + "\\\\b").matcher(working).find()) {
+                throw new IllegalArgumentException("Iris terrain shader uses '" + unavailable
+                        + "', which CAUSTIQ does not yet bind to a real Nvidium resource.");
+            }
+        }
 
         if (vertex) {
             Matcher attributes = ATTRIBUTE.matcher(working);
@@ -645,39 +656,9 @@ public final class IrisNvidiumTerrainTranslator {
     private static String photonUniformDeclarations() {
         return """
                 layout(binding = 2) uniform sampler2D caustiqNoiseTexture;
-                layout(binding = 3) uniform sampler2D caustiqNormalTexture;
-                layout(binding = 4) uniform sampler2D caustiqSpecularTexture;
                 layout(binding = 5) uniform sampler2D caustiqColortex1;
                 layout(binding = 6) uniform sampler2D caustiqColortex2;
                 layout(binding = 7) uniform sampler2D caustiqColortex4;
-                layout(binding = 8) uniform sampler2D caustiqDepthTexture1;
-                layout(binding = 15) uniform sampler2D caustiqColortex15;
-                layout(binding = 10) uniform sampler2D caustiqVxDepthTextureOpaque;
-                layout(binding = 11) uniform sampler2D caustiqVxDepthTextureTrans;
-                layout(binding = 12) uniform sampler2D caustiqDhDepthTexture;
-                layout(binding = 13) uniform sampler2D caustiqDhDepthTexture1;
-                uniform mat4 caustiqDhProjection;
-                uniform mat4 caustiqDhProjectionInverse;
-                uniform mat4 caustiqDhPreviousProjection;
-                uniform mat4 caustiqDhModelView;
-                uniform mat4 caustiqDhModelViewInverse;
-                uniform mat4 caustiqVxProjection;
-                uniform mat4 caustiqVxProjectionInverse;
-                uniform mat4 caustiqVxPreviousProjection;
-                uniform float caustiqDhNearPlane;
-                uniform float caustiqDhFarPlane;
-                uniform float caustiqCombinedNear;
-                uniform float caustiqCombinedFar;
-                uniform int caustiqDhRenderDistance;
-                uniform int caustiqVxRenderDistance;
-                uniform vec4 caustiqCombinedProjection0;
-                uniform vec4 caustiqCombinedProjection1;
-                uniform vec4 caustiqCombinedProjection2;
-                uniform vec4 caustiqCombinedProjection3;
-                uniform vec4 caustiqCombinedProjectionInverse0;
-                uniform vec4 caustiqCombinedProjectionInverse1;
-                uniform vec4 caustiqCombinedProjectionInverse2;
-                uniform vec4 caustiqCombinedProjectionInverse3;
                 uniform float caustiqNear;
                 uniform float caustiqFar;
                 uniform ivec2 caustiqAtlasSize;
