@@ -766,6 +766,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform bool caustiqIsElytraFlying;
                 uniform int caustiqHeldBlockLightValue;
                 uniform int caustiqHeldBlockLightValue2;
+                uniform int caustiqHeldItemId;
                 """;
     }
 
