@@ -702,13 +702,15 @@ public final class NvidiumIrisUniformBridge {
                 "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse",
                 "gbufferPreviousModelView", "gbufferPreviousProjection", "gl_ModelViewMatrix",
                 "gl_ModelViewMatrixInverse", "gl_ProjectionMatrix", "gl_ProjectionMatrixInverse",
-                "gl_ModelViewProjectionMatrix"
+                "gl_ModelViewProjectionMatrix", "gl_TextureMatrix[0]",
+                "iris_ModelViewMatrix", "iris_ProjectionMatrix", "u_ModelViewProjectionMatrix"
         };
         for (String name : matrices) {
             float[] identity = new org.joml.Matrix4f().get(new float[16]);
             putMatrixComponents(values, name, identity, 4);
         }
         putMatrix3Components(values, "gl_NormalMatrix", new org.joml.Matrix3f().get(new float[9]));
+        putMatrix3Components(values, "iris_NormalMatrix", new org.joml.Matrix3f().get(new float[9]));
         values.put("CAT_NONE", 0.0);
         String[] categories = {"TAIGA", "EXTREME_HILLS", "JUNGLE", "MESA", "PLAINS", "SAVANNA",
                 "ICY", "THE_END", "BEACH", "FOREST", "OCEAN", "DESERT", "RIVER", "SWAMP",
