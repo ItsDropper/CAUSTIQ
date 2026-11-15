@@ -167,6 +167,7 @@ public final class IrisShaderResources implements AutoCloseable {
             if (unit >= maximum) {
                 terrainUnits = units.stream().mapToInt(Integer::intValue).toArray();
                 terrainBindings = bindings.stream().mapToInt(Integer::intValue).toArray();
+                terrainTargets = terrainTargetList.stream().mapToInt(Integer::intValue).toArray();
                 GL13C.glActiveTexture(terrainActiveTexture);
                 restoreTerrainTextures();
                 throw new IllegalStateException("Terrain shader custom textures exceed the fragment-stage texture-unit limit.");
@@ -467,15 +468,20 @@ public final class IrisShaderResources implements AutoCloseable {
 
     private static TextureAsset decodeTypedTexture(String name, String[] declaration, byte[] encoded)
             throws IOException {
-        if (declaration.length != 8) {
+        if (declaration.length < 7) {
             throw new IOException("Typed custom texture '" + name
-                    + "' must use: path TEXTURE_3D format width height depth pixelFormat pixelType.");
+                    + "' has an incomplete target/format/dimension declaration.");
         }
         int target = switch (declaration[1].toUpperCase(Locale.ROOT)) {
             case "TEXTURE_2D" -> GL11C.GL_TEXTURE_2D;
             case "TEXTURE_3D" -> GL12C.GL_TEXTURE_3D;
             default -> throw new IOException("Unsupported custom texture target: " + declaration[1]);
         };
+        int expectedTokens = target == GL12C.GL_TEXTURE_3D ? 8 : 7;
+        if (declaration.length != expectedTokens) {
+            throw new IOException("Typed custom texture '" + name + "' has " + declaration.length
+                    + " declaration fields; expected " + expectedTokens + " for its texture target.");
+        }
         int internalFormat = internalFormat(declaration[2]);
         int width = parseDimension(declaration[3], name);
         int height = parseDimension(declaration[4], name);
