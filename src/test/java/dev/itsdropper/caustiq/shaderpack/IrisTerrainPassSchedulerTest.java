@@ -50,6 +50,24 @@ class IrisTerrainPassSchedulerTest {
     }
 
     @Test
+    void excludesColorwheelFlywheelEntryPointsFromIrisPassSchedule() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("ColorwheelPack/shaders"));
+        writeProgram(shaders, "gbuffers_terrain",
+                "out vec4 color; void main(){ color=vec4(1.0); }");
+        writeProgram(shaders, "clrwl_gbuffers",
+                "out vec4 color; void main(){ color=vec4(0.5); }");
+        writeProgram(shaders, "clrwl_shadow",
+                "out vec4 color; void main(){ color=vec4(0.0); }");
+
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor("ColorwheelPack", 3))) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
+
+            assertEquals(java.util.List.of("gbuffers_terrain"), plan.orderedProgramNames());
+        }
+    }
+
+    @Test
     void dimensionOverrideIsASeparateProgramSetRatherThanMergedWithBase() throws IOException {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("DimensionPack/shaders"));
         Files.writeString(shaders.resolve("dimension.properties"), "dimension.world0=minecraft:overworld\n");
