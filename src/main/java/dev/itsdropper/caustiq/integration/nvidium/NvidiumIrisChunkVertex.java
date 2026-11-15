@@ -24,25 +24,24 @@ public final class NvidiumIrisChunkVertex implements ChunkVertexType {
     private static final float MODEL_RANGE = 32.0f;
     private static final GlVertexFormat FORMAT = new GlVertexFormat(null, null, STRIDE);
     private static volatile boolean enabled;
-    private static volatile boolean committed;
 
     private NvidiumIrisChunkVertex() { }
 
-    public static void enable() { enabled = true; committed = false; }
+    public static void enable() { enabled = true; NvidiumVertexAbiState.clear(); }
 
     /** Marks the 40-byte encoder and Nvidium shader define as one verified ABI selection. */
     public static void commit() {
         if (!enabled) throw new IllegalStateException("Cannot commit an unrequested Nvidium vertex ABI.");
-        committed = true;
+        NvidiumVertexAbiState.commit();
     }
 
-    public static void disable() { enabled = false; committed = false; }
+    public static void disable() { enabled = false; NvidiumVertexAbiState.clear(); }
 
     /** True once CAUSTIQ requests the extended format, before Nvidium initializes its renderer. */
     public static boolean isRequested() { return enabled; }
 
     /** True only after Nvidium's Sodium vertex-format config has been verified. */
-    public static boolean isCommitted() { return enabled && committed; }
+    public static boolean isCommitted() { return enabled && NvidiumVertexAbiState.isCommitted(); }
 
     public static boolean isEnabled() {
         if (!isCommitted()) return false;
