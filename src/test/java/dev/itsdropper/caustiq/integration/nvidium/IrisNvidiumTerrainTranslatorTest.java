@@ -226,6 +226,26 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void exposesAllIrisColorAttachmentsAsRuntimeSamplers() {
+        Map<String, String> aliases = IrisNvidiumTerrainTranslator.uniformAliases();
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                void main() { gl_FragColor = vec4(1.0); }
+                """);
+        String declarations = translator.adapt(nativeStages()).get("FRAGMENT");
+        for (int attachment = 1; attachment <= 7; attachment++) {
+            String name = "colortex" + attachment;
+            String alias = "caustiqColortex" + attachment;
+            assertEquals(alias, aliases.get(name), "Missing runtime alias for " + name);
+            assertTrue(declarations.contains("uniform sampler2D " + alias + ";"),
+                    "Missing shader sampler declaration for " + name);
+        }
+    }
+
+    @Test
     void translatesPhotonTemperateBiomeUniformToItsExpressionBackedRuntimeBinding() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150

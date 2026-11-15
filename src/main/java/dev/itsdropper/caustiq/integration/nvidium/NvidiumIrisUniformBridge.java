@@ -106,15 +106,14 @@ public final class NvidiumIrisUniformBridge {
             int frameLocation = GL20C.glGetUniformLocation(program, "caustiqFrameCounter");
             if (frameLocation >= 0) GL20C.glUniform1i(frameLocation, snapshot.frameCounter());
             uploadPhotonUniforms(program, snapshot);
+            int firstCustomTextureUnit;
             if (NvidiumShadowRenderer.isShadowRasterization()) {
-                NvidiumIrisTextureBridge.bindForShadow(program);
+                firstCustomTextureUnit = NvidiumIrisTextureBridge.bindForShadow(program);
             } else {
-                NvidiumIrisTextureBridge.bindForTerrain();
-                int noiseLocation = GL20C.glGetUniformLocation(program, "noisetex");
-                if (noiseLocation >= 0) GL20C.glUniform1i(noiseLocation, 2);
+                firstCustomTextureUnit = NvidiumIrisTextureBridge.bindForTerrain(program);
             }
             ShaderRuntime.uploadTerrainCustomUniforms(program);
-            ShaderRuntime.bindTerrainCustomTextures(program);
+            ShaderRuntime.bindTerrainCustomTextures(program, firstCustomTextureUnit);
             warnedUploadFailure = false;
         } catch (ReflectiveOperationException | RuntimeException exception) {
             if (!warnedUploadFailure) {

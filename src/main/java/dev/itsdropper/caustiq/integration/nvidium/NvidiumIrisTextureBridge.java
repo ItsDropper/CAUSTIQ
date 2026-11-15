@@ -20,58 +20,90 @@ public final class NvidiumIrisTextureBridge {
 
     private NvidiumIrisTextureBridge() { }
 
-    /** Binds deterministic noise and neutral material maps to the explicit shader units 2-4. */
+    /** Binds shared noise/shadow textures and every active Iris colortex sampler. */
     public static void bindForTerrain() {
         bindForTerrain(0);
     }
 
-    public static void bindForTerrain(int program) {
+    public static int bindForTerrain(int program) {
         if (bindingState != null || customResources != null) restoreBindings();
         ensureTextures();
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
-        int[] units = {
-                GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE5, GL13C.GL_TEXTURE6, GL13C.GL_TEXTURE7,
-                GL13C.GL_TEXTURE12, GL13C.GL_TEXTURE13, GL13C.GL_TEXTURE14, GL13C.GL_TEXTURE15
-        };
-        int[] textures = {
-                noiseTexture, NvidiumGBufferTargets.texture(1), NvidiumGBufferTargets.texture(2),
-                NvidiumGBufferTargets.texture(4),
+        int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE12, GL13C.GL_TEXTURE13,
+                GL13C.GL_TEXTURE14, GL13C.GL_TEXTURE15};
+        int[] textures = {noiseTexture,
                 shadowOrFallback(NvidiumShadowRenderer.shadowTexture()),
                 shadowOrFallback(NvidiumShadowRenderer.shadowTexture1()),
                 colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0)),
-                colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))
-        };
-        int[] previousBindings = new int[units.length];
-        for (int i = 0; i < units.length; i++) {
-            GL13C.glActiveTexture(units[i]);
-            previousBindings[i] = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
-            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, textures[i]);
-        }
-        GL13C.glActiveTexture(previousActive);
-        bindingState = new BindingState(previousActive, units, previousBindings);
-        if (program != 0) {
-            int noiseLocation = GL20C.glGetUniformLocation(program, "noisetex");
-            if (noiseLocation >= 0) GL20C.glUniform1i(noiseLocation, 2);
-            int shadow0 = GL20C.glGetUniformLocation(program, "shadowtex0");
-            if (shadow0 >= 0) GL20C.glUniform1i(shadow0, 12);
-            int shadow1 = GL20C.glGetUniformLocation(program, "shadowtex1");
-            if (shadow1 >= 0) GL20C.glUniform1i(shadow1, 13);
-            int shadowColor0 = GL20C.glGetUniformLocation(program, "shadowcolor0");
-            if (shadowColor0 >= 0) GL20C.glUniform1i(shadowColor0, 14);
-            int shadowColor1 = GL20C.glGetUniformLocation(program, "shadowcolor1");
-            if (shadowColor1 >= 0) GL20C.glUniform1i(shadowColor1, 15);
-        }
+                colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))};
+        bindingState = bindTextures(previousActive, units, textures);
+        setSampler(program, "noisetex", 2);
+        setSampler(program, "shadowtex0", 12);
+        setSampler(program, "shadowtex1", 13);
+        setSampler(program, "shadowcolor0", 14);
+        setSampler(program, "shadowcolor1", 15);
+        return bindColortexSamplers(program, previousActive);
     }
 
-    /** Binds shadow depth samplers and deterministic noise for the Iris shadow terrain program. */
-    public static void bindForShadow(int program) {
+    /** Binds shadow resources and any Iris colortex samplers referenced by the shadow program. */
+    public static int bindForShadow(int program) {
         if (bindingState != null || customResources != null) restoreBindings();
         ensureTextures();
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
-        int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE12, GL13C.GL_TEXTURE13};
-        int depth0 = shadowOrFallback(NvidiumShadowRenderer.shadowTexture());
-        int depth1 = shadowOrFallback(NvidiumShadowRenderer.shadowTexture1());
-        int[] textures = {noiseTexture, depth0, depth1};
+        int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE12, GL13C.GL_TEXTURE13,
+                GL13C.GL_TEXTURE14, GL13C.GL_TEXTURE15};
+        int[] textures = {noiseTexture,
+                shadowOrFallback(NvidiumShadowRenderer.shadowTexture()),
+                shadowOrFallback(NvidiumShadowRenderer.shadowTexture1()),
+                colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0)),
+                colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))};
+        bindingState = bindTextures(previousActive, units, textures);
+        setSampler(program, "noisetex", 2);
+        setSampler(program, "shadowtex0", 12);
+        setSampler(program, "shadowtex1", 13);
+        setSampler(program, "shadowcolor0", 14);
+        setSampler(program, "shadowcolor1", 15);
+        return bindColortexSamplers(program, previousActive);
+    }
+
+    private static int bindColortexSamplers(int program, int previousActive) {
+        if (program == 0) return 5;
+        int unit = 5;
+        int maximum = GL11C.glGetInteger(GL20C.GL_MAX_TEXTURE_IMAGE_UNITS);
+        java.util.ArrayList<Integer> units = new java.util.ArrayList<>();
+        java.util.ArrayList<Integer> previousBindings = new java.util.ArrayList<>();
+        try {
+            for (int attachment = 1; attachment <= NvidiumGBufferTargets.MAX_ATTACHMENT; attachment++) {
+                int location = GL20C.glGetUniformLocation(program, "caustiqColortex" + attachment);
+                if (location < 0) continue;
+                if (unit >= maximum) {
+                    throw new IllegalStateException("Iris colortex samplers exceed the fragment-stage texture-unit limit.");
+                }
+                int textureUnit = GL13C.GL_TEXTURE0 + unit;
+                GL13C.glActiveTexture(textureUnit);
+                units.add(textureUnit);
+                previousBindings.add(GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D));
+                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, NvidiumGBufferTargets.texture(attachment));
+                GL20C.glUniform1i(location, unit);
+                unit++;
+            }
+        } catch (RuntimeException exception) {
+            restoreState(new BindingState(previousActive,
+                    units.stream().mapToInt(Integer::intValue).toArray(),
+                    previousBindings.stream().mapToInt(Integer::intValue).toArray()));
+            restoreBindings();
+            throw exception;
+        }
+        if (!units.isEmpty()) {
+            bindingState = merge(bindingState, new BindingState(previousActive,
+                    units.stream().mapToInt(Integer::intValue).toArray(),
+                    previousBindings.stream().mapToInt(Integer::intValue).toArray()));
+        }
+        GL13C.glActiveTexture(previousActive);
+        return unit;
+    }
+
+    private static BindingState bindTextures(int previousActive, int[] units, int[] textures) {
         int[] previousBindings = new int[units.length];
         for (int i = 0; i < units.length; i++) {
             GL13C.glActiveTexture(units[i]);
@@ -79,15 +111,30 @@ public final class NvidiumIrisTextureBridge {
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, textures[i]);
         }
         GL13C.glActiveTexture(previousActive);
-        bindingState = new BindingState(previousActive, units, previousBindings);
-        if (program != 0) {
-            int noise = GL20C.glGetUniformLocation(program, "noisetex");
-            if (noise >= 0) GL20C.glUniform1i(noise, 2);
-            int shadow0 = GL20C.glGetUniformLocation(program, "shadowtex0");
-            if (shadow0 >= 0) GL20C.glUniform1i(shadow0, 12);
-            int shadow1 = GL20C.glGetUniformLocation(program, "shadowtex1");
-            if (shadow1 >= 0) GL20C.glUniform1i(shadow1, 13);
+        return new BindingState(previousActive, units, previousBindings);
+    }
+
+    private static void setSampler(int program, String name, int unit) {
+        if (program == 0) return;
+        int location = GL20C.glGetUniformLocation(program, name);
+        if (location >= 0) GL20C.glUniform1i(location, unit);
+    }
+
+    private static BindingState merge(BindingState first, BindingState second) {
+        if (first == null) return second;
+        int[] units = java.util.Arrays.copyOf(first.units(), first.units().length + second.units().length);
+        int[] bindings = java.util.Arrays.copyOf(first.bindings(), first.bindings().length + second.bindings().length);
+        System.arraycopy(second.units(), 0, units, first.units().length, second.units().length);
+        System.arraycopy(second.bindings(), 0, bindings, first.bindings().length, second.bindings().length);
+        return new BindingState(first.activeTexture(), units, bindings);
+    }
+
+    private static void restoreState(BindingState state) {
+        for (int i = 0; i < state.units().length; i++) {
+            GL13C.glActiveTexture(state.units()[i]);
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, state.bindings()[i]);
         }
+        GL13C.glActiveTexture(state.activeTexture());
     }
 
     /** Returns the managed fallback noise texture for fullscreen sampler bindings. */
@@ -98,21 +145,19 @@ public final class NvidiumIrisTextureBridge {
 
     /** Restores CAUSTIQ's noise and Iris colortex units after the terrain draw. */
     public static void bindCustomTextures(IrisShaderResources resources, int program) {
+        bindCustomTextures(resources, program, 5);
+    }
+
+    public static void bindCustomTextures(IrisShaderResources resources, int program, int firstTextureUnit) {
         if (customResources != null) customResources.restoreTerrainTextures();
         customResources = resources;
-        if (resources != null) resources.bindTerrainTextures(program, 8);
+        if (resources != null) resources.bindTerrainTextures(program, firstTextureUnit);
     }
 
     public static void restoreBindings() {
         BindingState state = bindingState;
         bindingState = null;
-        if (state != null) {
-            for (int i = 0; i < state.units().length; i++) {
-                GL13C.glActiveTexture(state.units()[i]);
-                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, state.bindings()[i]);
-            }
-            GL13C.glActiveTexture(state.activeTexture());
-        }
+        if (state != null) restoreState(state);
         if (customResources != null) {
             customResources.restoreTerrainTextures();
             customResources = null;

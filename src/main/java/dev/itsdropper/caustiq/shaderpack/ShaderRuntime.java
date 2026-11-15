@@ -119,9 +119,9 @@ public final class ShaderRuntime {
     }
 
     /** Binds declared custom textures to the active Nvidium terrain program. */
-    public static void bindTerrainCustomTextures(int program) {
+    public static void bindTerrainCustomTextures(int program, int firstTextureUnit) {
         try {
-            NvidiumIrisTextureBridge.bindCustomTextures(irisShaderResources, program);
+            NvidiumIrisTextureBridge.bindCustomTextures(irisShaderResources, program, firstTextureUnit);
         } catch (RuntimeException exception) {
             CaustiqClient.LOGGER.warn("Could not bind custom Iris terrain textures: {}", exception.getMessage());
         }
