@@ -606,11 +606,13 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         for (int i = 0; i < drawBufferCount; i++) {
             drawBuffers[i] = GL11C.glGetInteger(GL20C.GL_DRAW_BUFFER0 + i);
         }
-        int textureUnits = GL11C.glGetInteger(GL20C.GL_MAX_TEXTURE_IMAGE_UNITS);
+        int textureUnits = GL11C.glGetInteger(GL20C.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);
         int[] textureBindings = new int[textureUnits];
+        int[] textureBindings3D = new int[textureUnits];
         for (int i = 0; i < textureUnits; i++) {
             GL13C.glActiveTexture(GL13C.GL_TEXTURE0 + i);
             textureBindings[i] = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
+            textureBindings3D[i] = GL11C.glGetInteger(GL12C.GL_TEXTURE_BINDING_3D);
         }
         GL13C.glActiveTexture(activeTexture);
         int[] viewport = new int[4];
@@ -620,7 +622,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             values.get(viewport);
         }
         return new GlState(drawFramebuffer, readFramebuffer, program, vertexArray, activeTexture,
-                readBuffer, drawBuffers, textureBindings, viewport,
+                readBuffer, drawBuffers, textureBindings, textureBindings3D, viewport,
                 GL11C.glIsEnabled(GL11C.GL_DEPTH_TEST),
                 GL11C.glIsEnabled(GL11C.GL_BLEND),
                 GL11C.glIsEnabled(GL11C.GL_CULL_FACE),
@@ -638,6 +640,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         for (int i = 0; i < state.textureBindings().length; i++) {
             GL13C.glActiveTexture(GL13C.GL_TEXTURE0 + i);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, state.textureBindings()[i]);
+            GL11C.glBindTexture(GL12C.GL_TEXTURE_3D, state.textureBindings3D()[i]);
         }
         GL13C.glActiveTexture(state.activeTexture());
         setEnabled(GL11C.GL_DEPTH_TEST, state.depthTest());
@@ -670,6 +673,6 @@ public final class IrisGlPassExecutor implements AutoCloseable {
 
     private record GlState(int drawFramebuffer, int readFramebuffer, int program, int vertexArray,
                            int activeTexture, int readBuffer, int[] drawBuffers, int[] textureBindings,
-                           int[] viewport, boolean depthTest, boolean blend, boolean cullFace,
+                           int[] textureBindings3D, int[] viewport, boolean depthTest, boolean blend, boolean cullFace,
                            boolean scissorTest) { }
 }
