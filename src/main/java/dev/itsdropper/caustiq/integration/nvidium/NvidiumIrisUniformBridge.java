@@ -135,6 +135,7 @@ public final class NvidiumIrisUniformBridge {
                 (float) Math.sin(sunAngle), (float) Math.cos(sunAngle), 0.0f);
         scalar(program, "caustiqWorldAge", worldAge);
         integer(program, "caustiqWorldTime", worldTime);
+        integer(program, "caustiqWorldDay", (int) Math.floorDiv(invokeLong(level, "getDayTime", 0L), 24_000L));
         scalar(program, "caustiqDayFactor", 0.5f + 0.5f * (float) Math.cos((dayProgress - 0.25f) * Math.PI * 2.0));
         float biomeTemperature = biomeFloat(level, "getBaseTemperature");
         float biomeHumidity = biomeFloat(level, "getDownfall");
