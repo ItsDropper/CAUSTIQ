@@ -45,6 +45,11 @@ assert "class Builder" in shader, "Shader.Builder nested class disappeared"
 mixins_json = json.loads((caustiq_root / "src/main/resources/caustiq.mixins.json").read_text(encoding="utf-8"))
 assert "NvidiumShaderBuilderMixin" in mixins_json["client"]
 assert "NvidiumTerrainRasterizerMixin" in mixins_json["client"]
+assert "NvidiumTranslucentTerrainRasterizerMixin" in mixins_json["client"]
+translucent_rasterizer_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumTranslucentTerrainRasterizerMixin.java").read_text(encoding="utf-8")
+assert 'method = "<init>", at = @At("HEAD")' in translucent_rasterizer_mixin
+assert "private static void caustiq$beginTranslucentShaderCompilation(CallbackInfo callbackInfo)" in translucent_rasterizer_mixin, "Translucent constructor HEAD injection must be static because it runs before super()"
+assert 'method = "<init>", at = @At("TAIL")' in translucent_rasterizer_mixin
 rasterizer_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumTerrainRasterizerMixin.java").read_text(encoding="utf-8")
 assert 'me.cortex.nvidium.renderers.PrimaryTerrainRasterizer' in rasterizer_mixin
 assert 'method = "raster"' in rasterizer_mixin
