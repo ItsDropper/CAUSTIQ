@@ -575,6 +575,48 @@ public final class IrisNvidiumTerrainTranslator {
         return List.copyOf(outputs.values());
     }
 
+    private static boolean hasReachableReference(String source, String symbol) {
+        Pattern functionPattern = Pattern.compile(
+                "(?m)(?:^|[;}])\\s*(?:void|bool|int|uint|float|double|[biud]?vec[234]|mat[234]|[A-Za-z_][A-Za-z0-9_]*)"
+                        + "\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\([^;{}]*\\)\\s*\\{");
+        Map<String, String> functions = new LinkedHashMap<>();
+        Matcher matcher = functionPattern.matcher(source);
+        while (matcher.find()) {
+            int open = matcher.end() - 1;
+            int depth = 1;
+            int cursor = open + 1;
+            while (cursor < source.length() && depth > 0) {
+                char current = source.charAt(cursor++);
+                if (current == '{') depth++;
+                else if (current == '}') depth--;
+            }
+            if (depth == 0) {
+                functions.merge(matcher.group(1), source.substring(open + 1, cursor - 1),
+                        (left, right) -> left + "\\n" + right);
+            }
+        }
+        if (functions.isEmpty()) return Pattern.compile("\\\\b" + Pattern.quote(symbol) + "\\\\b")
+                .matcher(source).find();
+
+        Set<String> reachable = new LinkedHashSet<>();
+        java.util.ArrayDeque<String> pending = new java.util.ArrayDeque<>();
+        if (functions.containsKey("main")) pending.add("main");
+        while (!pending.isEmpty()) {
+            String name = pending.removeFirst();
+            if (!reachable.add(name)) continue;
+            String body = functions.get(name);
+            if (Pattern.compile("\\\\b" + Pattern.quote(symbol) + "\\\\b").matcher(body).find()) return true;
+            for (String candidate : functions.keySet()) {
+                if (!reachable.contains(candidate)
+                        && Pattern.compile("\\\\b" + Pattern.quote(candidate) + "\\\\s*\\\\(")
+                        .matcher(body).find()) {
+                    pending.addLast(candidate);
+                }
+            }
+        }
+        return false;
+    }
+
     private static String removeUniformsAndAttributes(String source, boolean vertex) {
         String working = stripComments(source);
         Matcher uniforms = UNIFORM.matcher(working);
@@ -595,12 +637,14 @@ public final class IrisNvidiumTerrainTranslator {
                     || name.equals("view_pixel_size") || name.equals("fogColor")) && vertex) {
                 throw new IllegalArgumentException("Iris terrain vertex stage cannot use fragment-only uniform '" + name + "'.");
             }
+            if (UNSUPPORTED_RUNTIME_UNIFORMS.contains(name)) continue;
             uniforms.appendReplacement(uniformOutput, "");
         }
         uniforms.appendTail(uniformOutput);
         working = uniformOutput.toString();
+        String usageSource = UNIFORM.matcher(working).replaceAll("");
         for (String unavailable : UNSUPPORTED_RUNTIME_UNIFORMS) {
-            if (Pattern.compile("\\b" + Pattern.quote(unavailable) + "\\b").matcher(working).find()) {
+            if (hasReachableReference(usageSource, unavailable)) {
                 throw new IllegalArgumentException("Iris terrain shader uses '" + unavailable
                         + "', which CAUSTIQ does not yet bind to a real Nvidium resource.");
             }
@@ -639,8 +683,14 @@ public final class IrisNvidiumTerrainTranslator {
             while (outputs.find()) outputs.appendReplacement(outputBuffer, "");
             outputs.appendTail(outputBuffer);
             working = outputBuffer.toString();
-            if (Pattern.compile("(?m)^\\s*(?:varying|uniform)\\s+").matcher(working).find()) {
-                throw new IllegalArgumentException("Iris terrain fragment source contains an unsupported varying/uniform declaration.");
+            Matcher remainingUniforms = UNIFORM.matcher(working);
+            while (remainingUniforms.find()) {
+                if (!UNSUPPORTED_RUNTIME_UNIFORMS.contains(remainingUniforms.group(2))) {
+                    throw new IllegalArgumentException("Iris terrain fragment source contains an unsupported uniform declaration.");
+                }
+            }
+            if (Pattern.compile("(?m)^\\s*varying\\s+").matcher(working).find()) {
+                throw new IllegalArgumentException("Iris terrain fragment source contains an unsupported varying declaration.");
             }
         }
 
@@ -664,7 +714,6 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform ivec2 caustiqAtlasSize;
                 uniform float caustiqRainStrength;
                 uniform float caustiqWetness;
-                uniform vec2 caustiqTaaOffset;
                 uniform vec3 caustiqLightDirection;
                 uniform float caustiqWorldAge;
                 uniform float caustiqDayFactor;
