@@ -295,6 +295,157 @@ public final class IrisNvidiumTerrainTranslator {
         return renderTargetIndices;
     }
 
+    /**
+     * Builds a conventional GL vertex/fragment harness around the exact Iris
+     * functions injected into Nvidium. CI uses Mesa llvmpipe to compile, link,
+     * execute and read back pixels from these functions. The native NV mesh
+     * stage is validated separately because Mesa does not implement
+     * GL_NV_mesh_shader or Nvidium's NV buffer-reference ABI.
+     */
+    Map<String, String> softwareRenderHarnessSources() {
+        StringBuilder vertex = new StringBuilder("#version 430 core\n");
+        vertex.append(softwareVertexSupport())
+                .append(NvidiumTerrainVaryingAdapter.softwareRenderVertexHelpers())
+                .append(vertexProgramSource());
+        for (Varying varying : varyings) {
+            vertex.append(varying.qualifier().isBlank() ? "" : varying.qualifier() + " ")
+                    .append("out ").append(varying.type()).append(" ")
+                    .append(varying.name()).append(";\n");
+        }
+        for (int index = 0; index < 8; index++) {
+            vertex.append("out vec4 v_irisTexCoord").append(index).append(";\n");
+        }
+        vertex.append("""
+                uint caustiqTestPackPosition(float value) {
+                    return uint(clamp(round(((value + 8.0) / 32.0) * 1048576.0), 0.0, 1048575.0));
+                }
+                void main() {
+                    vec3 position = gl_VertexID == 0 ? vec3(-0.8, -0.8, 0.0)
+                            : gl_VertexID == 1 ? vec3(0.8, -0.8, 0.0)
+                            : vec3(0.0, 0.8, 0.0);
+                    uvec3 packedPosition = uvec3(caustiqTestPackPosition(position.x),
+                            caustiqTestPackPosition(position.y), caustiqTestPackPosition(position.z));
+                    Vertex testVertex;
+                    testVertex.hi = ((packedPosition.x >> 10u) & 0x3FFu)
+                            | (((packedPosition.y >> 10u) & 0x3FFu) << 10u)
+                            | (((packedPosition.z >> 10u) & 0x3FFu) << 20u);
+                    testVertex.lo = (packedPosition.x & 0x3FFu)
+                            | ((packedPosition.y & 0x3FFu) << 10u)
+                            | ((packedPosition.z & 0x3FFu) << 20u);
+                    testVertex.color = 0x00FFFFFFu;
+                    testVertex.u = 0x4000u;
+                    testVertex.v = 0x4000u;
+                    testVertex.blockLight = 255u;
+                    testVertex.skyLight = 255u;
+                    testVertex.material = 0u;
+                    testVertex.section = 0u;
+                    testVertex.blockId = 0u;
+                    testVertex.normal = 0x80000000u;
+                    testVertex.midUV = 0x80008000u;
+                    testVertex.midBlock = 0u;
+                    testVertex.nvidiumMaterial = 0x0000FF00u;
+
+                    caustiqCurrentVertex = testVertex;
+                    caustiqCurrentVertexId = uint(gl_VertexID);
+                    caustiqCurrentOrigin = vec3(0.0);
+                    caustiqCurrentTransform = mat4(1.0);
+                    caustiqIrisClipPosition = vec4(0.0);
+                    caustiqIrisTexCoord[0] = vec4(decodeVertexUV(testVertex), 0.0, 1.0);
+                    caustiqIrisTexCoord[1] = vec4(decodeLightUV(testVertex) * 256.0, 0.0, 1.0);
+                    for (int index = 2; index < 8; index++) caustiqIrisTexCoord[index] = vec4(0.0);
+                    caustiqIrisVertexMain();
+                    gl_Position = caustiqIrisClipPosition;
+                """);
+        for (Varying varying : varyings) {
+            vertex.append(varying.name()).append(" = caustiqIrisVarying_")
+                    .append(varying.name()).append(";\n");
+        }
+        for (int index = 0; index < 8; index++) {
+            vertex.append("    v_irisTexCoord").append(index)
+                    .append(" = caustiqIrisTexCoord[").append(index).append("];\n");
+        }
+        vertex.append("}\n");
+
+        StringBuilder fragment = new StringBuilder("#version 430 core\n");
+        fragment.append("""
+                layout(binding = 0) uniform sampler2D tex_diffuse;
+                layout(binding = 1) uniform sampler2D tex_light;
+                uniform vec2 screenSize;
+                uniform vec2 texelSize;
+                uniform vec2 texCoordShrink;
+                uniform vec4 fogColour;
+                uniform vec2 environmentFog;
+                uniform vec2 renderFog;
+                """);
+        for (Varying varying : varyings) {
+            fragment.append(varying.qualifier().isBlank() ? "" : varying.qualifier() + " ")
+                    .append("in ").append(varying.type()).append(" ")
+                    .append(varying.name()).append(";\n");
+        }
+        for (int index = 0; index < 8; index++) {
+            fragment.append("in vec4 v_irisTexCoord").append(index).append(";\n");
+        }
+        fragment.append("layout(location = 0) out vec4 colour;\n");
+        for (FragmentOutput output : outputs) {
+            fragment.append("layout(location = ").append(output.location() + 1)
+                    .append(") out ").append(output.type()).append(" caustiqIrisOutput")
+                    .append(output.location()).append(";\n");
+        }
+        if (usesFragData) {
+            for (int index = 0; index < fragDataCount && index < renderTargetIndices.size(); index++) {
+                fragment.append("layout(location = ").append(index + 1)
+                        .append(") out vec4 caustiqIrisOutput").append(index).append(";\n");
+            }
+        }
+        fragment.append(fragmentProgramSource())
+                .append("void main() {\n    colour = vec4(0.0);\n")
+                .append(fragmentInvocation())
+                .append("}\n");
+
+        return Map.of("VERTEX", vertex.toString(), "FRAGMENT", fragment.toString());
+    }
+
+    private static String softwareVertexSupport() {
+        return """
+                struct Vertex {
+                    uint hi; uint lo; uint color; uint u; uint v;
+                    uint blockLight; uint skyLight; uint material; uint section;
+                    uint blockId; uint normal; uint midUV; uint midBlock; uint nvidiumMaterial;
+                };
+                const float COLOR_SCALE = 1.0 / 255.0;
+                const uint POSITION_BITS = 20u;
+                const uint TEXTURE_BITS = 15u;
+                const uint TEXTURE_MAX_VALUE = (1u << TEXTURE_BITS) - 1u;
+                const float VERTEX_SCALE = 32.0 / float(1u << POSITION_BITS);
+                const float VERTEX_OFFSET = -8.0;
+                uniform vec2 texCoordShrink;
+                uniform vec2 screenSize;
+                uniform vec2 texelSize;
+                uniform vec4 fogColour;
+                uniform vec2 environmentFog;
+                uniform vec2 renderFog;
+                vec3 decodeVertexPosition(Vertex vertex) {
+                    uvec3 hi = (uvec3(vertex.hi) >> uvec3(0u, 10u, 20u)) & 0x3FFu;
+                    uvec3 lo = (uvec3(vertex.lo) >> uvec3(0u, 10u, 20u)) & 0x3FFu;
+                    return (vec3((hi << 10u) | lo) * VERTEX_SCALE) + VERTEX_OFFSET;
+                }
+                vec2 decodeVertexUV(Vertex vertex) {
+                    vec2 rawUv = vec2(vertex.u & TEXTURE_MAX_VALUE, vertex.v & TEXTURE_MAX_VALUE)
+                            / float(1u << TEXTURE_BITS);
+                    vec2 bias = mix(vec2(-1.0), vec2(1.0),
+                            bvec2(uvec2(vertex.u, vertex.v) >> TEXTURE_BITS));
+                    return (bias * texCoordShrink) + rawUv;
+                }
+                vec2 decodeLightUV(Vertex vertex) {
+                    return vec2(vertex.blockLight, vertex.skyLight) / 256.0;
+                }
+                vec4 decodeVertexColour(Vertex vertex) {
+                    uvec3 packedColour = (uvec3(vertex.color) >> uvec3(0u, 8u, 16u)) & 0xFFu;
+                    return vec4(vec3(packedColour) * COLOR_SCALE, 1.0);
+                }
+                """;
+    }
+
     private List<Integer> parseRenderTargetIndices(String source) {
         Matcher matcher = RENDERTARGETS.matcher(source);
         String activeDirective = null;
