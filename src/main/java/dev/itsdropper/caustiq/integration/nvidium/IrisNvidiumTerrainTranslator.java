@@ -592,10 +592,10 @@ public final class IrisNvidiumTerrainTranslator {
             }
             if (depth == 0) {
                 functions.merge(matcher.group(1), source.substring(open + 1, cursor - 1),
-                        (left, right) -> left + "\\n" + right);
+                        (left, right) -> left + "\n" + right);
             }
         }
-        if (functions.isEmpty()) return Pattern.compile("\\\\b" + Pattern.quote(symbol) + "\\\\b")
+        if (functions.isEmpty()) return Pattern.compile("\\b" + Pattern.quote(symbol) + "\\b")
                 .matcher(source).find();
 
         Set<String> reachable = new LinkedHashSet<>();
@@ -605,10 +605,10 @@ public final class IrisNvidiumTerrainTranslator {
             String name = pending.removeFirst();
             if (!reachable.add(name)) continue;
             String body = functions.get(name);
-            if (Pattern.compile("\\\\b" + Pattern.quote(symbol) + "\\\\b").matcher(body).find()) return true;
+            if (Pattern.compile("\\b" + Pattern.quote(symbol) + "\\b").matcher(body).find()) return true;
             for (String candidate : functions.keySet()) {
                 if (!reachable.contains(candidate)
-                        && Pattern.compile("\\\\b" + Pattern.quote(candidate) + "\\\\s*\\\\(")
+                        && Pattern.compile("\\b" + Pattern.quote(candidate) + "\\s*\\(")
                         .matcher(body).find()) {
                     pending.addLast(candidate);
                 }
