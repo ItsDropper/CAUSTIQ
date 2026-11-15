@@ -223,7 +223,8 @@ class IrisNvidiumTerrainTranslatorTest {
             assertTrue(combined.get("FRAGMENT").contains("caustiqIrisFragmentMain"));
             assertTrue(combined.get("MESH").contains("gl_MeshVerticesNV[id].gl_Position = caustiqIrisClipPosition;"));
             assertTrue(combined.get("FRAGMENT").contains("layout(location = 1) out vec4 caustiqIrisOutput1;"));
-            assertTrue(combined.get("FRAGMENT").contains("caustiqIrisOutput1 = pack_unorm_2x8"));
+            assertFalse(combined.get("FRAGMENT").contains("layout(location = 1) out vec4 caustiqIrisOutput1;"),
+                    "Photon's default RENDERTARGETS: 1 must not expose its disabled second MRT output");
             String outputDirectory = System.getenv("CAUSTIQ_COMPAT_OUTPUT_DIR");
             String validator = System.getenv("GLSLANG_VALIDATOR");
             Assumptions.assumeTrue(outputDirectory != null && validator != null,
