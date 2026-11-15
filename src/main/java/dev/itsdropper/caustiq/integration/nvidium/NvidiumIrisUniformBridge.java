@@ -1215,51 +1215,6 @@ public final class NvidiumIrisUniformBridge {
                 invokeDouble(entity, "getY", 0.0), invokeDouble(entity, "getZ", 0.0)};
     }
 
-    private static double attributeNumber(Minecraft client, String name, double fallback) {
-        Object value = environmentAttribute(client, name);
-        if (value instanceof Number number) return number.doubleValue();
-        Object index = invokeObject(value, "index");
-        return index instanceof Number number ? number.doubleValue() : fallback;
-    }
-
-    private static Object environmentAttribute(Minecraft client, String name) {
-        try {
-            Object camera = invokeObject(client.gameRenderer, "getMainCamera");
-            Object probe = invokeObject(camera, "attributeProbe");
-            Class<?> attributes = Class.forName("net.minecraft.world.attribute.EnvironmentAttributes");
-            Object key = attributes.getField(name).get(null);
-            Object tracker = invokeObject(client, "getDeltaTracker");
-            Object partial = invokeCompatibleQuietly(tracker, "getGameTimeDeltaPartialTick", false);
-            if (!(partial instanceof Number)) partial = 1.0f;
-            return invokeCompatibleQuietly(probe, "getValue", key, partial);
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
-            return null;
-        }
-    }
-
-    private static double normalizeDegrees(double degrees) {
-        double normalized = degrees % 360.0;
-        return normalized < 0.0 ? normalized + 360.0 : normalized;
-    }
-
-    private static long worldTimeForUniform(Object level, long dayTime) {
-        Object dimensionType = invokeObject(level, "dimensionType");
-        Object dimension = invokeObject(level, "dimension");
-        Object identifier = invokeObject(dimension, "identifier");
-        String path = String.valueOf(invokeObject(identifier, "getPath"));
-        boolean fixedTime = invokeBoolean(dimensionType, "hasFixedTime", false);
-        if (fixedTime && !path.equals("the_nether") && !path.equals("the_end")) return 0L;
-        return Math.floorMod(dayTime, 24_000L);
-    }
-
-    private static int moonPhase(Minecraft client, Object level) {
-        Object value = environmentAttribute(client, "MOON_PHASE");
-        Object index = invokeObject(value, "index");
-        if (index instanceof Number number) return number.intValue();
-        long dayTime = invokeLong(level, "getDayTime", 0L);
-        return (int) Math.floorMod(Math.floorDiv(dayTime, 24_000L), 8L);
-    }
-
     private static double[] skyColor(Object level, Snapshot snapshot) {
         Object colorValue = environmentAttribute(Minecraft.getInstance(), "SKY_COLOR");
         if (colorValue instanceof Number number) {
