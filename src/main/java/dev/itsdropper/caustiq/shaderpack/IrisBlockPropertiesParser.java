@@ -49,7 +49,7 @@ public final class IrisBlockPropertiesParser {
                 String key = block.properties().isEmpty()
                         ? block.identifier()
                         : block.identifier() + formatProperties(block.properties());
-                putUnique(result, key, id, lineNumber + 1);
+                putFirst(result, key, id);
             }
         }
         return Map.copyOf(result);
@@ -113,12 +113,9 @@ public final class IrisBlockPropertiesParser {
         return result.append(']').toString();
     }
 
-    private static void putUnique(Map<String, Integer> target, String key, int id, int lineNumber) {
-        Integer previous = target.putIfAbsent(key, id);
-        if (previous != null && previous != id) {
-            throw new IllegalArgumentException("Conflicting block.properties IDs for " + key
-                    + " on line " + lineNumber + ": " + previous + " and " + id);
-        }
+    /** Iris/OptiFine block-state maps use first-match precedence for duplicate selectors. */
+    private static void putFirst(Map<String, Integer> target, String key, int id) {
+        target.putIfAbsent(key, id);
     }
 
     private static String stripComment(String line) {

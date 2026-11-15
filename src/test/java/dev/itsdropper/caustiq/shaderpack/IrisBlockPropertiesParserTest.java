@@ -52,11 +52,11 @@ class IrisBlockPropertiesParserTest {
     }
 
     @Test
-    void rejectsMalformedAndConflictingMaterialMappings() {
+    void rejectsMalformedAndOutOfRangeMaterialMappingsButUsesIrisFirstMatchPrecedence() {
         assertThrows(IllegalArgumentException.class,
                 () -> parser.parse("block.1=minecraft:oak_log:axis"));
-        assertThrows(IllegalArgumentException.class,
-                () -> parser.parse("block.1=minecraft:stone\nblock.2=minecraft:stone"));
+        assertEquals(1, parser.parse("block.1=minecraft:stone\nblock.2=minecraft:stone")
+                .get("minecraft:stone"));
         assertThrows(IllegalArgumentException.class,
                 () -> parser.parse("block.2147483647=minecraft:stone"));
     }
