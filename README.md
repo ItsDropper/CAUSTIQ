@@ -190,6 +190,7 @@ Because it hooks into someone else's renderer internals, this branch leans hard 
 
 - **Pinned Nvidium source audit** — downloads Nvidium at a fixed revision and asserts that every method signature, field and shader anchor the mixins rely on still exists.
 - **Pinned Photon audits** — translates every dimension of a pinned [Photon](https://github.com/sixthsurge/photon) revision (terrain and shadow programs) against Nvidium's real task/mesh/fragment stages, runs its LPV compute program, and renders the translated terrain programs on Mesa under Xvfb. The workflow fails if these tests are *skipped*, not just if they fail.
+- **Pinned Complementary Reimagined r5.9.3 expression audit** — downloads the exact Modrinth release archive and evaluates every declared custom uniform and variable through CAUSTIQ's real Iris expression resolver. The workflow fails if the audit is skipped, if a declaration type is unsupported, if any identifier is unresolved, or if any result is non-finite. This is an expression-compatibility audit, not a claim that the complete pack renders in-game.
 - **Combined integration test** — native ABI adapter and Iris translator composed against the pinned sources.
 - **GLSL validation** with `glslangValidator` of the bundled packs, plus unit tests across the parser, analyzer, scheduler, G-buffers, uniform bridge and Lumina.
 - **JAR audit** — checks `fabric.mod.json` pins, the full mixin list and required classes, and that the artifact is named `caustiq-nvidium`.
