@@ -133,6 +133,10 @@ public final class NvidiumTerrainVaryingAdapter {
             "}",
             "// CAUSTIQ_NVIDIUM_ADAPTER_HELPERS_END");
 
+    static String softwareRenderVertexHelpers() {
+        return NORMAL_HELPER;
+    }
+
     private NvidiumTerrainVaryingAdapter() { }
 
     /** Adapts the pinned Nvidium terrain shader ABI; unknown layouts fail closed. */
