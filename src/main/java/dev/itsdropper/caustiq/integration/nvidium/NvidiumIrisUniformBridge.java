@@ -150,7 +150,7 @@ public final class NvidiumIrisUniformBridge {
         integer(program, "caustiqNoiseTexture", 2);
         integer(program, "caustiqHeavyFog", isHeavyFog() ? 1 : 0);
         integer(program, "caustiqIsElytraFlying", isElytraFlying() ? 1 : 0);
-        integer(program, "caustiqHeldBlockLightValue", heldBlockLightValue());
+        integer(program, "caustiqHeldBlockLightValue", heldBlockLightValue(InteractionHand.MAIN_HAND));
         integer(program, "caustiqHeldBlockLightValue2", heldBlockLightValue(InteractionHand.OFF_HAND));
         integer(program, "caustiqColortex1", 5);
         integer(program, "caustiqColortex2", 6);
