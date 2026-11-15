@@ -787,6 +787,7 @@ public final class NvidiumIrisUniformBridge {
                     modelViewProjection.get(new float[16]), 4);
             putMatrix3Components(values, "gl_NormalMatrix", snapshot.normalMatrix());
             putMatrix3Components(values, "iris_NormalMatrix", snapshot.normalMatrix());
+            putMatrix3Components(values, "iris_NormalMat", snapshot.normalMatrix());
             putMatrixComponents(values, "iris_ModelViewMatrix", snapshot.modelView(), 4);
             putMatrixComponents(values, "iris_ProjectionMatrix", snapshot.projection(), 4);
             putMatrixComponents(values, "iris_ModelViewMat", snapshot.modelView(), 4);
@@ -868,7 +869,7 @@ public final class NvidiumIrisUniformBridge {
         for (String name : scalars) values.putIfAbsent(name, 0.0);
         values.put("maxPlayerHealth", 20.0);
         values.put("maxPlayerHunger", 20.0);
-        values.put("maxPlayerArmor", 20.0);
+        values.put("maxPlayerArmor", 50.0);
         values.put("maxPlayerAir", 300.0);
         values.put("chunkFadeTimeInv", 0.0);
         values.put("seaLevel", 63.0);
@@ -902,7 +903,7 @@ public final class NvidiumIrisUniformBridge {
         putVector3(values, "relativeVehiclePosition", 0.0, 0.0, 0.0);
         putVector3(values, "upPosition", 0.0, 100.0, 0.0);
         putVector3(values, "sunPosition", 0.0, 100.0, 0.0);
-        putVector3(values, "moonPosition", 0.0, -100.0, 0.0);
+        putVector3(values, "moonPosition", 0.0, 100.0, 0.0);
         putVector3(values, "shadowLightPosition", 0.0, 100.0, 0.0);
         putVector3(values, "skyColor", 0.0, 0.0, 0.0);
         putVector3(values, "fogColor", 0.0, 0.0, 0.0);
