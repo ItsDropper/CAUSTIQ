@@ -428,24 +428,36 @@ public final class NvidiumIrisUniformBridge {
 
     /** Current frame values exposed to Iris custom uniform/variable expressions. */
     public static java.util.Map<String, Double> expressionVariables(int viewWidth, int viewHeight) {
+        return expressionVariables(viewWidth, viewHeight, java.util.Map.of());
+    }
+
+    public static java.util.Map<String, Double> expressionVariables(
+            int viewWidth, int viewHeight, java.util.Map<String, String> selectedDefines) {
         java.util.Map<String, Double> values = new java.util.HashMap<>();
         putIrisBuiltInDefaults(values);
 
         Minecraft client = Minecraft.getInstance();
         Object player = client.player;
+        Object cameraEntity = invokeObject(client, "getCameraEntity");
         Object level = client.level;
         Snapshot snapshot = CURRENT.get();
         Snapshot previous = PREVIOUS.get() == null ? snapshot : PREVIOUS.get();
         long worldAge = invokeLong(level, "getGameTime", 0L);
         long dayTime = invokeLong(level, "getDayTime", 0L);
-        long timeOfDay = Math.floorMod(dayTime - 6_000L, 24_000L);
-        float normalizedSunAngle = timeOfDay / 24_000.0f;
-        float celestialAngle = invokeFloat(level, "getSunAngle", 1.0f,
-                (float) (normalizedSunAngle * Math.PI * 2.0));
-        float rain = invokeFloat(level, "getRainLevel", 1.0f, 0.0f);
-        float thunder = invokeFloat(level, "getThunderLevel", 1.0f, 0.0f);
-        float near = snapshot == null ? 0.05f : projectionDistance(snapshot.projection(), false);
-        float far = snapshot == null ? 512.0f : projectionDistance(snapshot.projection(), true);
+        long timeOfDay = worldTimeForUniform(level, dayTime);
+        double fallbackSunDegrees = Math.toDegrees(invokeFloat(level, "getSunAngle", 1.0f, 0.0f));
+        double sunDegrees = attributeNumber(client, "SUN_ANGLE", fallbackSunDegrees);
+        double moonDegrees = attributeNumber(client, "MOON_ANGLE", sunDegrees + 180.0);
+        double sunAngleDegrees = normalizeDegrees(sunDegrees + 90.0);
+        double moonAngleDegrees = normalizeDegrees(moonDegrees + 90.0);
+        float normalizedSunAngle = (float) (sunAngleDegrees / 360.0);
+        boolean isDay = sunAngleDegrees < 180.0;
+        float sunPathRotation = parseFloat(selectedDefines.get("sunPathRotation"), 0.0f);
+        float celestialAngle = (float) Math.toRadians(sunDegrees);
+        float rain = clamp01(invokeFloat(level, "getRainLevel", 1.0f, 0.0f));
+        float thunder = clamp01(invokeFloat(level, "getThunderLevel", 1.0f, 0.0f));
+        float near = 0.05f;
+        float far = Math.max(16.0f, invokeDouble(client.options, "getEffectiveRenderDistance", 32.0) * 16.0);
 
         putScalar(values, "frameCounter", snapshot == null ? FRAME_COUNTER.get() : snapshot.frameCounter());
         putScalar(values, "frameTime", snapshot == null ? 1.0 / 60.0 : snapshot.frameTime());
@@ -454,12 +466,11 @@ public final class NvidiumIrisUniformBridge {
         putScalar(values, "worldDay", Math.floorDiv(dayTime, 24_000L));
         putScalar(values, "worldTime", Math.floorMod(dayTime, 24_000L));
         putScalar(values, "sunAngle", normalizedSunAngle);
-        putScalar(values, "shadowAngle", normalizedSunAngle <= 0.5f
-                ? normalizedSunAngle : normalizedSunAngle - 0.5f);
+        putScalar(values, "shadowAngle", isDay ? normalizedSunAngle : moonAngleDegrees / 360.0);
         putScalar(values, "rainStrength", rain);
         putScalar(values, "wetness", rain);
         putScalar(values, "thunderStrength", thunder);
-        putScalar(values, "moonPhase", moonPhase(level));
+        putScalar(values, "moonPhase", moonPhase(client, level));
         putScalar(values, "near", near);
         putScalar(values, "far", far);
         putScalar(values, "dhNearPlane", near);
@@ -471,11 +482,11 @@ public final class NvidiumIrisUniformBridge {
         putVector2(values, "viewSize", viewWidth, viewHeight);
         putVector2(values, "iris_ScreenSize", viewWidth, viewHeight);
         putVector2(values, "iris_ScreenSize", viewWidth, viewHeight);
-        putScalar(values, "eyeAltitude", invokeDouble(player, "getEyeY",
+        putScalar(values, "eyeAltitude", invokeDouble(cameraEntity, "getEyeY",
                 snapshot == null ? 0.0 : snapshot.cameraY()));
         putScalar(values, "screenBrightness", optionDouble(client, "gamma", 0.5));
-        putScalar(values, "isNight", timeOfDay >= 13_000L ? 1.0 : 0.0);
-        putScalar(values, "isDay", timeOfDay < 13_000L ? 1.0 : 0.0);
+        putScalar(values, "isNight", isDay ? 0.0 : 1.0);
+        putScalar(values, "isDay", isDay ? 1.0 : 0.0);
         putScalar(values, "isRaining", invokeBoolean(level, "isRaining", false) ? 1.0 : 0.0);
         putScalar(values, "isThundering", invokeBoolean(level, "isThundering", false) ? 1.0 : 0.0);
         putScalar(values, "isEyeInWater", isEyeInWater());
