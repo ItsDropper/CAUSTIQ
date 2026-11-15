@@ -51,6 +51,35 @@ class IrisShaderResourcesTest {
     }
 
     @Test
+    void resolvesComponentsOfCustomVectorVariablesAndTheirSwizzles() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("Vector/shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), """
+                variable.vec3.sunPosition=vec3(0.25, 0.5, 0.75)
+                variable.vec4.sunColor=vec4(sunPosition.x, sunPosition.y, sunPosition.z, 1.0)
+                uniform.float.sunRed=sunPosition.r
+                uniform.float.sunGreen=sunPosition.g
+                uniform.float.sunBlue=sunPosition.b
+                uniform.float.sunAlpha=sunColor.a
+                uniform.vec4.resolvedSunColor=sunColor
+                """);
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("vector", "Vector",
+                temporaryDirectory.resolve("Vector"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            try (IrisShaderResources resources = IrisShaderResources.load(model.properties(), sources)) {
+                Map<String, double[]> values = resources.evaluateUniformValues(Map.of());
+                assertEquals(0.25, values.get("sunRed")[0], 1.0e-9);
+                assertEquals(0.5, values.get("sunGreen")[0], 1.0e-9);
+                assertEquals(0.75, values.get("sunBlue")[0], 1.0e-9);
+                assertEquals(1.0, values.get("sunAlpha")[0], 1.0e-9);
+                assertArrayEquals(new double[]{0.25, 0.5, 0.75, 1.0},
+                        values.get("resolvedSunColor"), 1.0e-9);
+            }
+        }
+    }
+
+    @Test
     void loadsProgramScopedRawThreeDimensionalTextures() throws IOException {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("Scoped/shaders"));
         Path imageDirectory = Files.createDirectories(shaders.resolve("image"));

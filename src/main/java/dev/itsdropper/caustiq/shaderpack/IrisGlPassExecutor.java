@@ -293,6 +293,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                     + "' requires more simultaneous color attachments than this OpenGL context exposes.");
         }
 
+        assertNoGlError(pass, "before framebuffer setup");
         GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, framebuffer);
         for (int outputSlot = 0; outputSlot < maxColorAttachments; outputSlot++) {
             Integer targetIndex = outputTargets.get(outputSlot);
@@ -306,6 +307,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                     GL30C.GL_COLOR_ATTACHMENT0 + outputSlot, GL11C.GL_TEXTURE_2D, texture, 0);
         }
         GL20C.glDrawBuffers(drawBuffers);
+        assertNoGlError(pass, "framebuffer attachment setup");
         int status = GL30C.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER);
         if (status != GL30C.GL_FRAMEBUFFER_COMPLETE) {
             throw new IllegalStateException("Iris pass '" + pass.name()
@@ -318,15 +320,19 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         GL11C.glDisable(GL11C.GL_CULL_FACE);
         GL11C.glDisable(GL11C.GL_SCISSOR_TEST);
         clearOutputs(outputTargets, targets, clearedTargets);
+        assertNoGlError(pass, "output clearing");
 
         GL20C.glUseProgram(program.programId());
         bindSamplers(program, mainTarget, alternateCurrent, hasWritten, resources);
+        assertNoGlError(pass, "sampler binding");
         uploadScreenUniforms(program.programId(), outputSize.width(), outputSize.height());
         NvidiumIrisUniformBridge.uploadProgram(program.programId());
         resources.uploadUniforms(program.programId(),
                 NvidiumIrisUniformBridge.expressionVariables(outputSize.width(), outputSize.height()));
+        assertNoGlError(pass, "uniform upload");
         GL30C.glBindVertexArray(vertexArray);
         GL11C.glDrawArrays(GL11C.GL_TRIANGLES, 0, 3);
+        assertNoGlError(pass, "fullscreen draw");
 
         for (int location : writes) {
             alternateCurrent[location] = !alternateCurrent[location];
@@ -336,7 +342,16 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 GL11C.glBindTexture(GL11C.GL_TEXTURE_2D,
                         currentTexture(location, mainTarget, alternateCurrent, hasWritten));
                 GL30C.glGenerateMipmap(GL11C.GL_TEXTURE_2D);
+                assertNoGlError(pass, "mipmap generation for colortex" + location);
             }
+        }
+    }
+
+    private static void assertNoGlError(IrisTerrainPassScheduler.Pass pass, String stage) {
+        int error = GL11C.glGetError();
+        if (error != GL11C.GL_NO_ERROR) {
+            throw new IllegalStateException("OpenGL error 0x" + Integer.toHexString(error)
+                    + " during Iris pass '" + pass.name() + "' at " + stage + ".");
         }
     }
 

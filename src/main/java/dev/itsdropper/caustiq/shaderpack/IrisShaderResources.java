@@ -260,7 +260,34 @@ public final class IrisShaderResources implements AutoCloseable {
     private double resolveVariable(String name, Map<String, Double> context,
                                    Map<String, Double> evaluated, List<String> stack) {
         Double value = context.get(name);
-        return value != null ? value : evaluateVariable(name, context, evaluated, stack);
+        if (value != null) return value;
+
+        int separator = name.lastIndexOf('.');
+        if (separator > 0 && separator < name.length() - 1) {
+            String vectorName = name.substring(0, separator);
+            TypedExpression vector = variables.get(vectorName);
+            if (vector != null && componentCount(vector.type()) > 1) {
+                int component = vectorComponent(name.substring(separator + 1));
+                double[] components = evaluateVariableTyped(vectorName, vector.type(),
+                        context, evaluated, stack);
+                if (component >= components.length) {
+                    throw new IllegalArgumentException("Iris vector variable '" + vectorName
+                            + "' has no component '" + name.substring(separator + 1) + "'.");
+                }
+                return components[component];
+            }
+        }
+        return evaluateVariable(name, context, evaluated, stack);
+    }
+
+    private static int vectorComponent(String component) {
+        return switch (component) {
+            case "x", "r" -> 0;
+            case "y", "g" -> 1;
+            case "z", "b" -> 2;
+            case "w", "a" -> 3;
+            default -> throw new IllegalArgumentException("Unsupported Iris vector component '" + component + "'.");
+        };
     }
 
     private double evaluateVariable(String name, Map<String, Double> context,
