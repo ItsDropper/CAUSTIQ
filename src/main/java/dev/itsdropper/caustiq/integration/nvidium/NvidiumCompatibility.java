@@ -24,6 +24,7 @@ public final class NvidiumCompatibility {
      * selected as well.
      */
     public static boolean requestExtendedVertexFormat() {
+        NvidiumVertexAbiState.clear();
         if (!CaustiqConfig.get().enabled()) return false;
         try {
             Class<?> nvidium = Class.forName("me.cortex.nvidium.Nvidium");
