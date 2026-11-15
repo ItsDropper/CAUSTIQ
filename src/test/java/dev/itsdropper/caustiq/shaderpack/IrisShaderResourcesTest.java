@@ -127,6 +127,48 @@ class IrisShaderResourcesTest {
     }
 
     @Test
+    void resolvesScalarCustomUniformDependenciesInDeclarationOrder() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("ScalarUniforms/shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), """
+                uniform.float.me_fade=if(sun_dir_y < 0.18, 0.37 + 1.2 * max(0.0, -sun_dir_y), 1.7)
+                uniform.float.me_weight=pow(clamp(1.0 - me_fade * abs(sun_dir_y - 0.18), 0.0, 1.0), 2.0)
+                uniform.float.time_sunrise=if(sun_dir_x > 0.0, 1.0, 0.0) * me_weight
+                """);
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("scalar-uniforms", "ScalarUniforms",
+                temporaryDirectory.resolve("ScalarUniforms"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            try (IrisShaderResources resources = IrisShaderResources.load(model.properties(), sources)) {
+                Map<String, double[]> values = resources.evaluateUniformValues(
+                        Map.of("sun_dir_y", 0.5, "sun_dir_x", 1.0));
+                assertEquals(0.8976, values.get("me_weight")[0], 1.0e-9);
+                assertEquals(0.8976, values.get("time_sunrise")[0], 1.0e-9);
+            }
+        }
+    }
+
+    @Test
+    void rejectsCyclicScalarCustomUniformDependencies() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("CyclicUniforms/shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), """
+                uniform.float.first=second + 1.0
+                uniform.float.second=first + 1.0
+                """);
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("cyclic-uniforms", "CyclicUniforms",
+                temporaryDirectory.resolve("CyclicUniforms"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            try (IrisShaderResources resources = IrisShaderResources.load(model.properties(), sources)) {
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                        () -> resources.evaluateUniformValues(Map.of()));
+                assertTrue(exception.getMessage().contains("Cyclic Iris uniform dependency"));
+            }
+        }
+    }
+
+    @Test
     void loadsProgramScopedRawThreeDimensionalTextures() throws IOException {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("Scoped/shaders"));
         Path imageDirectory = Files.createDirectories(shaders.resolve("image"));
