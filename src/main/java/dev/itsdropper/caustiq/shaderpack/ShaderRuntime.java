@@ -8,6 +8,7 @@ import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisVertexContext;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTextureBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumRenderBridge;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumShaderProgramBridge;
 import dev.itsdropper.caustiq.integration.nvidium.IrisNvidiumTerrainTranslator;
 import net.fabricmc.loader.api.FabricLoader;
@@ -60,6 +61,7 @@ public final class ShaderRuntime {
     /** Invalidates compiled resources after a UI/configuration change. Render-thread only. */
     public static void requestReload() {
         closeSources();
+        NvidiumShadowRenderer.configure(false, 2048, 128.0f);
         NvidiumShaderProgramBridge.unregisterTerrainAdapter();
         NvidiumGBufferTargets.resetOutputRouting();
         POST_PROCESS.close();
@@ -130,6 +132,7 @@ public final class ShaderRuntime {
         preparedDimensionMappings = Map.of();
         activeTerrainDimensionKey = "";
         preparedTerrainAdapterRegistered = false;
+        NvidiumShadowRenderer.configure(false, 2048, 128.0f);
         if (!CaustiqConfig.get().enabled()
                 || !FabricLoader.getInstance().isModLoaded("nvidium")
                 || !NvidiumShaderProgramBridge.hasNativeSourceAdapter()) {
@@ -155,6 +158,8 @@ public final class ShaderRuntime {
                         selected.displayName(), model.requiredFeatures());
                 return;
             }
+
+            configureShadowRenderer(model);
 
             Map<String, String> optionDefines = new LinkedHashMap<>();
             for (ShaderPackMetadata.Option option : model.options().options()) {
@@ -298,6 +303,41 @@ public final class ShaderRuntime {
         preparedTerrainAdapterRegistered = false;
         activeTerrainDimensionKey = "";
         NvidiumRenderBridge.reloadShaders();
+    }
+
+    private static void configureShadowRenderer(IrisShaderPackModel model) {
+        boolean hasShadowTerrain = model.base().programs().values().stream()
+                .anyMatch(program -> ShaderPackProgramCatalog.Group.classify(program.name())
+                        == ShaderPackProgramCatalog.Group.SHADOW)
+                || model.dimensionOverrides().values().stream()
+                .flatMap(programSet -> programSet.programs().values().stream())
+                .anyMatch(program -> ShaderPackProgramCatalog.Group.classify(program.name())
+                        == ShaderPackProgramCatalog.Group.SHADOW);
+        int resolution = parseIntegerProperty(model.properties().get("shadowMapResolution"), 2048);
+        float distance = parseFloatProperty(model.properties().get("shadowDistance"), 128.0f);
+        float distanceMultiplier = parseFloatProperty(
+                model.properties().get("shadowDistanceRenderMul"), 1.0f);
+        NvidiumShadowRenderer.configure(hasShadowTerrain, resolution, distance * distanceMultiplier);
+        if (hasShadowTerrain) {
+            CaustiqClient.LOGGER.info("Prepared isolated Nvidium shadow terrain pipeline ({}px, {:.1f}-block light-space radius).",
+                    Integer.highestOneBit(Math.max(256, Math.min(8192, resolution))), distance * distanceMultiplier);
+        }
+    }
+
+    private static int parseIntegerProperty(String value, int fallback) {
+        if (value == null) return fallback;
+        try { return Integer.parseInt(value.trim()); }
+        catch (NumberFormatException ignored) { return fallback; }
+    }
+
+    private static float parseFloatProperty(String value, float fallback) {
+        if (value == null) return fallback;
+        try {
+            float parsed = Float.parseFloat(value.trim());
+            return Float.isFinite(parsed) && parsed > 0.0f ? parsed : fallback;
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 
     private static String builtInDimensionDirectory(String dimensionId) {

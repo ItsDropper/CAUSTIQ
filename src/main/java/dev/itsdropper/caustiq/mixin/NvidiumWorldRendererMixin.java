@@ -4,6 +4,7 @@ import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisChunkVertex;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTextureBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumRenderBridge;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -27,6 +28,12 @@ public abstract class NvidiumWorldRendererMixin {
     @Inject(method = "delete", at = @At("TAIL"), remap = false, require = 1)
     private void caustiq$releaseShaderTextures(CallbackInfo callbackInfo) {
         NvidiumIrisTextureBridge.destroy();
+        NvidiumShadowRenderer.destroy(this);
+    }
+
+    @Inject(method = "reloadShaders", at = @At("TAIL"), remap = false, require = 1)
+    private void caustiq$reloadShadowRasterizer(CallbackInfo callbackInfo) {
+        NvidiumShadowRenderer.reload(this);
     }
 
     @ModifyArg(
@@ -54,6 +61,14 @@ public abstract class NvidiumWorldRendererMixin {
             CallbackInfo callbackInfo) {
         NvidiumRenderBridge.attachWorldRenderer(this);
         NvidiumIrisUniformBridge.capture(matrices, x, y, z);
+    }
+
+    @Inject(method = "renderFrame", at = @At("RETURN"), remap = false, require = 1)
+    private void caustiq$renderShadowTerrain(
+            @Coerce Object pass, @Coerce Object viewport, @Coerce Object fogParameters,
+            @Coerce Object matrices, double x, double y, double z,
+            @Coerce Object terrainSampler, CallbackInfo callbackInfo) {
+        NvidiumShadowRenderer.render(this, pass, fogParameters, x, y, z, terrainSampler);
     }
 
     @Inject(method = "renderFrame", at = @At("HEAD"), remap = false, require = 1)

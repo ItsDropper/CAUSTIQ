@@ -149,6 +149,7 @@ jobs:
                   "dev/itsdropper/caustiq/mixin/NvidiumBlockRendererVertexContextMixin.class",
                   "dev/itsdropper/caustiq/mixin/NvidiumFluidRendererVertexContextMixin.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumGBufferTargets.class",
+                  "dev/itsdropper/caustiq/integration/nvidium/NvidiumShadowRenderer.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisTextureBridge.class",
                   "dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisVertexContext.class",

@@ -76,13 +76,17 @@ public final class NvidiumShaderProgramBridge {
         ACTIVE_PIPELINE.set(Objects.requireNonNull(pipeline, "pipeline"));
     }
 
+    /** Preserves an explicitly selected SHADOW compile scope inside Nvidium's constructor mixin. */
+    public static PipelineKind pipelineForConstructor() { return ACTIVE_PIPELINE.get(); }
+
     public static void endPipelineCompile() {
         ACTIVE_PIPELINE.remove();
     }
 
     public enum PipelineKind {
         PRIMARY,
-        TRANSLUCENT
+        TRANSLUCENT,
+        SHADOW
     }
 
     /** Called immediately before Nvidium links a shader program through OpenGL. */
@@ -102,8 +106,11 @@ public final class NvidiumShaderProgramBridge {
         UnaryOperator<Map<String, String>> nativeAdapter = nativeSourceAdapter;
         if (nativeAdapter != null) transformed = applyAdapter(nativeAdapter, transformed, "native Nvidium", false);
         PipelineKind pipeline = ACTIVE_PIPELINE.get();
-        UnaryOperator<Map<String, String>> irisAdapter = pipeline == PipelineKind.TRANSLUCENT
-                ? translucentTerrainAdapter : primaryTerrainAdapter;
+        UnaryOperator<Map<String, String>> irisAdapter = switch (pipeline) {
+            case PRIMARY -> primaryTerrainAdapter;
+            case TRANSLUCENT -> translucentTerrainAdapter;
+            case SHADOW -> null;
+        };
         if (irisAdapter != null) {
             transformed = applyAdapter(irisAdapter, transformed,
                     pipeline == PipelineKind.TRANSLUCENT ? "Iris translucent terrain" : "Iris terrain", true);
