@@ -152,6 +152,7 @@ public final class NvidiumIrisUniformBridge {
         integer(program, "caustiqHeavyFog", isHeavyFog() ? 1 : 0);
         integer(program, "caustiqIsElytraFlying", isElytraFlying() ? 1 : 0);
         integer(program, "caustiqIsEyeInWater", isEyeInWater());
+        integer(program, "caustiqMoonPhase", moonPhase(level));
         integer(program, "caustiqHeldBlockLightValue", heldBlockLightValue(InteractionHand.MAIN_HAND));
         integer(program, "caustiqHeldBlockLightValue2", heldBlockLightValue(InteractionHand.OFF_HAND));
         integer(program, "caustiqHeldItemId", heldItemId(InteractionHand.MAIN_HAND));
@@ -167,6 +168,12 @@ public final class NvidiumIrisUniformBridge {
         if (player == null) return 0;
         ItemStack stack = player.getItemInHand(hand);
         return stack.isEmpty() ? 0 : BuiltInRegistries.ITEM.getId(stack.getItem());
+    }
+
+    /** Mirrors Minecraft's eight-step lunar phase, derived from the world's day time. */
+    private static int moonPhase(Object level) {
+        long dayTime = invokeLong(level, "getDayTime", 0L);
+        return (int) Math.floorMod(Math.floorDiv(dayTime, 24_000L), 8L);
     }
 
     /** Mirrors Iris isEyeInWater(): 0=none, 1=water, 2=lava, 3=powder snow. */
