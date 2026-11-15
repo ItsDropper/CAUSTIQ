@@ -59,10 +59,11 @@ class ComplementaryReimaginedCompatibilityTest {
                     properties, Map.of("MC_VERSION", "12111", "IS_IRIS", "1"))) {
                 assertFalse(resources.uniformNames().isEmpty(),
                         "Complementary r5.9.3 must expose custom uniforms.");
-                assertTrue(resources.variableNames().containsAll(
-                                java.util.Set.of("difX", "difY", "difZ", "difSum", "moving", "moved",
-                                        "endFlashFactor0", "endFlashFactor1")),
-                        "Complementary's declared variable dependency chain was not loaded.");
+                assertEquals(
+                        java.util.Set.of("difX", "difY", "difZ", "difSum", "moving", "moved",
+                                "endFlashFactor0", "endFlashFactor1"),
+                        resources.variableNames(),
+                        "The complete Complementary r5.9.3 variable declaration set must be loaded.");
 
                 Map<String, Double> context = new HashMap<>();
                 NvidiumIrisUniformBridge.putIrisBuiltInDefaults(context);
