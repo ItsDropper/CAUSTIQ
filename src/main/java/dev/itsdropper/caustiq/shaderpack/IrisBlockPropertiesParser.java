@@ -54,12 +54,19 @@ public final class IrisBlockPropertiesParser {
             value = value.substring(0, propertyStart);
         } else {
             int namespaceSeparator = value.indexOf(':');
-            int selectorSeparator = namespaceSeparator < 0 ? -1 : value.indexOf(':', namespaceSeparator + 1);
+            int selectorSeparator = namespaceSeparator < 0
+                    ? -1 : value.indexOf(':', namespaceSeparator + 1);
+            if (namespaceSeparator < 0) {
+                // OptiFine/Iris block.properties accepts vanilla shorthand such as
+                // oak_sign and oak_log:axis=y; treat its first colon as a state selector.
+                selectorSeparator = value.indexOf(':');
+            }
             if (selectorSeparator >= 0) {
                 propertyText = value.substring(selectorSeparator + 1);
                 value = value.substring(0, selectorSeparator);
             }
         }
+        if (!value.contains(":")) value = "minecraft:" + value;
         if (!value.matches("[a-z0-9_.-]+:[a-z0-9_./-]+")) {
             throw new IllegalArgumentException("Invalid block identifier on line " + lineNumber + ": " + token);
         }
