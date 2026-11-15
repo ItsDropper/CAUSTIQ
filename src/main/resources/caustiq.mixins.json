@@ -16,10 +16,7 @@
     "NvidiumBlockRendererVertexContextMixin",
     "NvidiumFluidRendererVertexContextMixin",
     "NvidiumPrimaryTerrainRasterizerMixin",
-    "NvidiumTranslucentTerrainRasterizerMixin",
-    "NvidiumSodiumResultCompatibilityMixin",
-    "SodiumBlockRendererContextMixin",
-    "SodiumFluidRendererContextMixin"
+    "NvidiumTranslucentTerrainRasterizerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
