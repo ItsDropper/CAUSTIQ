@@ -88,6 +88,36 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesEveryPinnedPhotonDimensionAndHonorsPackFeatureOptionsWhenCiProvidesItsSource() throws Exception {
+        String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
+        Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),
+                "Photon source checkout is supplied by CI only");
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("photon", "Photon",
+                Path.of(photonDirectory), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            for (String dimension : List.of("world0", "world-1", "world1")) {
+                IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
+                        model, dimension, "gbuffers_terrain",
+                        Map.of("NORMAL_MAPPING", "1", "SPECULAR_MAPPING", "1"));
+                Map<String, String> translated = translator.adapt(nativeStages());
+                assertTrue(translated.get("MESH").contains("void caustiqIrisVertexMain()"),
+                        dimension + " vertex program was not translated");
+                assertTrue(translated.get("FRAGMENT").contains("void caustiqIrisFragmentMain()"),
+                        dimension + " fragment program was not translated");
+                assertFalse(translator.renderTargetIndices().isEmpty(),
+                        dimension + " has no routed fragment outputs");
+            }
+
+            IrisNvidiumTerrainTranslator defaults = IrisNvidiumTerrainTranslator.from(
+                    model, "world0", "gbuffers_terrain",
+                    Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false"));
+            assertEquals(List.of(1), defaults.renderTargetIndices());
+        }
+    }
+
+    @Test
     void translatesGlFragDataToNvidiumMrtLocations() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150
