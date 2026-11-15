@@ -108,6 +108,14 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
         try (var sources = ShaderPackSources.open(descriptor)) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            var overworld = model.dimensionOverrides().get("world0");
+            assertNotNull(overworld, "Photon's overworld program set must be parsed");
+            assertTrue(overworld.programs().containsKey("deferred4_a"),
+                    "Photon's numbered/lettered deferred compute entry point must be recognized");
+            assertTrue(overworld.programs().containsKey("clrwl_gbuffers"),
+                    "Photon's color-wheel gbuffers entry point must be recognized");
+            assertTrue(overworld.programs().containsKey("shadow_block"),
+                    "Photon's specialized shadow entry points must be recognized");
             IrisNvidiumTerrainTranslator translator = assertDoesNotThrow(
                     () -> IrisNvidiumTerrainTranslator.from(model, null, "gbuffers_terrain",
                             java.util.Map.of("TAA", "false", "NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false")),
