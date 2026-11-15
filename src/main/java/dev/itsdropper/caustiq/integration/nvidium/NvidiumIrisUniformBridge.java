@@ -109,12 +109,14 @@ public final class NvidiumIrisUniformBridge {
         scalar(program, "caustiqWorldAge", worldAge);
         scalar(program, "caustiqWorldTime", worldTime);
         scalar(program, "caustiqDayFactor", 0.5f - 0.5f * (float) Math.cos(worldTime * Math.PI * 2.0));
+        float biomeTemperature = biomeFloat(level, "getBaseTemperature");
+        float biomeHumidity = biomeFloat(level, "getDownfall");
+        if (Float.isFinite(biomeTemperature)) scalar(program, "caustiqBiomeTemperature", biomeTemperature);
+        if (Float.isFinite(biomeHumidity)) scalar(program, "caustiqBiomeHumidity", biomeHumidity);
         scalar(program, "caustiqTimeSunrise", 0.0f);
         scalar(program, "caustiqTimeNoon", 0.0f);
         scalar(program, "caustiqTimeSunset", 0.0f);
         scalar(program, "caustiqTimeMidnight", 0.0f);
-        scalar(program, "caustiqBiomeTemperature", 0.5f);
-        scalar(program, "caustiqBiomeHumidity", 0.5f);
         scalar(program, "caustiqAlphaTestRef", 0.1f);
         integer(program, "caustiqBlockEntityId", 0);
         integer(program, "caustiqEntityId", 0);
@@ -124,6 +126,20 @@ public final class NvidiumIrisUniformBridge {
         integer(program, "caustiqColortex1", 5);
         integer(program, "caustiqColortex2", 6);
         integer(program, "caustiqColortex4", 7);
+    }
+
+    private static float biomeFloat(Object level, String methodName) {
+        if (level == null || Minecraft.getInstance().player == null) return Float.NaN;
+        try {
+            Object player = Minecraft.getInstance().player;
+            Object position = player.getClass().getMethod("blockPosition").invoke(player);
+            Object holder = level.getClass().getMethod("getBiome", position.getClass()).invoke(level, position);
+            Object biome = holder.getClass().getMethod("value").invoke(holder);
+            Object value = biome.getClass().getMethod(methodName).invoke(biome);
+            return value instanceof Number number ? number.floatValue() : Float.NaN;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return Float.NaN;
+        }
     }
 
     private static float projectionDistance(float[] projection, boolean farPlane) {
