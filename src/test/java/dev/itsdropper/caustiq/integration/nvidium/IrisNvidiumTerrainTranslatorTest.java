@@ -485,8 +485,8 @@ class IrisNvidiumTerrainTranslatorTest {
         assertTrue(nativeSources.get("MESH").contains("uint8_t section;"),
                 "Pinned Nvidium mesh imports must be expanded before ABI adaptation");
         Map<String, String> extended = NvidiumTerrainVaryingAdapter.adapt(nativeSources);
-        assertTrue(extended.get("MESH").contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4"));
-        assertTrue(extended.get("MESH").contains("OUT[id].v_tbn = caustiqDecodeTbn(V);"));
+        assertTrue(extended.get("MESH").contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 5"));
+        assertFalse(extended.get("MESH").contains("OUT[id].v_tbn ="));
         assertTrue(extended.get("FRAGMENT").contains("caustiqGBufferLightmap"));
 
         String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
