@@ -26,6 +26,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class ShaderRuntime {
+    private static final Set<String> SUPPORTED_REQUIRED_IRIS_FEATURES = Set.of("CUSTOM_IMAGES");
     private static final AtomicReference<ShaderPackScanResult> SCAN_RESULT = new AtomicReference<>();
     private static final List<CompiledShaderProgram> COMPILED = new ArrayList<>();
     private static final ShaderPostProcessPass POST_PROCESS = new ShaderPostProcessPass();
@@ -162,10 +163,11 @@ public final class ShaderRuntime {
             IrisShaderResources loadedResources = IrisShaderResources.load(model.properties(), selectedSources);
             irisShaderResources.close();
             irisShaderResources = loadedResources;
-            if (!model.requiredFeatures().isEmpty()) {
+            Set<String> unsupportedRequiredFeatures = unsupportedRequiredFeatures(model);
+            if (!unsupportedRequiredFeatures.isEmpty()) {
                 CaustiqClient.LOGGER.warn(
-                        "Shader pack '{}' requires Iris feature flags {}; Nvidium terrain translation remains disabled.",
-                        selected.displayName(), model.requiredFeatures());
+                        "Shader pack '{}' requires Iris feature flag(s) CAUSTIQ cannot provide: {}; Nvidium terrain translation remains disabled.",
+                        selected.displayName(), unsupportedRequiredFeatures);
                 return;
             }
 
@@ -584,10 +586,11 @@ public final class ShaderRuntime {
             ShaderPackProgramCatalog.Result catalog = new ShaderPackProgramCatalog.Result(
                     discoveredPrograms, List.of(), invalidPrograms);
 
-            if (!packModel.requiredFeatures().isEmpty()) {
+            Set<String> unsupportedRequiredFeatures = unsupportedRequiredFeatures(packModel);
+            if (!unsupportedRequiredFeatures.isEmpty()) {
                 CaustiqClient.LOGGER.warn(
-                        "Shader pack '{}' requires Iris feature flag(s) {}. CAUSTIQ's Nvidium translation pipeline does not currently implement Iris feature negotiation; refusing partial activation.",
-                        selected.displayName(), packModel.requiredFeatures());
+                        "Shader pack '{}' requires Iris feature flag(s) CAUSTIQ cannot provide: {}; refusing partial activation.",
+                        selected.displayName(), unsupportedRequiredFeatures);
                 pending = List.of();
                 discoveryFinished = true;
                 closeSources();
@@ -685,6 +688,13 @@ public final class ShaderRuntime {
             discoveryFinished = true;
             closeSources();
         }
+    }
+
+    private static Set<String> unsupportedRequiredFeatures(IrisShaderPackModel model) {
+        return model.requiredFeatures().stream()
+                .map(feature -> feature.toUpperCase(java.util.Locale.ROOT))
+                .filter(feature -> !SUPPORTED_REQUIRED_IRIS_FEATURES.contains(feature))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     private static IrisShaderPackModel.ProgramSet programSetForDimension(
