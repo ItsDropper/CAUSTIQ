@@ -134,7 +134,7 @@ final class IrisImageResources implements AutoCloseable {
                 GL30C.glGetIntegeri(GL42C.GL_IMAGE_BINDING_FORMAT, unit)));
     }
 
-    private static Map<String, ImageSpec> parse(String source, Map<String, String> defines) throws java.io.IOException {
+    static Map<String, ImageSpec> parse(String source, Map<String, String> defines) throws java.io.IOException {
         Map<String, ImageSpec> result = new LinkedHashMap<>();
         Deque<Conditional> stack = new ArrayDeque<>();
         boolean active = true;
