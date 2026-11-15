@@ -497,8 +497,13 @@ public final class IrisNvidiumTerrainTranslator {
         }
         for (int irisIndex : irisOutputIndices) {
             int nvidiumLocation = irisIndex + 1;
+            String outputType = outputs.stream()
+                    .filter(output -> output.location() == irisIndex)
+                    .map(FragmentOutput::type)
+                    .findFirst().orElse("vec4");
             fragment = insertAfter(fragment, "layout(location = 0) out vec4 colour;",
-                    "layout(location = " + nvidiumLocation + ") out vec4 caustiqIrisOutput" + irisIndex + ";\\n");
+                    "layout(location = " + nvidiumLocation + ") out " + outputType
+                            + " caustiqIrisOutput" + irisIndex + ";\\n");
         }
         return fragment;
     }
@@ -559,8 +564,8 @@ public final class IrisNvidiumTerrainTranslator {
         while (matcher.find()) {
             int location = matcher.group(1) == null ? implicitLocation : Integer.parseInt(matcher.group(1));
             String type = matcher.group(2);
-            if (!type.equals("vec4")) {
-                throw new IllegalArgumentException("Nvidium terrain MRT currently requires vec4 fragment outputs; got "
+            if (!Set.of("float", "vec2", "vec3", "vec4").contains(type)) {
+                throw new IllegalArgumentException("Nvidium terrain MRT supports floating-point scalar/vector outputs; got "
                         + type + " at location " + location + ".");
             }
             if (location < 0 || location > 7) {
