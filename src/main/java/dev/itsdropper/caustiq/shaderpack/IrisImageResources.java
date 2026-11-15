@@ -1,5 +1,6 @@
 package dev.itsdropper.caustiq.shaderpack;
 
+import net.minecraft.client.Minecraft;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL12C;
 import org.lwjgl.opengl.GL13C;
@@ -221,9 +222,9 @@ final class IrisImageResources implements AutoCloseable {
                 throw new java.io.IOException("Iris image." + name
                         + " must declare sampler, format, internal format, type, clear, nearest and 2D/3D dimensions.");
             }
-            int width = dimension(v[6], defines, name);
-            int height = dimension(v[7], defines, name);
-            int depth = v.length == 9 ? dimension(v[8], defines, name) : 1;
+            int width = dimension(v[6], defines, name, 0);
+            int height = dimension(v[7], defines, name, 1);
+            int depth = v.length == 9 ? dimension(v[8], defines, name, 2) : 1;
             if (width < 1 || height < 1 || depth < 1 || width > 8192 || height > 8192 || depth > 2048) {
                 throw new java.io.IOException("Iris image." + name + " has invalid dimensions "
                         + width + "x" + height + "x" + depth + ".");
@@ -306,12 +307,25 @@ final class IrisImageResources implements AutoCloseable {
         return value != null && !value.equalsIgnoreCase("false") && !value.equals("0");
     }
 
-    private static int dimension(String token, Map<String, String> defines, String image) throws java.io.IOException {
+    private static int dimension(String token, Map<String, String> defines, String image, int axis)
+            throws java.io.IOException {
         String value = defines.getOrDefault(token, token);
         try { return Integer.parseInt(value); }
-        catch (NumberFormatException ex) {
-            throw new java.io.IOException("Iris image." + image + " dimension '" + token
-                    + "' is not a resolved integer (selected value: " + value + ").", ex);
+        catch (NumberFormatException integerFailure) {
+            try {
+                double scale = Double.parseDouble(value);
+                if (!Double.isFinite(scale) || scale <= 0.0 || scale > 4.0 || axis == 2) {
+                    throw new NumberFormatException("Invalid image scale");
+                }
+                var window = Minecraft.getInstance().getWindow();
+                int base = axis == 0 ? window.getWidth() : window.getHeight();
+                if (base < 1) throw new NumberFormatException("Render window is not initialized");
+                return Math.max(1, (int) Math.ceil(base * scale));
+            } catch (NumberFormatException | RuntimeException scaleFailure) {
+                throw new java.io.IOException("Iris image." + image + " dimension '" + token
+                        + "' is not a positive integer or a valid render-scale expression (selected value: "
+                        + value + ").", scaleFailure);
+            }
         }
     }
 
