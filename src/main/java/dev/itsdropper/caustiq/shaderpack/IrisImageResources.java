@@ -321,7 +321,7 @@ final class IrisImageResources implements AutoCloseable {
                 int base = axis == 0 ? window.getWidth() : window.getHeight();
                 if (base < 1) throw new NumberFormatException("Render window is not initialized");
                 return Math.max(1, (int) Math.ceil(base * scale));
-            } catch (NumberFormatException | RuntimeException scaleFailure) {
+            } catch (RuntimeException scaleFailure) {
                 throw new java.io.IOException("Iris image." + image + " dimension '" + token
                         + "' is not a positive integer or a valid render-scale expression (selected value: "
                         + value + ").", scaleFailure);
