@@ -123,6 +123,19 @@ jobs:
           print("Verified pinned-source terrain, shadow, and Photon LPV compute audits executed successfully.")
           PY
 
+      - name: Compile generated Nvidium terrain and shadow shaders
+        shell: bash
+        run: |
+          set -euo pipefail
+          compat_dir="build/nvidium-compat"
+          for shader in photon-nvidium-terrain.mesh photon-nvidium-terrain.frag photon-nvidium-shadow.mesh photon-nvidium-shadow.frag; do
+            test -s "$compat_dir/$shader"
+          done
+          glslangValidator -S mesh "$compat_dir/photon-nvidium-terrain.mesh"
+          glslangValidator -S frag "$compat_dir/photon-nvidium-terrain.frag"
+          glslangValidator -S mesh "$compat_dir/photon-nvidium-shadow.mesh"
+          glslangValidator -S frag "$compat_dir/photon-nvidium-shadow.frag"
+
       - name: Validate bundled GLSL
         shell: bash
         run: |
