@@ -492,6 +492,7 @@ public final class IrisNvidiumTerrainTranslator {
         mesh = insertIntoInterfaceBlock(mesh, "out Interpolants", declarations, "} OUT[];");
         String vertexProgram = vertexProgramSource();
         mesh = hoistExtensions(mesh, vertexProgram);
+        vertexProgram = stripExtensions(vertexProgram);
         mesh = insertBefore(mesh, "vec4 transformVertex(Vertex V) {", vertexProgram);
         String vertexInvocation = vertexInvocation();
         String assignmentAnchor = "    OUT[id].v_materialFlags = V.nvidiumMaterial & 0xFFu;";
@@ -512,6 +513,7 @@ public final class IrisNvidiumTerrainTranslator {
         fragment = addPackMrtOutputs(fragment);
         String program = fragmentProgramSource();
         fragment = hoistExtensions(fragment, program);
+        program = stripExtensions(program);
         fragment = insertBefore(fragment, "void main() {", program);
 
         String invocation = fragmentInvocation();
@@ -1113,7 +1115,7 @@ public final class IrisNvidiumTerrainTranslator {
         Matcher extensions = Pattern.compile("(?m)^[\\t ]*#\\s*extension\\b[^\\r\\n]*(?:\\r?\\n|$)")
                 .matcher(injectedSource);
         StringBuilder directives = new StringBuilder();
-        String cleaned = extensions.replaceAll("");
+        extensions.reset();
         while (extensions.find()) {
             String directive = extensions.group();
             if (!nativeSource.contains(directive.strip())) directives.append(directive);
@@ -1124,6 +1126,11 @@ public final class IrisNvidiumTerrainTranslator {
             return nativeSource.substring(0, version.end()) + directives + nativeSource.substring(version.end());
         }
         return directives + nativeSource;
+    }
+
+    private static String stripExtensions(String source) {
+        return Pattern.compile("(?m)^[\\t ]*#\\s*extension\\b[^\\r\\n]*(?:\\r?\\n|$)")
+                .matcher(source).replaceAll("");
     }
 
     private static String insertBefore(String source, String anchor, String insertion) {
