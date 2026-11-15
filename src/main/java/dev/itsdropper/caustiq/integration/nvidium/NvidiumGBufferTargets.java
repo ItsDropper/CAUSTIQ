@@ -55,14 +55,18 @@ public final class NvidiumGBufferTargets {
 
     /** Maps fragment output locations to Iris colortex indices for the active terrain program. */
     public static void configureOutputRouting(java.util.List<Integer> targetIndices) {
+        if (targetIndices.size() > MAX_ATTACHMENT) {
+            throw new IllegalArgumentException("Nvidium reserves one draw-buffer location for native color; at most seven Iris MRT outputs are supported.");
+        }
         int[] routing = new int[REQUIRED_DRAW_BUFFERS];
         Arrays.fill(routing, -1);
-        for (int location = 0; location < targetIndices.size() && location < routing.length; location++) {
-            int target = targetIndices.get(location);
-            if (target < 0 || target > MAX_ATTACHMENT) {
-                throw new IllegalArgumentException("Nvidium supports Iris colortex0 through colortex7.");
+        routing[0] = 0; // Preserve Nvidium's native forward-rendered terrain color.
+        for (int irisIndex = 0; irisIndex < targetIndices.size(); irisIndex++) {
+            int target = targetIndices.get(irisIndex);
+            if (target < 1 || target > MAX_ATTACHMENT) {
+                throw new IllegalArgumentException("Nvidium reserves colortex0 and supports Iris colortex1 through colortex7.");
             }
-            routing[location] = target;
+            routing[irisIndex + 1] = target;
         }
         outputRouting = routing;
     }
