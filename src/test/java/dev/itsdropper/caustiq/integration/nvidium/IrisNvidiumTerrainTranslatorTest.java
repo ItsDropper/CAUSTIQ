@@ -187,14 +187,15 @@ class IrisNvidiumTerrainTranslatorTest {
             options.put("NORMAL_MAPPING", "false");
             options.put("SPECULAR_MAPPING", "false");
             options.put("TAA", "false");
+            Map<String, String> nativeStages =
+                    NvidiumTerrainVaryingAdapter.adapt(pinnedNvidiumStages());
 
             for (String dimension : List.of("world0", "world-1", "world1")) {
                 for (String programName : List.of(
                         "gbuffers_water", "shadow_solid", "shadow_cutout", "shadow_water")) {
                     IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
                             model, dimension, programName, options);
-                    Map<String, String> translated = translator.adapt(
-                            NvidiumTerrainVaryingAdapter.adapt(pinnedNvidiumStages()));
+                    Map<String, String> translated = translator.adapt(nativeStages);
                     assertTrue(translated.get("MESH").contains("void caustiqIrisVertexMain()"),
                             dimension + "/" + programName + " vertex stage was not translated");
                     assertTrue(translated.get("FRAGMENT").contains("void caustiqIrisFragmentMain()"),
