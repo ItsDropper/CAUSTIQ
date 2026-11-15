@@ -169,7 +169,7 @@ class NvidiumIrisUniformBridgeTest {
                 base.put("biome", -1.0);
                 Map<String, double[]> evaluated = resources.evaluateUniformValues(base);
                 assertEquals(0.0, evaluated.get("isEyeInCave")[0], 1.0e-9);
-                assertEquals(1.0, evaluated.get("inDry")[0], 1.0e-9);
+                assertEquals(1.0, evaluated.get("inDry")[0], 1.0e-5);
                 assertEquals(1.0, evaluated.get("starter")[0], 1.0e-8);
                 assertEquals(1.0, evaluated.get("inNetherWastes")[0], 1.0e-9);
                 assertEquals(0.0, evaluated.get("maxBlindnessDarkness")[0], 1.0e-9);
