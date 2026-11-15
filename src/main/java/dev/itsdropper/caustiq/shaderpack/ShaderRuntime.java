@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class ShaderRuntime {
     private static final AtomicReference<ShaderPackScanResult> SCAN_RESULT = new AtomicReference<>();
@@ -504,6 +506,20 @@ public final class ShaderRuntime {
         }
     }
 
+    private static int minecraftVersionCode() {
+        String version = FabricLoader.getInstance().getModContainer("minecraft")
+                .orElseThrow(() -> new IllegalStateException("Minecraft mod metadata is unavailable"))
+                .getMetadata().getVersion().getFriendlyString();
+        Matcher matcher = Pattern.compile("^(\\d+)\\.(\\d+)(?:\\.(\\d+))?").matcher(version);
+        if (!matcher.find()) {
+            throw new IllegalStateException("Cannot convert Minecraft version to Iris MC_VERSION: " + version);
+        }
+        int major = Integer.parseInt(matcher.group(1));
+        int minor = Integer.parseInt(matcher.group(2));
+        int patch = matcher.group(3) == null ? 0 : Integer.parseInt(matcher.group(3));
+        return major * 10_000 + minor * 100 + patch;
+    }
+
     private static void beginDiscovery() {
         ShaderPackScanResult result = SCAN_RESULT.get();
         if (result == null || result.packs().isEmpty()) {
@@ -525,7 +541,7 @@ public final class ShaderRuntime {
             List<String> shaderFiles = sources.listShaderFiles();
             if (shaderFiles.contains("block.properties")) {
                 Map<String, Integer> blockIds = new IrisBlockPropertiesParser()
-                        .parse(sources.read("block.properties"));
+                        .parse(sources.read("block.properties"), minecraftVersionCode());
                 if (NvidiumIrisVertexContext.setBlockIds(blockIds)) rebuildTerrainSections();
                 CaustiqClient.LOGGER.info("Loaded {} block.properties material ID mapping(s) for mc_Entity.",
                         blockIds.size());
