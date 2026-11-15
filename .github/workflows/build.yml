@@ -50,8 +50,18 @@ jobs:
           test -s "$photon_dir/shaders/world0/gbuffers_terrain.fsh"
           echo "PHOTON_SOURCE_DIR=$photon_dir" >> "$GITHUB_ENV"
 
+      - name: Install GLSL compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes glslang-tools
+
       - name: Build mod and package example shader pack
         shell: bash
+        env:
+          GLSLANG_VALIDATOR: glslangValidator
+          CAUSTIQ_COMPAT_OUTPUT_DIR: ${{ github.workspace }}/build/nvidium-compat
         run: |
           set -o pipefail
           ./gradlew build --stacktrace --info 2>&1 | tee build.log
@@ -92,8 +102,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes glslang-tools
           glslangValidator -S vert examples/caustiq-stillwater/shaders/final.vsh
           glslangValidator -S frag examples/caustiq-stillwater/shaders/final.fsh
 
