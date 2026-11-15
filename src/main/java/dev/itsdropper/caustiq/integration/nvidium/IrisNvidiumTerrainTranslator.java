@@ -269,13 +269,13 @@ public final class IrisNvidiumTerrainTranslator {
         Matcher matcher = RENDERTARGETS.matcher(source);
         String activeDirective = null;
         while (matcher.find()) activeDirective = matcher.group(1);
-        if (activeDirective == null) return List.of(0, 1, 2, 3, 4, 5, 6, 7);
+        if (activeDirective == null) return List.of(1);
         List<Integer> targets = new ArrayList<>();
         for (String token : activeDirective.split("[,\\s]+")) {
             if (token.isBlank()) continue;
             int target = Integer.parseInt(token);
-            if (target < 0 || target > 7) {
-                throw new IllegalArgumentException("Nvidium terrain MRT supports Iris colortex0 through colortex7; got colortex" + target + ".");
+            if (target < 1 || target > 7) {
+                throw new IllegalArgumentException("Nvidium reserves colortex0 for its native forward color and supports terrain MRT outputs to colortex1 through colortex7; got colortex" + target + ".");
             }
             if (targets.contains(target)) {
                 throw new IllegalArgumentException("Iris RENDERTARGETS contains duplicate colortex" + target + ".");
@@ -449,7 +449,7 @@ public final class IrisNvidiumTerrainTranslator {
         }
         for (FragmentOutput output : outputs) {
             translated = replaceIdentifier(translated, output.name(),
-                    output.location() == 0 ? "colour" : "caustiqIrisOutput" + output.location());
+                    "caustiqIrisOutput" + output.location());
         }
         return source.append(translated).toString();
     }
@@ -475,20 +475,21 @@ public final class IrisNvidiumTerrainTranslator {
     }
 
     private String addPackMrtOutputs(String fragment) {
-        Set<Integer> locations = new LinkedHashSet<>();
+        Set<Integer> irisOutputIndices = new LinkedHashSet<>();
         for (FragmentOutput output : outputs) {
-            if (output.location() > 0 && output.location() < renderTargetIndices.size()) {
-                locations.add(output.location());
+            if (output.location() < renderTargetIndices.size()) {
+                irisOutputIndices.add(output.location());
             }
         }
         if (usesFragData) {
-            for (int index = 1; index < fragDataCount && index < renderTargetIndices.size(); index++) {
-                locations.add(index);
+            for (int index = 0; index < fragDataCount && index < renderTargetIndices.size(); index++) {
+                irisOutputIndices.add(index);
             }
         }
-        for (int location : locations) {
+        for (int irisIndex : irisOutputIndices) {
+            int nvidiumLocation = irisIndex + 1;
             fragment = insertAfter(fragment, "layout(location = 0) out vec4 colour;",
-                    "layout(location = " + location + ") out vec4 caustiqIrisOutput" + location + ";\n");
+                    "layout(location = " + nvidiumLocation + ") out vec4 caustiqIrisOutput" + irisIndex + ";\\n");
         }
         return fragment;
     }
