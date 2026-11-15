@@ -121,6 +121,28 @@ class IrisTerrainPassSchedulerTest {
         }
     }
 
+
+    @Test
+    void prefersIrisRenderTargetsWhenLegacyOptifineDrawbuffersAreAlsoPresent() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("DualOutputMapping/shaders"));
+        writeProgram(shaders, "composite", """
+                /* DRAWBUFFERS: 35 */
+                /* RENDERTARGETS: 2,6 */
+                void main() {
+                    gl_FragData[0] = vec4(1.0);
+                    gl_FragData[1] = vec4(0.5);
+                }
+                """);
+
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor("DualOutputMapping", 3))) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
+
+            assertEquals(java.util.Map.of(0, 2, 1, 6),
+                    plan.passes().getFirst().pass().outputTargets());
+        }
+    }
+
     @Test
     void ignoresFragmentOutputsInInactiveConditionalBranches() throws IOException {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("ConditionalOutputs/shaders"));
