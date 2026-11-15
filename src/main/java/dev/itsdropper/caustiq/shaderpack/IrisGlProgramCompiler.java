@@ -1,6 +1,7 @@
 package dev.itsdropper.caustiq.shaderpack;
 
 import org.lwjgl.opengl.GL20C;
+import org.lwjgl.opengl.GL43C;
 
 import java.io.IOException;
 import java.util.LinkedHashSet;
@@ -12,7 +13,9 @@ import java.util.regex.Pattern;
 public final class IrisGlProgramCompiler {
     private static final Pattern VERSION = Pattern.compile("(?m)^\\s*#\\s*version[^\\r\\n]*\\R?");
     private static final Pattern EXTENSION = Pattern.compile("(?m)^\\s*#\\s*extension[^\\r\\n]*\\R?");
-    private static final Pattern SAMPLER = Pattern.compile("(?m)^\\s*uniform\\s+(sampler\\w+)\\s+(\\w+)\\s*;\\s*");
+    private static final Pattern SAMPLER = Pattern.compile("(?m)^\\s*uniform\\s+([iu]?sampler\\w+)\\s+(\\w+)\\s*;\\s*");
+    private static final Pattern IMAGE = Pattern.compile("(?m)^\\s*(?:readonly\\s+|writeonly\\s+)?uniform\\s+[iu]?image[123]D\\s+(\\w+)\\s*;");
+    private static final Pattern LOCAL_SIZE = Pattern.compile("local_size_([xyz])\\s*=\\s*(\\d+)");
     private static final Pattern FRAG_DATA = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]");
     private static final Pattern TEXCOORD = Pattern.compile("\\bgl_TexCoord\\s*\\[\\s*(\\d+)\\s*]");
     private static final String FULLSCREEN_VERTEX = """
@@ -39,14 +42,44 @@ public final class IrisGlProgramCompiler {
     public IrisGlProgram compile(ShaderPackProgramCatalog.Program program,
                                  GlslPreprocessor.SourceProvider sourceProvider,
                                  Set<String> defines) throws IOException {
-        if (program.hasCompute() || program.fragmentSource() == null
-                || program.stages().containsKey(ShaderPackProgramCatalog.Stage.GEOMETRY)
+        if (program.stages().containsKey(ShaderPackProgramCatalog.Stage.GEOMETRY)
                 || program.stages().containsKey(ShaderPackProgramCatalog.Stage.TESSELLATION_CONTROL)
                 || program.stages().containsKey(ShaderPackProgramCatalog.Stage.TESSELLATION_EVALUATION)) {
+            throw new IOException("Program '" + program.name() + "' contains an unsupported geometry/tessellation stage.");
+        }
+        GlslPreprocessor preprocessor = new GlslPreprocessor();
+        if (program.hasCompute()) {
+            if (program.stages().size() != 1) {
+                throw new IOException("Compute program '" + program.name() + "' must contain only a .csh stage.");
+            }
+            String compute = injectDefines(
+                    preprocessor.preprocess(program.stages().get(ShaderPackProgramCatalog.Stage.COMPUTE), sourceProvider).source(),
+                    defines);
+            int shader = compileShader(GL43C.GL_COMPUTE_SHADER, compute, program.name() + " compute");
+            int linked = 0;
+            try {
+                linked = GL20C.glCreateProgram();
+                GL20C.glAttachShader(linked, shader);
+                GL20C.glLinkProgram(linked);
+                if (GL20C.glGetProgrami(linked, GL20C.GL_LINK_STATUS) == GL20C.GL_FALSE) {
+                    throw new IOException("Iris compute program '" + program.name() + "' failed to link:\\n"
+                            + GL20C.glGetProgramInfoLog(linked));
+                }
+                int[] local = localSizes(compute);
+                return new IrisGlProgram(program.name(), linked, findSamplers(compute), findImages(compute),
+                        true, local[0], local[1], local[2],
+                        compute.contains("gl_GlobalInvocationID.y"), compute.contains("gl_GlobalInvocationID.z"));
+            } catch (IOException | RuntimeException exception) {
+                if (linked != 0) GL20C.glDeleteProgram(linked);
+                throw exception;
+            } finally {
+                GL20C.glDeleteShader(shader);
+            }
+        }
+        if (program.fragmentSource() == null || program.vertexSource() != null
+                && program.stages().containsKey(ShaderPackProgramCatalog.Stage.COMPUTE)) {
             throw new IOException("Program '" + program.name() + "' is not a supported full-screen vertex/fragment pass.");
         }
-
-        GlslPreprocessor preprocessor = new GlslPreprocessor();
         String fragment = preprocessor.preprocess(program.fragmentSource(), sourceProvider).source();
         String vertex;
         if (program.vertexSource() == null) {
@@ -72,7 +105,7 @@ public final class IrisGlProgramCompiler {
                 throw new IOException("Iris program '" + program.name() + "' failed to link:\n"
                         + GL20C.glGetProgramInfoLog(linkedProgram));
             }
-            return new IrisGlProgram(program.name(), linkedProgram, findSamplers(fragment));
+            return new IrisGlProgram(program.name(), linkedProgram, findSamplers(fragment), Set.of(), false, 1, 1, 1, false, false);
         } catch (IOException | RuntimeException exception) {
             if (linkedProgram != 0) GL20C.glDeleteProgram(linkedProgram);
             throw exception;
@@ -100,9 +133,10 @@ public final class IrisGlProgramCompiler {
         while (matcher.find()) {
             String samplerType = matcher.group(1);
             String name = matcher.group(2);
-            if (!samplerType.equals("sampler2D")) {
-                throw new IOException("Iris sampler '" + name + "' uses " + samplerType
-                        + "; only sampler2D resources are currently supported by the GL pass executor.");
+            if (!samplerType.equals("sampler2D") && !samplerType.equals("sampler3D")
+                    && !samplerType.equals("usampler3D")) {
+                throw new IOException("Iris sampler '" + name + "' uses unsupported type " + samplerType
+                        + "; this executor supports sampler2D, sampler3D and usampler3D.");
             }
             samplers.add(name);
         }
@@ -111,6 +145,23 @@ public final class IrisGlProgramCompiler {
             throw new IOException("Iris pass contains a sampler declaration that is not a supported single sampler2D binding.");
         }
         return Set.copyOf(samplers);
+    }
+
+    private static Set<String> findImages(String source) {
+        Set<String> images = new LinkedHashSet<>();
+        Matcher matcher = IMAGE.matcher(source);
+        while (matcher.find()) images.add(matcher.group(1));
+        return Set.copyOf(images);
+    }
+
+    private static int[] localSizes(String source) {
+        int[] sizes = {1, 1, 1};
+        Matcher matcher = LOCAL_SIZE.matcher(source);
+        while (matcher.find()) {
+            int index = switch (matcher.group(1)) { case "x" -> 0; case "y" -> 1; default -> 2; };
+            sizes[index] = Integer.parseInt(matcher.group(2));
+        }
+        return sizes;
     }
 
     private static String translateVertex(String source, Set<Integer> fragmentTexCoords) throws IOException {
