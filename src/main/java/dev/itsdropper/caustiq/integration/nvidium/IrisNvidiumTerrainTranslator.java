@@ -71,6 +71,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("viewWidth", "(screenSize.x * 2.0)"),
             Map.entry("viewHeight", "(screenSize.y * 2.0)"),
             Map.entry("fogColor", "fogColour"),
+            Map.entry("aspectRatio", "caustiqAspectRatio"),
             Map.entry("heavyFog", "caustiqHeavyFog"),
             Map.entry("isElytraFlying", "caustiqIsElytraFlying"),
             Map.entry("isEyeInWater", "caustiqIsEyeInWater"),
@@ -526,7 +527,7 @@ public final class IrisNvidiumTerrainTranslator {
                     .findFirst().orElse("vec4");
             fragment = insertAfter(fragment, "layout(location = 0) out vec4 colour;",
                     "layout(location = " + nvidiumLocation + ") out " + outputType
-                            + " caustiqIrisOutput" + irisIndex + ";\\n");
+                            + " caustiqIrisOutput" + irisIndex + ";\n");
         }
         return fragment;
     }
@@ -756,6 +757,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform mat3 caustiqNormalMatrix;
                 uniform vec3 caustiqCameraPosition;
                 uniform float caustiqFrameTimeCounter;
+                uniform float caustiqAspectRatio;
                 uniform int caustiqFrameCounter;
                 #endif
                 layout(binding = 2) uniform sampler2D caustiqNoiseTexture;
@@ -814,7 +816,7 @@ public final class IrisNvidiumTerrainTranslator {
             case "heavyFog", "isElytraFlying" -> "bool";
             case "isEyeInWater", "moonPhase", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2" -> "int";
             case "frameTimeCounter", "viewWidth", "viewHeight", "near", "far", "rainStrength",
-                    "wetness", "world_age", "day_factor", "time_sunrise", "time_noon", "time_sunset",
+                    "wetness", "world_age", "day_factor", "aspectRatio", "time_sunrise", "time_noon", "time_sunset",
                     "time_midnight", "biome_temperature", "biome_humidity", "alphaTestRef",
                     "dhNearPlane", "dhFarPlane", "combined_near", "combined_far" -> "float";
             case "frameCounter", "blockEntityId", "entityId", "currentRenderedItemId",
