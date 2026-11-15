@@ -160,6 +160,11 @@ assert 'Map.entry("isElytraFlying", "caustiqIsElytraFlying")' in translator
 assert 'Map.entry("isEyeInWater", "caustiqIsEyeInWater")' in translator
 assert "uniform int caustiqIsEyeInWater;" in translator
 assert 'integer(program, "caustiqIsEyeInWater", isEyeInWater())' in uniform_bridge
+assert 'Map.entry("moonPhase", "caustiqMoonPhase")' in translator
+assert "uniform int caustiqMoonPhase;" in translator
+assert 'case "isEyeInWater", "moonPhase", "heldBlockLightValue"' in translator
+assert 'integer(program, "caustiqMoonPhase", moonPhase(level))' in uniform_bridge
+assert "Math.floorDiv(dayTime, 24_000L), 8L" in uniform_bridge
 assert 'case "WATER" -> 1;' in uniform_bridge and 'case "LAVA" -> 2;' in uniform_bridge and 'case "POWDER_SNOW" -> 3;' in uniform_bridge
 assert 'uniform bool caustiqIsElytraFlying;' in translator
 assert 'integer(program, "caustiqIsElytraFlying", isElytraFlying() ? 1 : 0)' in uniform_bridge
@@ -196,8 +201,8 @@ stride_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/Nvidi
 assert "NvidiumIrisChunkVertex.INSTANCE" in format_mixin
 assert "NvidiumIrisChunkVertex.STRIDE" in stride_mixin
 assert "@ModifyConstant(" in stride_mixin, "copyQuad stride constants must be modified after javac inlines the static final fields"
-assert "@Constant(intValue = 80)" in stride_mixin and "@Constant(intValue = 64)" in stride_mixin
-assert "NvidiumIrisChunkVertex.STRIDE * 4" in stride_mixin, "copyQuad must copy four extended 40-byte vertices"
+assert "@Constant(longValue = 80L)" in stride_mixin and "@Constant(longValue = 64L)" in stride_mixin
+assert "NvidiumIrisChunkVertex.STRIDE * 4L" in stride_mixin, "copyQuad must copy four extended 40-byte vertices"
 assert "@Redirect(" not in stride_mixin, "Compile-time STRIDE constants cannot be redirected as field reads"
 world_renderer = source("src/main/java/me/cortex/nvidium/NvidiumWorldRenderer.java")
 world_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumWorldRendererMixin.java").read_text(encoding="utf-8")
@@ -223,3 +228,9 @@ assert "NvidiumTerrainVaryingAdapter.class" in (caustiq_root / ".github/workflow
 block_parser = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/IrisBlockPropertiesParser.java").read_text(encoding="utf-8")
 assert 'if (!value.contains(":")) value = "minecraft:" + value;' in block_parser
 print("Nvidium source contract verified: compile hook, Iris gate, packed vertex format, scene uniforms, sampler bindings, and varying ABI.")
+
+# block.properties uses MC_VERSION conditionals to separate legacy and modern block IDs.
+block_parser = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/IrisBlockPropertiesParser.java").read_text(encoding="utf-8")
+shader_runtime = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/ShaderRuntime.java").read_text(encoding="utf-8")
+assert "VERSION_CONDITION" in block_parser and "activeLines(source, mcVersion)" in block_parser
+assert '.parse(sources.read("block.properties"), minecraftVersionCode())' in shader_runtime
