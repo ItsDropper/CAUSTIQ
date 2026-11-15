@@ -237,6 +237,9 @@ assert "SODIUM_VERTEX_FORMAT_DEFINE" in adapter
 preprocessor = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/IrisGlslConditionalPreprocessor.java").read_text(encoding="utf-8")
 assert "maskComments(normalized)" in preprocessor
 assert "private static String maskComments(String source)" in preprocessor
+assert "public static String stripComments(String source)" in preprocessor
+assert "IrisGlslConditionalPreprocessor.stripComments(source)" in translator
+assert "preservesCodeInsideIrisSlashStarToggleComments" in (caustiq_root / "src/test/java/dev/itsdropper/caustiq/shaderpack/IrisGlslConditionalPreprocessorTest.java").read_text(encoding="utf-8")
 translator = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/IrisNvidiumTerrainTranslator.java").read_text(encoding="utf-8")
 assert "softwareRenderHarnessSources()" in translator
 render_smoke = (caustiq_root / "src/test/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisTerrainGlRenderSmokeTest.java").read_text(encoding="utf-8")
