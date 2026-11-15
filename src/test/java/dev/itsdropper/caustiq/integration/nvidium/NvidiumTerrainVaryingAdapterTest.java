@@ -59,6 +59,8 @@ class NvidiumTerrainVaryingAdapterTest {
                 "caustiqGBufferLightmap = vec4(v_lightmapCoord, 0.0, 1.0);"}) {
             assertTrue(fragment.contains(output), "Fragment G-buffer ABI missing " + output);
         }
+        assertTrue(fragment.contains("void main() {\n    caustiqGBufferNormal ="),
+                "Injected G-buffer writes must start on a new GLSL source line");
         assertTrue(mesh.contains("transformMat * vec4(decodeVertexPosition(V) + origin, 1.0)"));
         assertTrue(mesh.contains("vec3 caustiqDecodeNormal(Vertex vertex)"));
         assertTrue(mesh.contains("vec4 caustiqDecodeTangent(Vertex vertex)"));

@@ -279,7 +279,7 @@ public final class NvidiumTerrainVaryingAdapter {
         if (closingBrace < 0 || !source.substring(closingBrace + 1).isBlank()) {
             throw new IllegalStateException("Unsupported Nvidium fragment shader layout at main() terminator.");
         }
-        return source.substring(0, closingBrace) + statements + "\n" + source.substring(closingBrace);
+        return source.substring(0, closingBrace) + "\n" + statements + "\n" + source.substring(closingBrace);
     }
 
     private static String disableBarycentricPath(String source) {
