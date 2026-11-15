@@ -18,7 +18,7 @@ class NvidiumTerrainVaryingAdapterTest {
         String mesh = adapted.get("MESH");
         String fragment = adapted.get("FRAGMENT");
 
-        assertTrue(mesh.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4"));
+        assertTrue(mesh.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 5"));
         assertTrue(fragment.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4"));
         assertTrue(mesh.indexOf("#extension GL_ARB_gpu_shader5 : require")
                 < mesh.indexOf("uniform mat4 caustiqProjection;"),
@@ -30,7 +30,7 @@ class NvidiumTerrainVaryingAdapterTest {
                 "vec2 uv;", "vec3 v_colour;", "vec3 v_vertexColour;",
                 "vec2 v_lightmapCoord;", "vec3 v_renderPosition;", "vec2 v_quadMidUv;",
                 "vec3 v_quadMidPosition;", "vec3 v_midBlock;", "vec3 v_blockEntity;",
-                "vec3 v_normal;", "vec4 v_tangent;", "flat mat3 v_tbn;", "flat uint v_materialFlags;"
+                "vec3 v_normal;", "vec4 v_tangent;", "flat uint v_materialFlags;"
         }) {
             assertTrue(mesh.contains(varying), "Mesh output missing " + varying);
             assertTrue(fragment.contains(varying), "Fragment input missing " + varying);
@@ -68,7 +68,9 @@ class NvidiumTerrainVaryingAdapterTest {
         assertTrue(mesh.contains("vec3 caustiqDecodeMidBlock(Vertex vertex)"));
         assertFalse(java.util.regex.Pattern.compile("\\bpacked\\b").matcher(mesh).find(),
                 "Generated GLSL must not use the reserved layout qualifier token as an identifier");
-        assertTrue(mesh.contains("OUT[id].v_tbn = caustiqDecodeTbn(V);"));
+        assertFalse(mesh.contains("flat mat3 v_tbn;"), "Unused TBN matrix must not consume three inter-stage locations");
+        assertFalse(fragment.contains("flat mat3 v_tbn;"));
+        assertFalse(mesh.contains("OUT[id].v_tbn ="));
         assertEquals("task source", adapted.get("TASK"));
     }
 
