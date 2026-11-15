@@ -100,21 +100,16 @@ public final class IrisGlslConditionalPreprocessor {
     }
 
     /**
-     * GLSL directives inside comments are ordinary comment text. Mask comments
-     * before recognizing directives while preserving line breaks and source
-     * offsets; active non-directive lines are still emitted from the original
-     * source so comments remain intact in the resulting shader.
-     */
-    /**
      * Removes GLSL comments without interpreting a slash-star sequence that
      * occurs inside a line comment as the start of a block comment. Photon
-     * handles Iris-compatible slash-slash-star toggle comments, which regex-based
+     * uses Iris-compatible slash-slash-star toggle comments, which regex-based
      * block-comment stripping corrupts.
      */
     public static String stripComments(String source) {
         return maskComments(source);
     }
 
+    /** Masks comments while preserving line breaks and quoted string contents. */
     private static String maskComments(String source) {
         char[] masked = source.toCharArray();
         boolean blockComment = false;
