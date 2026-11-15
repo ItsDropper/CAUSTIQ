@@ -164,6 +164,21 @@ public final class CaustiqCiShaderValidation {
             for (ShaderPackMetadata.Option option : model.options().options()) {
                 optionValues.put(option.name(), option.defaultValue());
             }
+            // Validate a realistic high-quality Photon profile rather than bare
+            // option defaults. Shader-pack profiles enable/disable feature macros
+            // that also control whether matching uniforms and samplers are declared.
+            String highProfile = model.properties().getOrDefault("profile.high", "");
+            for (String token : highProfile.trim().split("\\s+")) {
+                if (token.isBlank() || token.equals("<empty>")) continue;
+                if (token.startsWith("!")) {
+                    optionValues.put(token.substring(1), "false");
+                } else {
+                    int separator = token.indexOf('=');
+                    if (separator < 0) optionValues.put(token, "true");
+                    else optionValues.put(token.substring(0, separator), token.substring(separator + 1));
+                }
+            }
+            optionValues.put("SHADOW", "true");
             optionValues.put("MC_VERSION", "12111");
             optionValues.put("MC_GL_VERSION", "450");
             optionValues.put("IS_IRIS", "1");
@@ -197,6 +212,14 @@ public final class CaustiqCiShaderValidation {
                 dimensionValues.put("NETHER", dimensionValues.get("WORLD_NETHER"));
                 dimensionValues.put("WORLD_END", set.directory().equals("world1") ? "1" : "0");
                 dimensionValues.put("END", dimensionValues.get("WORLD_END"));
+                if (set.directory().equals("world-1")) {
+                    // Photon deliberately omits shadow samplers in the Nether.
+                    dimensionValues.put("SHADOW", "false");
+                    dimensionValues.put("SHADOW_COLOR", "false");
+                    dimensionValues.put("SHADOW_SSRT", "false");
+                    dimensionValues.put("SHADOW_PCF", "false");
+                    dimensionValues.put("SHADOW_VPS", "false");
+                }
                 Set<String> dimensionDefines = new LinkedHashSet<>();
                 dimensionValues.forEach((name, value) -> dimensionDefines.add(name + "=" + value));
 
