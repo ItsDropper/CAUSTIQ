@@ -1,6 +1,10 @@
 package dev.itsdropper.caustiq.shaderpack;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -55,6 +59,39 @@ class IrisBlockPropertiesParserTest {
                 () -> parser.parse("block.1=minecraft:stone\nblock.2=minecraft:stone"));
         assertThrows(IllegalArgumentException.class,
                 () -> parser.parse("block.2147483647=minecraft:stone"));
+    }
+
+    @Test
+    void parsesUnqualifiedBlockStateSelectorsWithMultipleProperties() {
+        var result = parser.parse("block.263=comparator:mode=compare:powered=true");
+        assertEquals(263, result.get("minecraft:comparator[mode=compare,powered=true]"));
+    }
+
+    @Test
+    void preprocessesPhotonTagAndMinecraftVersionConditionalsWithoutTreatingTagsAsBlocks() {
+        var result = parser.parse("""
+                #if IRIS_TAG_SUPPORT > 1
+                #define tags_leaves %leaves
+                #endif
+                #if MC_VERSION >= 11300
+                block.1=stone tags_leaves comparator:mode=compare:powered=true
+                #endif
+                """, 12111);
+        assertEquals(1, result.get("minecraft:stone"));
+        assertEquals(1, result.get("minecraft:comparator[mode=compare,powered=true]"));
+        assertFalse(result.containsKey("minecraft:tags_leaves"));
+    }
+
+    @Test
+    void parsesThePinnedPhotonBlockPropertiesFile() throws Exception {
+        String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
+        Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),
+                "Photon source checkout is supplied by CI only");
+        String source = Files.readString(Path.of(photonDirectory, "shaders", "block.properties"));
+        var result = parser.parse(source, 12111);
+        assertFalse(result.isEmpty(), "Photon block.properties produced no concrete block mappings");
+        assertTrue(result.keySet().stream().anyMatch(key -> key.startsWith("minecraft:")),
+                "Photon block.properties did not produce any namespaced Minecraft blocks");
     }
 
     @Test

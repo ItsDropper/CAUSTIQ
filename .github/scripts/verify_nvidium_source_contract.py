@@ -163,6 +163,11 @@ assert 'integer(program, "caustiqIsEyeInWater", isEyeInWater())' in uniform_brid
 assert 'Map.entry("moonPhase", "caustiqMoonPhase")' in translator
 assert "uniform int caustiqMoonPhase;" in translator
 assert 'case "isEyeInWater", "moonPhase", "heldBlockLightValue"' in translator
+assert 'case "worldTime" -> "int";' in translator
+assert 'uniform int caustiqWorldTime;' in translator
+assert 'uniform vec2 caustiqTaaOffset;' in translator
+assert '"taa_offset"' not in translator.split('UNSUPPORTED_RUNTIME_UNIFORMS', 1)[1].split(');', 1)[0]
+assert 'integer(program, "caustiqWorldTime", worldTime)' in uniform_bridge
 assert 'integer(program, "caustiqMoonPhase", moonPhase(level))' in uniform_bridge
 assert "Math.floorDiv(dayTime, 24_000L), 8L" in uniform_bridge
 assert 'case "WATER" -> 1;' in uniform_bridge and 'case "LAVA" -> 2;' in uniform_bridge and 'case "POWDER_SNOW" -> 3;' in uniform_bridge
@@ -199,7 +204,9 @@ for field in ("blockId", "normalTangent", "midpointUv", "midBlock", "nvidiumMate
 format_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumExtendedVertexFormatMixin.java").read_text(encoding="utf-8")
 stride_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumRepackagedStrideMixin.java").read_text(encoding="utf-8")
 assert "NvidiumIrisChunkVertex.INSTANCE" in format_mixin
+assert "NvidiumIrisChunkVertex.isRequested()" in format_mixin
 assert "NvidiumIrisChunkVertex.STRIDE" in stride_mixin
+assert "NvidiumIrisChunkVertex.isRequested()" in stride_mixin
 assert "@ModifyConstant(" in stride_mixin, "copyQuad stride constants must be modified after javac inlines the static final fields"
 assert "@Constant(longValue = 80L)" in stride_mixin and "@Constant(longValue = 64L)" in stride_mixin
 assert "NvidiumIrisChunkVertex.STRIDE * 4L" in stride_mixin, "copyQuad must copy four extended 40-byte vertices"

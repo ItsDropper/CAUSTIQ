@@ -1,7 +1,7 @@
 package dev.itsdropper.caustiq.shaderpack;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -44,6 +44,7 @@ public final class IrisBlockPropertiesParser {
             String[] values = entry.group(2).trim().split("[\\s,]+");
             for (String value : values) {
                 if (value.isBlank()) continue;
+                if (value.startsWith("%") || value.startsWith("tags_")) continue;
                 ParsedBlock block = parseBlock(value, lineNumber + 1);
                 String key = block.properties().isEmpty()
                         ? block.identifier()
@@ -54,59 +55,13 @@ public final class IrisBlockPropertiesParser {
         return Map.copyOf(result);
     }
 
-    private static java.util.List<String> activeLines(String source, int mcVersion) {
-        java.util.List<String> result = new java.util.ArrayList<>();
-        Deque<Conditional> stack = new ArrayDeque<>();
-        boolean active = true;
-        String[] lines = source.split("\\R");
-        for (int i = 0; i < lines.length; i++) {
-            String trimmed = lines[i].trim();
-            if (trimmed.startsWith("#if")) {
-                Matcher condition = VERSION_CONDITION.matcher(trimmed);
-                if (!condition.matches()) {
-                    throw new IllegalArgumentException("Unsupported block.properties conditional on line "
-                            + (i + 1) + ": " + trimmed);
-                }
-                boolean matches = evaluateVersionCondition(
-                        mcVersion, condition.group(1), Integer.parseInt(condition.group(2)));
-                stack.push(new Conditional(active, matches, false, i + 1));
-                active = active && matches;
-            } else if (trimmed.equals("#else")) {
-                if (stack.isEmpty()) {
-                    throw new IllegalArgumentException("Unexpected #else in block.properties on line " + (i + 1));
-                }
-                Conditional previous = stack.pop();
-                if (previous.elseSeen()) {
-                    throw new IllegalArgumentException("Duplicate #else in block.properties on line " + (i + 1));
-                }
-                stack.push(new Conditional(previous.parentActive(), previous.condition(), true, previous.line()));
-                active = previous.parentActive() && !previous.condition();
-            } else if (trimmed.equals("#endif")) {
-                if (stack.isEmpty()) {
-                    throw new IllegalArgumentException("Unexpected #endif in block.properties on line " + (i + 1));
-                }
-                active = stack.pop().parentActive();
-            } else if (active) {
-                result.add(lines[i]);
-            }
-        }
-        if (!stack.isEmpty()) {
-            Conditional unclosed = stack.peek();
-            throw new IllegalArgumentException("Unclosed #if in block.properties on line " + unclosed.line());
-        }
-        return result;
-    }
-
-    private static boolean evaluateVersionCondition(int version, String operator, int threshold) {
-        return switch (operator) {
-            case ">=" -> version >= threshold;
-            case ">" -> version > threshold;
-            case "<=" -> version <= threshold;
-            case "<" -> version < threshold;
-            case "==" -> version == threshold;
-            case "!=" -> version != threshold;
-            default -> throw new IllegalArgumentException("Unsupported MC_VERSION operator: " + operator);
-        };
+    private static List<String> activeLines(String source, int mcVersion) {
+        // Iris exposes block tag selectors only when its tag support API is available.
+        // CAUSTIQ currently resolves concrete block identifiers, so select the non-tag
+        // branch and deliberately ignore tag aliases instead of treating them as blocks.
+        String preprocessed = new IrisGlslConditionalPreprocessor().preprocess(
+                source, Map.of("MC_VERSION", Integer.toString(mcVersion), "IRIS_TAG_SUPPORT", "0"));
+        return new ArrayList<>(List.of(preprocessed.split("\\R", -1)));
     }
 
     private static ParsedBlock parseBlock(String token, int lineNumber) {
@@ -120,16 +75,16 @@ public final class IrisBlockPropertiesParser {
             propertyText = value.substring(propertyStart + 1, value.length() - 1);
             value = value.substring(0, propertyStart);
         } else {
-            int namespaceSeparator = value.indexOf(':');
-            int selectorSeparator = namespaceSeparator < 0
-                    ? -1 : value.indexOf(':', namespaceSeparator + 1);
-            if (selectorSeparator < 0 && namespaceSeparator >= 0
-                    && value.substring(namespaceSeparator + 1).contains("=")) {
-                selectorSeparator = namespaceSeparator;
-            }
-            if (selectorSeparator >= 0) {
-                propertyText = value.substring(selectorSeparator + 1);
-                value = value.substring(0, selectorSeparator);
+            int firstSeparator = value.indexOf(':');
+            if (firstSeparator >= 0) {
+                String suffix = value.substring(firstSeparator + 1);
+                boolean unqualifiedState = suffix.matches("[a-zA-Z0-9_]+=[^:]+(?::.*)?");
+                int selectorSeparator = unqualifiedState
+                        ? firstSeparator : value.indexOf(':', firstSeparator + 1);
+                if (selectorSeparator >= 0) {
+                    propertyText = value.substring(selectorSeparator + 1);
+                    value = value.substring(0, selectorSeparator);
+                }
             }
         }
         if (!value.contains(":")) value = "minecraft:" + value;

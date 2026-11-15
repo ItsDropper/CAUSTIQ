@@ -121,7 +121,8 @@ public final class NvidiumIrisUniformBridge {
         float rain = invokeFloat(level, "getRainLevel", 1.0f, 0.0f);
         float wetness = rain;
         float worldAge = invokeLong(level, "getGameTime", 0L);
-        float worldTime = (invokeLong(level, "getDayTime", 0L) % 24_000L) / 24_000.0f;
+        int worldTime = (int) Math.floorMod(invokeLong(level, "getDayTime", 0L), 24_000L);
+        float dayProgress = worldTime / 24_000.0f;
         float sunAngle = invokeFloat(level, "getSunAngle", 1.0f, 0.0f);
 
         scalar(program, "caustiqNear", near);
@@ -133,16 +134,16 @@ public final class NvidiumIrisUniformBridge {
         vector3(program, "caustiqLightDirection",
                 (float) Math.sin(sunAngle), (float) Math.cos(sunAngle), 0.0f);
         scalar(program, "caustiqWorldAge", worldAge);
-        scalar(program, "caustiqWorldTime", worldTime);
-        scalar(program, "caustiqDayFactor", 0.5f + 0.5f * (float) Math.cos((worldTime - 0.25f) * Math.PI * 2.0));
+        integer(program, "caustiqWorldTime", worldTime);
+        scalar(program, "caustiqDayFactor", 0.5f + 0.5f * (float) Math.cos((dayProgress - 0.25f) * Math.PI * 2.0));
         float biomeTemperature = biomeFloat(level, "getBaseTemperature");
         float biomeHumidity = biomeFloat(level, "getDownfall");
         if (Float.isFinite(biomeTemperature)) scalar(program, "caustiqBiomeTemperature", biomeTemperature);
         if (Float.isFinite(biomeHumidity)) scalar(program, "caustiqBiomeHumidity", biomeHumidity);
-        scalar(program, "caustiqTimeSunrise", dayPhaseWeight(worldTime, 0.0f));
-        scalar(program, "caustiqTimeNoon", dayPhaseWeight(worldTime, 0.25f));
-        scalar(program, "caustiqTimeSunset", dayPhaseWeight(worldTime, 0.5f));
-        scalar(program, "caustiqTimeMidnight", dayPhaseWeight(worldTime, 0.75f));
+        scalar(program, "caustiqTimeSunrise", dayPhaseWeight(dayProgress, 0.0f));
+        scalar(program, "caustiqTimeNoon", dayPhaseWeight(dayProgress, 0.25f));
+        scalar(program, "caustiqTimeSunset", dayPhaseWeight(dayProgress, 0.5f));
+        scalar(program, "caustiqTimeMidnight", dayPhaseWeight(dayProgress, 0.75f));
         scalar(program, "caustiqAlphaTestRef", 0.1f);
         integer(program, "caustiqBlockEntityId", 0);
         integer(program, "caustiqEntityId", 0);

@@ -42,8 +42,7 @@ public final class IrisNvidiumTerrainTranslator {
             "(?s)/\\*\\s*RENDERTARGETS\\s*:\\s*([0-9,\\s]+)\\s*\\*/");
     private static final Set<String> UNSUPPORTED_RUNTIME_UNIFORMS = Set.of(
             "normals", "specular", "depthtex1", "colortex15",
-            "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans",
-            "taa_offset");
+            "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans");
     private static final Set<String> SUPPORTED_ATTRIBUTES = Set.of(
             "mc_Entity", "at_midBlock", "mc_midTexCoord", "at_midTexCoord",
             "iris_Normal", "at_tangent", "vaPosition", "vaUV0", "vaUV2", "vaColor",
@@ -753,7 +752,8 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform vec3 caustiqLightDirection;
                 uniform float caustiqWorldAge;
                 uniform float caustiqDayFactor;
-                uniform float caustiqWorldTime;
+                uniform int caustiqWorldTime;
+                uniform vec2 caustiqTaaOffset;
                 uniform float caustiqTimeSunrise;
                 uniform float caustiqTimeNoon;
                 uniform float caustiqTimeSunset;
@@ -789,12 +789,13 @@ public final class IrisNvidiumTerrainTranslator {
             case "heavyFog", "isElytraFlying" -> "bool";
             case "isEyeInWater", "moonPhase", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2" -> "int";
             case "frameTimeCounter", "viewWidth", "viewHeight", "near", "far", "rainStrength",
-                    "wetness", "world_age", "day_factor", "worldTime", "time_sunrise", "time_noon", "time_sunset",
+                    "wetness", "world_age", "day_factor", "time_sunrise", "time_noon", "time_sunset",
                     "time_midnight", "biome_temperature", "biome_humidity", "alphaTestRef",
                     "dhNearPlane", "dhFarPlane", "combined_near", "combined_far" -> "float";
             case "frameCounter", "blockEntityId", "entityId", "currentRenderedItemId",
                     "dhRenderDistance", "vxRenderDistance" -> "int";
             case "viewSize", "pixelSize", "view_res", "view_pixel_size", "taa_offset" -> "vec2";
+            case "worldTime" -> "int";
             case "atlasSize" -> "ivec2";
             case "entityColor", "combined_projection_matrix_0", "combined_projection_matrix_1",
                     "combined_projection_matrix_2", "combined_projection_matrix_3",

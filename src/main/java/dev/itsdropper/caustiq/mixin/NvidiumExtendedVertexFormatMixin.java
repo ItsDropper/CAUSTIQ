@@ -20,6 +20,6 @@ public abstract class NvidiumExtendedVertexFormatMixin {
             remap = false,
             require = 1)
     private ChunkVertexType caustiq$installExtendedIrisFormat(ChunkVertexType original) {
-        return NvidiumIrisChunkVertex.isEnabled() ? NvidiumIrisChunkVertex.INSTANCE : original;
+        return NvidiumIrisChunkVertex.isRequested() ? NvidiumIrisChunkVertex.INSTANCE : original;
     }
 }

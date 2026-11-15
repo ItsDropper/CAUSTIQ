@@ -134,6 +134,27 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesWorldTimeAsTheIrisIntegerClockValue() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform int worldTime;
+                uniform vec2 taa_offset;
+                void main() {
+                    gl_FragColor = vec4(float(worldTime) / 24000.0 + taa_offset.x);
+                }
+                """);
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform int caustiqWorldTime;"));
+        assertTrue(fragment.contains("uniform vec2 caustiqTaaOffset;"));
+        assertTrue(fragment.contains("float(caustiqWorldTime) / 24000.0 + caustiqTaaOffset.x"));
+        assertFalse(fragment.contains("uniform int worldTime;"));
+        assertFalse(fragment.contains("uniform vec2 taa_offset;"));
+    }
+
+    @Test
     void translatesIrisHeavyFogBooleanToTheRuntimeUniform() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150
