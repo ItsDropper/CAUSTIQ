@@ -172,6 +172,21 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesWorldDayAsAnIntegerUniform() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform int worldDay;
+                void main() { gl_FragColor = vec4(float(worldDay)); }
+                """);
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform int caustiqWorldDay;"));
+        assertTrue(fragment.contains("float(caustiqWorldDay)"));
+        assertFalse(fragment.contains("uniform int worldDay;"));
+    }
+    @Test
     void translatesIrisHeavyFogBooleanToTheRuntimeUniform() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150
