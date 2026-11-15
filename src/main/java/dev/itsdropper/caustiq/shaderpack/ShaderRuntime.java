@@ -160,7 +160,13 @@ public final class ShaderRuntime {
 
         try (ShaderPackSources selectedSources = ShaderPackSources.open(selected)) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(selectedSources);
-            IrisShaderResources loadedResources = IrisShaderResources.load(model.properties(), selectedSources);
+            Map<String, String> optionDefines = new LinkedHashMap<>();
+            for (ShaderPackMetadata.Option option : model.options().options()) {
+                optionDefines.put(option.name(), CaustiqConfig.get().option(
+                        selected.id(), option.name(), option.defaultValue()));
+            }
+            IrisShaderResources loadedResources = IrisShaderResources.load(
+                    model.properties(), selectedSources, optionDefines);
             irisShaderResources.close();
             irisShaderResources = loadedResources;
             Set<String> unsupportedRequiredFeatures = unsupportedRequiredFeatures(model);
@@ -172,12 +178,6 @@ public final class ShaderRuntime {
             }
 
             configureShadowRenderer(model);
-
-            Map<String, String> optionDefines = new LinkedHashMap<>();
-            for (ShaderPackMetadata.Option option : model.options().options()) {
-                optionDefines.put(option.name(), CaustiqConfig.get().option(
-                        selected.id(), option.name(), option.defaultValue()));
-            }
 
             Map<String, IrisNvidiumTerrainTranslator> translators = new LinkedHashMap<>();
             Set<String> unsupportedDimensions = new LinkedHashSet<>();
