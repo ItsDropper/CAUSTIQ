@@ -380,10 +380,11 @@ public final class IrisNvidiumTerrainTranslator {
             case "mc_midTexCoord", "at_midTexCoord" -> "caustiqDecodeMidUv(V)";
             case "iris_Normal", "Normal" -> "caustiqDecodeNormal(V)";
             case "at_tangent" -> "caustiqDecodeTangent(V)";
-            case "vaPosition", "Position" -> "decodeVertexPosition(V)";
+            case "vaPosition", "Position" -> "(decodeVertexPosition(V) + origin)";
             case "vaUV0", "UV0" -> "decodeVertexUV(V)";
-            case "vaUV2", "UV2" -> "decodeLightUV(V)";
-            case "vaColor", "Color" -> "decodeVertexColour(V)";
+            case "vaUV2", "UV2" -> "(decodeLightUV(V) * 256.0)";
+            case "vaColor", "Color" -> "caustiqDecodeIrisColor(V)";
+            case "vaNormal", "Normal" -> "caustiqDecodeNormal(V)";
             default -> null;
         };
     }
@@ -684,7 +685,7 @@ public final class IrisNvidiumTerrainTranslator {
         String translated = source;
         translated = replaceIdentifier(translated, "gl_VertexID", "int(caustiqCurrentVertexId)");
         translated = replaceIdentifier(translated, "gl_Vertex",
-                "(transformMat * vec4(decodeVertexPosition(caustiqCurrentVertex) + origin, 1.0))");
+                "(caustiqCurrentTransform * vec4(decodeVertexPosition(caustiqCurrentVertex) + caustiqCurrentOrigin, 1.0))");
         translated = replaceIdentifier(translated, "gl_MultiTexCoord0",
                 "vec4(decodeVertexUV(caustiqCurrentVertex), 0.0, 1.0)");
         translated = replaceIdentifier(translated, "gl_MultiTexCoord1",
@@ -701,7 +702,7 @@ public final class IrisNvidiumTerrainTranslator {
         translated = replaceIdentifier(translated, "at_midTexCoord", "caustiqDecodeMidUv(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "iris_Normal", "caustiqDecodeNormal(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "at_tangent", "caustiqDecodeTangent(caustiqCurrentVertex)");
-        translated = replaceIdentifier(translated, "vaPosition", "(decodeVertexPosition(caustiqCurrentVertex) + origin)");
+        translated = replaceIdentifier(translated, "vaPosition", "(decodeVertexPosition(caustiqCurrentVertex) + caustiqCurrentOrigin)");
         translated = replaceIdentifier(translated, "vaUV0", "decodeVertexUV(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "vaUV2", "decodeLightUV(caustiqCurrentVertex) * 256.0");
         translated = replaceIdentifier(translated, "vaColor", "caustiqDecodeIrisColor(caustiqCurrentVertex)");
@@ -712,7 +713,7 @@ public final class IrisNvidiumTerrainTranslator {
         translated = replaceIdentifier(translated, "Color", "caustiqDecodeIrisColor(caustiqCurrentVertex)");
         translated = replaceIdentifier(translated, "Normal", "caustiqDecodeNormal(caustiqCurrentVertex)");
         translated = translated.replaceAll("\\bftransform\\s*\\(\\s*\\)",
-                "(caustiqProjection * caustiqModelView * (transformMat * vec4(decodeVertexPosition(caustiqCurrentVertex) + origin, 1.0)))");
+                "(caustiqProjection * caustiqModelView * (caustiqCurrentTransform * vec4(decodeVertexPosition(caustiqCurrentVertex) + caustiqCurrentOrigin, 1.0)))");
         return translateUniformAliases(translated);
     }
 
