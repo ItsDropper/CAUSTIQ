@@ -120,7 +120,24 @@ jobs:
                   raise SystemExit(f"Photon LPV audit was skipped: {case.attrib.get('name')}")
               if case.find("failure") is not None or case.find("error") is not None:
                   raise SystemExit(f"Photon LPV audit failed: {case.attrib.get('name')}")
-          print("Verified pinned-source terrain, shadow, and Photon LPV compute audits executed successfully.")
+          terrain_render_test = "rendersTheTranslatedPhotonTerrainVertexAndFragmentProgramsOnMesa"
+          terrain_render_matches = []
+          for report in glob.glob("build/test-results/test/TEST-*.xml"):
+              root = ET.parse(report).getroot()
+              terrain_render_matches.extend(
+                  case for case in root.iter("testcase")
+                  if case.attrib.get("name", "").split("(")[0] == terrain_render_test
+              )
+          if len(terrain_render_matches) != 1:
+              raise SystemExit(
+                  f"Expected exactly one translated Photon terrain render test, found {len(terrain_render_matches)}"
+              )
+          render_case = terrain_render_matches[0]
+          if render_case.find("skipped") is not None:
+              raise SystemExit("Translated Photon terrain render smoke test was skipped.")
+          if render_case.find("failure") is not None or render_case.find("error") is not None:
+              raise SystemExit("Translated Photon terrain render smoke test failed.")
+          print("Verified pinned-source terrain/shadow audits, Photon LPV compute execution, and Mesa terrain framebuffer rendering.")
           PY
 
       - name: Compile generated Nvidium adapter GLSL helpers
@@ -188,6 +205,42 @@ jobs:
           print("Extracted the exact injected adapter helper block for standalone GLSL compilation.")
           PY
           glslangValidator -S vert "$validation_dir/nvidium-adapter-helpers.vert"
+
+      - name: Verify complete captured Nvidium shader stages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - build/nvidium-compat <<'PY'
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          required = (
+              "photon-nvidium-terrain.task",
+              "photon-nvidium-terrain.mesh",
+              "photon-nvidium-terrain.frag",
+              "photon-nvidium-shadow.mesh",
+              "photon-nvidium-shadow.frag",
+              "nvidium-native.mesh",
+              "nvidium-native.frag",
+              "nvidium-extended.mesh",
+              "nvidium-extended.frag",
+          )
+          missing = [name for name in required if not (root / name).is_file() or (root / name).stat().st_size == 0]
+          if missing:
+              raise SystemExit(f"Missing complete Nvidium source snapshots: {missing}")
+          mesh = (root / "photon-nvidium-terrain.mesh").read_text()
+          for contract in (
+              "#define USE_SODIUM_VERTEX_FORMAT",
+              "struct Vertex",
+              "uint nvidiumMaterial;",
+              "void caustiqIrisVertexMain()",
+              "void transformVertex",
+          ):
+              if contract not in mesh:
+                  raise SystemExit(f"Generated terrain mesh is missing required ABI/source contract: {contract}")
+          print("Verified pre-adaptation, extended-ABI, and final translated TASK/MESH/FRAGMENT source snapshots.")
+          PY
 
       - name: Validate bundled GLSL
         shell: bash
