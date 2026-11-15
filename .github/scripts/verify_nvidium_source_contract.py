@@ -213,6 +213,7 @@ assert "packedBlockEntityId" in adapter and "packedTangentAngle" in adapter
 for field in ("blockId", "normalTangent", "midpointUv", "midBlock", "nvidiumMaterial"):
     assert field in vertex_encoder
 format_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumExtendedVertexFormatMixin.java").read_text(encoding="utf-8")
+compatibility = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumCompatibility.java").read_text(encoding="utf-8")
 stride_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumRepackagedStrideMixin.java").read_text(encoding="utf-8")
 assert "NvidiumIrisChunkVertex.INSTANCE" in format_mixin
 assert "NvidiumIrisChunkVertex.isRequested()" in format_mixin
@@ -220,7 +221,6 @@ assert 'method = "<init>", at = @At("HEAD")' in format_mixin
 assert "enableExtendedVertexFormat()" in format_mixin
 assert "requestExtendedVertexFormat()" in compatibility
 assert "NvidiumIrisChunkVertex.disable()" in compatibility
-compatibility = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumCompatibility.java").read_text(encoding="utf-8")
 assert "CaustiqConfig.get().enabled()" in compatibility
 assert "IS_COMPATIBLE" in compatibility and "FORCE_DISABLE" in compatibility
 assert "NvidiumIrisChunkVertex.STRIDE" in stride_mixin
