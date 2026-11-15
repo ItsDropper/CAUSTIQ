@@ -1,13 +1,12 @@
 package dev.itsdropper.caustiq.mixin;
 
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisChunkVertex;
-import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex;
-import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Constant;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
  * Keeps Nvidium's CPU-side quad repackaging and copy size in lockstep with the
@@ -22,16 +21,22 @@ public abstract class NvidiumRepackagedStrideMixin {
         return NvidiumIrisChunkVertex.isEnabled() ? NvidiumIrisChunkVertex.STRIDE : original;
     }
 
-    @Redirect(
-            method = "copyQuad",
-            at = @At(value = "FIELD",
-                    target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/vertex/format/impl/CompactChunkVertex;STRIDE:I",
-                    opcode = Opcodes.GETSTATIC),
-            remap = false,
-            require = 1)
-    private static int caustiq$copyExtendedVertexStride() {
+    // STRIDE is a compile-time constant in both upstream vertex formats, so javac
+    // inlines the multiplied quad sizes (80 and 64) into copyQuad. A field
+    // redirect cannot match bytecode that contains no GETSTATIC instruction.
+    @ModifyConstant(method = "copyQuad", constant = @Constant(intValue = 80),
+            remap = false, require = 1)
+    private static int caustiq$copyExtendedSodiumQuadStride(int original) {
         return NvidiumIrisChunkVertex.isEnabled()
-                ? NvidiumIrisChunkVertex.STRIDE
-                : CompactChunkVertex.STRIDE;
+                ? NvidiumIrisChunkVertex.STRIDE * 4
+                : original;
+    }
+
+    @ModifyConstant(method = "copyQuad", constant = @Constant(intValue = 64),
+            remap = false, require = 1)
+    private static int caustiq$copyExtendedNvidiumQuadStride(int original) {
+        return NvidiumIrisChunkVertex.isEnabled()
+                ? NvidiumIrisChunkVertex.STRIDE * 4
+                : original;
     }
 }
