@@ -308,7 +308,7 @@ public final class IrisNvidiumTerrainTranslator {
                 .append(NvidiumTerrainVaryingAdapter.softwareRenderVertexHelpers())
                 .append(vertexProgramSource());
         for (Varying varying : varyings) {
-            vertex.append(varying.qualifier().isBlank() ? "" : varying.qualifier() + " ")
+            vertex.append(varying.qualifier() == null || varying.qualifier().isBlank() ? "" : varying.qualifier() + " ")
                     .append("out ").append(varying.type()).append(" ")
                     .append(varying.name()).append(";\n");
         }
@@ -378,7 +378,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform vec2 renderFog;
                 """);
         for (Varying varying : varyings) {
-            fragment.append(varying.qualifier().isBlank() ? "" : varying.qualifier() + " ")
+            fragment.append(varying.qualifier() == null || varying.qualifier().isBlank() ? "" : varying.qualifier() + " ")
                     .append("in ").append(varying.type()).append(" ")
                     .append(varying.name()).append(";\n");
         }
