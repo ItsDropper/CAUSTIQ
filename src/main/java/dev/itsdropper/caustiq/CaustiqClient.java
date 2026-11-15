@@ -10,7 +10,6 @@ import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanner;
 import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
@@ -33,8 +32,6 @@ public final class CaustiqClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         CaustiqConfig.get();
-        ClientTickEvents.END_CLIENT_TICK.register(client ->
-                ShaderRuntime.activateTerrainAdapterForCurrentWorld());
         shaderPackDirectory = FabricLoader.getInstance().getGameDir().resolve(SHADER_PACK_DIRECTORY);
         try {
             Files.createDirectories(shaderPackDirectory);

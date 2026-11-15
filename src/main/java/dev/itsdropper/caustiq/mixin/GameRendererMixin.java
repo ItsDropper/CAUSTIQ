@@ -9,6 +9,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(GameRenderer.class)
 public abstract class GameRendererMixin {
+    @Inject(method = "renderLevel", at = @At("HEAD"))
+    private void caustiq$selectTerrainDimension(CallbackInfo callbackInfo) {
+        ShaderRuntime.activateTerrainAdapterForCurrentWorld();
+    }
+
     @Inject(method = "renderLevel", at = @At("TAIL"))
     private void caustiq$compileShaderPrograms(CallbackInfo callbackInfo) {
         ShaderRuntime.onWorldRender();
