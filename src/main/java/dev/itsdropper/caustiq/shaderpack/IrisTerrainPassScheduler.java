@@ -21,7 +21,9 @@ public final class IrisTerrainPassScheduler {
     private static final Pattern NUMBERED_PROGRAM = Pattern.compile("^(.*?)(\\d+)$");
     private static final Pattern TARGET_REFERENCE = Pattern.compile("\\bcolortex(\\d+)\\b");
     private static final Pattern OUTPUT_LOCATION = Pattern.compile(
-            "(?m)layout\\s*\\([^)]*location\\s*=\\s*(\\d+)[^)]*\\)\\s*out\\s+");
+            "(?m)layout\\s*\\([^)]*location\\s*=\\s*(\\d+)[^)]*\\)\\s*" +
+                    "(?:(?:flat|smooth|noperspective|centroid|sample|invariant|precise|highp|mediump|lowp)\\s+)*out\\s+");
+    private static final Pattern OUTPUT_NAME = Pattern.compile("\\boutColor(\\d+)\\b");
     private static final Pattern FRAG_DATA = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]");
     private static final Pattern RENDERTARGETS = Pattern.compile(
             "/\\*\\s*RENDERTARGETS\\s*:\\s*([^*]*?)\\*/", Pattern.CASE_INSENSITIVE);
@@ -118,6 +120,8 @@ public final class IrisTerrainPassScheduler {
         Set<Integer> outputSlots = new LinkedHashSet<>();
         Matcher locations = OUTPUT_LOCATION.matcher(source);
         while (locations.find()) outputSlots.add(Integer.parseInt(locations.group(1)));
+        Matcher named = OUTPUT_NAME.matcher(source);
+        while (named.find()) outputSlots.add(Integer.parseInt(named.group(1)));
         Matcher legacy = FRAG_DATA.matcher(source);
         while (legacy.find()) outputSlots.add(Integer.parseInt(legacy.group(1)));
         if (outputSlots.isEmpty()) {
