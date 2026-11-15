@@ -566,7 +566,7 @@ public final class NvidiumIrisUniformBridge {
         putScalar(values, "frameTimeCounter", snapshot == null ? 0.0 : snapshot.frameTimeCounter());
         putScalar(values, "worldAge", worldAge);
         putScalar(values, "worldDay", Math.floorDiv(dayTime, 24_000L));
-        putScalar(values, "worldTime", Math.floorMod(dayTime, 24_000L));
+        putScalar(values, "worldTime", timeOfDay);
         putScalar(values, "sunAngle", normalizedSunAngle);
         putScalar(values, "shadowAngle", isDay ? normalizedSunAngle : moonAngleDegrees / 360.0);
         putScalar(values, "rainStrength", rain);
@@ -1134,6 +1134,10 @@ public final class NvidiumIrisUniformBridge {
             }
         }
         return fallback;
+    }
+
+    private static float clamp01(float value) {
+        return Math.max(0.0f, Math.min(1.0f, value));
     }
 
     private static double clamp01(double value) {
