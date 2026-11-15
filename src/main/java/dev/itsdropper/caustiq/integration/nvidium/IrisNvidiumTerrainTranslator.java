@@ -177,12 +177,13 @@ public final class IrisNvidiumTerrainTranslator {
     private final List<Integer> renderTargetIndices;
 
     private IrisNvidiumTerrainTranslator(
-            String programName, String vertexSource, String fragmentSource, Map<String, String> optionDefines) {
+            String programName, String dimensionDirectory, String vertexSource, String fragmentSource,
+            Map<String, String> optionDefines) {
         this.programName = Objects.requireNonNull(programName, "programName");
         String activeVertex = preprocessTerrainStage(
-                Objects.requireNonNull(vertexSource, "vertexSource"), true, optionDefines, programName);
+                Objects.requireNonNull(vertexSource, "vertexSource"), true, optionDefines, programName, dimensionDirectory);
         String activeFragment = preprocessTerrainStage(
-                Objects.requireNonNull(fragmentSource, "fragmentSource"), false, optionDefines, programName);
+                Objects.requireNonNull(fragmentSource, "fragmentSource"), false, optionDefines, programName, dimensionDirectory);
         StageSource vertex = prepareVertex(activeVertex);
         StageSource fragment = prepareFragment(activeFragment);
         this.vertexSource = vertex.source();
@@ -195,7 +196,8 @@ public final class IrisNvidiumTerrainTranslator {
     }
 
     private static String preprocessTerrainStage(
-            String source, boolean vertex, Map<String, String> optionDefines, String programName) {
+            String source, boolean vertex, Map<String, String> optionDefines, String programName,
+            String dimensionDirectory) {
         Map<String, String> defines = new LinkedHashMap<>();
         if (optionDefines != null) {
             optionDefines.forEach((name, rawValue) -> {
@@ -208,8 +210,20 @@ public final class IrisNvidiumTerrainTranslator {
             });
         }
         defines.put("PROGRAM_" + programName.toUpperCase(java.util.Locale.ROOT), "1");
-        defines.put("WORLD_OVERWORLD", "1");
-        defines.put("OVERWORLD", "1");
+        switch (dimensionDirectory == null ? "" : dimensionDirectory) {
+            case "world-1" -> {
+                defines.put("WORLD_NETHER", "1");
+                defines.put("NETHER", "1");
+            }
+            case "world1" -> {
+                defines.put("WORLD_END", "1");
+                defines.put("END", "1");
+            }
+            default -> {
+                defines.put("WORLD_OVERWORLD", "1");
+                defines.put("OVERWORLD", "1");
+            }
+        }
         defines.put("IS_IRIS", "1");
         // Nvidium terrain passes never render the first-person hand depth layer.
         defines.put("MC_HAND_DEPTH", "1.0");
@@ -294,7 +308,7 @@ public final class IrisNvidiumTerrainTranslator {
         if (vertex == null || fragment == null) {
             throw new IllegalArgumentException(programName + " references a missing preprocessed shader stage.");
         }
-        return new IrisNvidiumTerrainTranslator(programName, vertex, fragment, optionDefines);
+        return new IrisNvidiumTerrainTranslator(programName, programSet.directory(), vertex, fragment, optionDefines);
     }
 
     public List<Integer> renderTargetIndices() {
