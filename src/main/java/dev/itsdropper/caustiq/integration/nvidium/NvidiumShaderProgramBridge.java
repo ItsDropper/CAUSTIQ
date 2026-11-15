@@ -25,6 +25,8 @@ public final class NvidiumShaderProgramBridge {
     private static volatile UnaryOperator<Map<String, String>> primaryTerrainAdapter;
     private static volatile UnaryOperator<Map<String, String>> translucentTerrainAdapter;
     private static volatile UnaryOperator<Map<String, String>> shadowTerrainAdapter;
+    private static volatile UnaryOperator<Map<String, String>> shadowCutoutTerrainAdapter;
+    private static volatile UnaryOperator<Map<String, String>> shadowTranslucentTerrainAdapter;
     private static volatile List<Integer> primaryOutputRouting = List.of(0, 1, 2, 3, 4, 5, 6, 7);
     private static volatile List<Integer> translucentOutputRouting = List.of(0, 1, 2, 3, 4, 5, 6, 7);
     private static final ThreadLocal<PipelineKind> ACTIVE_PIPELINE =
@@ -64,10 +66,27 @@ public final class NvidiumShaderProgramBridge {
         shadowTerrainAdapter = Objects.requireNonNull(adapter, "adapter");
     }
 
+    public static void registerShadowCutoutTerrainAdapter(UnaryOperator<Map<String, String>> adapter) {
+        shadowCutoutTerrainAdapter = Objects.requireNonNull(adapter, "adapter");
+    }
+
+    public static void registerShadowTranslucentTerrainAdapter(UnaryOperator<Map<String, String>> adapter) {
+        shadowTranslucentTerrainAdapter = Objects.requireNonNull(adapter, "adapter");
+    }
+
+    /** Preserve an explicit shadow-translucent scope through Nvidium's constructor mixin. */
+    public static void beginTranslucentPipelineCompile() {
+        if (ACTIVE_PIPELINE.get() != PipelineKind.SHADOW_TRANSLUCENT) {
+            ACTIVE_PIPELINE.set(PipelineKind.TRANSLUCENT);
+        }
+    }
+
     public static void unregisterTerrainAdapter() {
         primaryTerrainAdapter = null;
         translucentTerrainAdapter = null;
         shadowTerrainAdapter = null;
+        shadowCutoutTerrainAdapter = null;
+        shadowTranslucentTerrainAdapter = null;
         primaryOutputRouting = List.of(0, 1, 2, 3, 4, 5, 6, 7);
         translucentOutputRouting = List.of(0, 1, 2, 3, 4, 5, 6, 7);
         ACTIVE_PIPELINE.remove();
@@ -80,7 +99,9 @@ public final class NvidiumShaderProgramBridge {
 
     /** True only when an Iris terrain program translator is installed. */
     public static boolean hasTerrainAdapter() {
-        return primaryTerrainAdapter != null || translucentTerrainAdapter != null || shadowTerrainAdapter != null;
+        return primaryTerrainAdapter != null || translucentTerrainAdapter != null
+                || shadowTerrainAdapter != null || shadowCutoutTerrainAdapter != null
+                || shadowTranslucentTerrainAdapter != null;
     }
 
     public static List<Integer> outputRoutingFor(PipelineKind pipeline) {
@@ -101,7 +122,9 @@ public final class NvidiumShaderProgramBridge {
     public enum PipelineKind {
         PRIMARY,
         TRANSLUCENT,
-        SHADOW
+        SHADOW,
+        SHADOW_CUTOUT,
+        SHADOW_TRANSLUCENT
     }
 
     /** Called immediately before Nvidium links a shader program through OpenGL. */
@@ -127,10 +150,16 @@ public final class NvidiumShaderProgramBridge {
             case PRIMARY -> primaryTerrainAdapter;
             case TRANSLUCENT -> translucentTerrainAdapter;
             case SHADOW -> shadowTerrainAdapter;
+            case SHADOW_CUTOUT -> shadowCutoutTerrainAdapter != null
+                    ? shadowCutoutTerrainAdapter : shadowTerrainAdapter;
+            case SHADOW_TRANSLUCENT -> shadowTranslucentTerrainAdapter != null
+                    ? shadowTranslucentTerrainAdapter : shadowTerrainAdapter;
         };
         if (irisAdapter != null) {
             transformed = applyAdapter(irisAdapter, transformed,
                     pipeline == PipelineKind.TRANSLUCENT ? "Iris translucent terrain"
+                            : pipeline == PipelineKind.SHADOW_TRANSLUCENT ? "Iris translucent shadow terrain"
+                            : pipeline == PipelineKind.SHADOW_CUTOUT ? "Iris cutout shadow terrain"
                             : pipeline == PipelineKind.SHADOW ? "Iris shadow terrain" : "Iris terrain", true);
         }
 

@@ -17,6 +17,13 @@ public final class NvidiumTerrainPassBridge {
         return name.equals("SOLID") || name.equals("OPAQUE");
     }
 
+    /** True for Nvidium/Sodium cutout terrain layers, including cutout-mipped. */
+    public static boolean isCutoutPass(Object terrainPass) {
+        Object renderType = readRenderType(terrainPass);
+        return renderType != null
+                && renderType.toString().toUpperCase(Locale.ROOT).contains("CUTOUT");
+    }
+
     private static Object readRenderType(Object terrainPass) {
         try {
             Method accessor = terrainPass.getClass().getMethod("renderType");

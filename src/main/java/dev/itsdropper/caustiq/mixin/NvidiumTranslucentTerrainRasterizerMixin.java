@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class NvidiumTranslucentTerrainRasterizerMixin {
     @Inject(method = "<init>", at = @At("HEAD"), remap = false, require = 1)
     private static void caustiq$beginTranslucentShaderCompilation(CallbackInfo callbackInfo) {
-        NvidiumShaderProgramBridge.beginPipelineCompile(NvidiumShaderProgramBridge.PipelineKind.TRANSLUCENT);
+        NvidiumShaderProgramBridge.beginTranslucentPipelineCompile();
     }
 
     @Inject(method = "<init>", at = @At("TAIL"), remap = false, require = 1)

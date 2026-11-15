@@ -38,6 +38,7 @@ public final class ShaderRuntime {
     private static IrisShaderPackModel preparedPackModel;
     private static String preparedPackId = "";
     private static Map<String, IrisNvidiumTerrainTranslator> preparedTerrainTranslators = Map.of();
+    private static Map<String, IrisNvidiumTerrainTranslator> preparedTranslucentTerrainTranslators = Map.of();
     private static Set<String> preparedUnsupportedTerrainDimensions = Set.of();
     private static IrisTerrainPassScheduler.Plan preparedTerrainPlan;
     private static Map<String, String> preparedDimensionMappings = Map.of();
@@ -88,6 +89,7 @@ public final class ShaderRuntime {
         preparedPackModel = null;
         preparedPackId = "";
         preparedTerrainTranslators = Map.of();
+        preparedTranslucentTerrainTranslators = Map.of();
         preparedUnsupportedTerrainDimensions = Set.of();
         preparedTerrainPlan = null;
         preparedDimensionMappings = Map.of();
@@ -138,6 +140,7 @@ public final class ShaderRuntime {
         preparedPackModel = null;
         preparedPackId = "";
         preparedTerrainTranslators = Map.of();
+        preparedTranslucentTerrainTranslators = Map.of();
         preparedUnsupportedTerrainDimensions = Set.of();
         preparedTerrainPlan = null;
         preparedDimensionMappings = Map.of();
@@ -180,6 +183,7 @@ public final class ShaderRuntime {
             configureShadowRenderer(model);
 
             Map<String, IrisNvidiumTerrainTranslator> translators = new LinkedHashMap<>();
+            Map<String, IrisNvidiumTerrainTranslator> translucentTranslators = new LinkedHashMap<>();
             Set<String> unsupportedDimensions = new LinkedHashSet<>();
             if (model.base().programs().containsKey("gbuffers_terrain")) {
                 try {
@@ -206,6 +210,9 @@ public final class ShaderRuntime {
                 }
             });
 
+            prepareTranslucentTerrainTranslators(
+                    model, optionDefines, translucentTranslators, selected.displayName());
+
             if (translators.isEmpty()) {
                 CaustiqClient.LOGGER.warn(
                         "Shader pack '{}' has no gbuffers_terrain program that the current Nvidium ABI can translate.",
@@ -216,6 +223,7 @@ public final class ShaderRuntime {
             preparedPackModel = model;
             preparedPackId = selected.id();
             preparedTerrainTranslators = Map.copyOf(translators);
+            preparedTranslucentTerrainTranslators = Map.copyOf(translucentTranslators);
             preparedUnsupportedTerrainDimensions = Set.copyOf(unsupportedDimensions);
             preparedTerrainPlan = new IrisTerrainPassScheduler().schedule(model, null);
             preparedDimensionMappings = model.dimensionMappings();
@@ -223,6 +231,9 @@ public final class ShaderRuntime {
             CaustiqClient.LOGGER.info(
                     "Prepared shader pack '{}' for Nvidium terrain translation: {} dimension program(s), {} unsupported dimension program(s).",
                     selected.displayName(), translators.size(), unsupportedDimensions.size());
+            CaustiqClient.LOGGER.info(
+                    "Prepared {} separate Iris translucent terrain program(s) for Nvidium.",
+                    translucentTranslators.size());
             activateTerrainAdapterForCurrentWorld();
         } catch (IOException | RuntimeException exception) {
             irisShaderResources.close();
@@ -276,6 +287,12 @@ public final class ShaderRuntime {
             deactivateTerrainAdapter();
             return false;
         }
+        IrisNvidiumTerrainTranslator translucentTranslator =
+                preparedTranslucentTerrainTranslators.get(directory);
+        if (translucentTranslator == null) translucentTranslator =
+                preparedTranslucentTerrainTranslators.get(adapterKey);
+        if (translucentTranslator == null) translucentTranslator =
+                preparedTranslucentTerrainTranslators.get("");
 
         if (preparedTerrainAdapterRegistered && !adapterKey.equals(activeTerrainDimensionKey)) {
             NvidiumShaderProgramBridge.unregisterTerrainAdapter();
@@ -296,6 +313,10 @@ public final class ShaderRuntime {
                     dimensionPlan == null ? Map.of() : dimensionPlan.targets());
             NvidiumShaderProgramBridge.registerTerrainAdapter(
                     translator::adapt, translator.renderTargetIndices());
+            if (translucentTranslator != null) {
+                NvidiumShaderProgramBridge.registerTranslucentTerrainAdapter(
+                        translucentTranslator::adapt, translucentTranslator.renderTargetIndices());
+            }
             activeTerrainDimensionKey = adapterKey;
             preparedTerrainAdapterRegistered = true;
             if (!NvidiumRenderBridge.reloadShaders()) {
@@ -318,43 +339,93 @@ public final class ShaderRuntime {
     }
 
     private static void configureShadowRenderer(IrisShaderPackModel model) {
-        NvidiumShaderProgramBridge.registerShadowTerrainAdapter(Map::copyOf);
-        String shadowProgramName = model.base().programs().keySet().stream()
-                .filter(name -> ShaderPackProgramCatalog.Group.classify(name)
-                        == ShaderPackProgramCatalog.Group.SHADOW)
-                .sorted(java.util.Comparator.comparingInt(name -> name.equalsIgnoreCase("shadow") ? 0 : 1))
-                .findFirst().orElseGet(() -> model.dimensionOverrides().values().stream()
-                        .flatMap(programSet -> programSet.programs().keySet().stream())
-                        .filter(name -> ShaderPackProgramCatalog.Group.classify(name)
-                                == ShaderPackProgramCatalog.Group.SHADOW)
-                        .findFirst().orElse(null));
-        if (shadowProgramName == null) {
-            NvidiumShadowRenderer.configure(false, 2048, 128.0f);
-            return;
-        }
         Map<String, String> optionDefines = new LinkedHashMap<>();
         for (ShaderPackMetadata.Option option : model.options().options()) {
             optionDefines.put(option.name(), CaustiqConfig.get().option(
                     CaustiqConfig.get().selectedPackId(), option.name(), option.defaultValue()));
         }
-        try {
-            IrisNvidiumTerrainTranslator shadowTranslator = IrisNvidiumTerrainTranslator.from(
-                    model, null, shadowProgramName, optionDefines);
-            NvidiumShaderProgramBridge.registerShadowTerrainAdapter(shadowTranslator::adapt);
-        } catch (RuntimeException exception) {
+
+        String solidProgram = selectShadowProgram(model, "shadow_solid", "shadow", "shadow_cutout");
+        String cutoutProgram = selectShadowProgram(model, "shadow_cutout", "shadow_solid", "shadow");
+        String translucentProgram = selectShadowProgram(
+                model, "shadow_water", "shadow", "shadow_solid", "shadow_cutout");
+        if (solidProgram == null) {
             NvidiumShadowRenderer.configure(false, 2048, 128.0f);
-            CaustiqClient.LOGGER.warn("Shader pack shadow program '{}' cannot be translated for Nvidium: {}",
-                    shadowProgramName, exception.getMessage());
+            CaustiqClient.LOGGER.info(
+                    "Shader pack has no translatable Iris shadow terrain program; Nvidium shadow rendering remains disabled.");
             return;
         }
+
+        try {
+            IrisNvidiumTerrainTranslator solid = IrisNvidiumTerrainTranslator.from(model, null, solidProgram, optionDefines);
+            IrisNvidiumTerrainTranslator cutout = IrisNvidiumTerrainTranslator.from(
+                    model, null, cutoutProgram == null ? solidProgram : cutoutProgram, optionDefines);
+            IrisNvidiumTerrainTranslator translucent = IrisNvidiumTerrainTranslator.from(
+                    model, null, translucentProgram == null ? solidProgram : translucentProgram, optionDefines);
+            NvidiumShaderProgramBridge.registerShadowTerrainAdapter(solid::adapt);
+            NvidiumShaderProgramBridge.registerShadowCutoutTerrainAdapter(cutout::adapt);
+            NvidiumShaderProgramBridge.registerShadowTranslucentTerrainAdapter(translucent::adapt);
+        } catch (RuntimeException exception) {
+            NvidiumShadowRenderer.configure(false, 2048, 128.0f);
+            CaustiqClient.LOGGER.warn(
+                    "Selected Iris shadow terrain program set ({}, {}, {}) cannot be translated for Nvidium: {}",
+                    solidProgram, cutoutProgram, translucentProgram, exception.getMessage());
+            return;
+        }
+
         int resolution = parseIntegerProperty(model.properties().get("shadowMapResolution"), 2048);
         float distance = parseFloatProperty(model.properties().get("shadowDistance"), 128.0f);
         float distanceMultiplier = parseFloatProperty(
                 model.properties().get("shadowDistanceRenderMul"), 1.0f);
         NvidiumShadowRenderer.configure(true, resolution, distance * distanceMultiplier);
-        CaustiqClient.LOGGER.info("Prepared Iris shadow program '{}' for the isolated Nvidium pipeline ({}px, {:.1f}-block light-space radius).",
-                shadowProgramName, Integer.highestOneBit(Math.max(256, Math.min(8192, resolution))),
+        CaustiqClient.LOGGER.info(
+                "Prepared Nvidium shadow rasterizers with Iris programs solid='{}', cutout='{}', translucent='{}' ({}px, {:.1f}-block light-space radius).",
+                solidProgram, cutoutProgram == null ? solidProgram : cutoutProgram,
+                translucentProgram == null ? solidProgram : translucentProgram,
+                Integer.highestOneBit(Math.max(256, Math.min(8192, resolution))),
                 distance * distanceMultiplier);
+    }
+
+    private static String selectShadowProgram(IrisShaderPackModel model, String... candidates) {
+        for (String candidate : candidates) {
+            if (model.base().programs().containsKey(candidate)) return candidate;
+            if (model.dimensionOverrides().values().stream()
+                    .anyMatch(programSet -> programSet.programs().containsKey(candidate))) return candidate;
+        }
+        return null;
+    }
+
+    private static void prepareTranslucentTerrainTranslators(
+            IrisShaderPackModel model, Map<String, String> optionDefines,
+            Map<String, IrisNvidiumTerrainTranslator> translators, String packName) {
+        List<String> directories = new ArrayList<>();
+        directories.add("");
+        directories.addAll(model.dimensionOverrides().keySet());
+        for (String directory : directories) {
+            IrisShaderPackModel.ProgramSet programSet = directory.isEmpty()
+                    ? model.base() : model.dimensionOverrides().get(directory);
+            if (programSet == null) continue;
+            String programName = programSet.programs().containsKey("gbuffers_water")
+                    ? "gbuffers_water"
+                    : programSet.programs().containsKey("gbuffers_terrain")
+                    ? "gbuffers_terrain"
+                    : model.base().programs().containsKey("gbuffers_water")
+                    ? "gbuffers_water"
+                    : model.base().programs().containsKey("gbuffers_terrain")
+                    ? "gbuffers_terrain" : null;
+            if (programName == null) continue;
+            try {
+                translators.put(directory, IrisNvidiumTerrainTranslator.from(
+                        model, directory.isEmpty() ? null : directory, programName, optionDefines));
+                CaustiqClient.LOGGER.info(
+                        "Mapped Nvidium translucent terrain to Iris '{}' for shader pack '{}'{}.",
+                        programName, packName, directory.isEmpty() ? "" : " in " + directory);
+            } catch (RuntimeException exception) {
+                CaustiqClient.LOGGER.warn(
+                        "Shader pack '{}' {} translucent terrain program '{}' cannot be translated: {}",
+                        packName, directory.isEmpty() ? "base" : directory, programName, exception.getMessage());
+            }
+        }
     }
     private static int parseIntegerProperty(String value, int fallback) {
         if (value == null) return fallback;

@@ -260,7 +260,9 @@ public final class NvidiumShadowRenderer {
             SHADOW_RASTERIZATION.set(Boolean.TRUE);
             try {
                 bindIndirectBuffer(state.terrainCommands);
-                invoke(state.shadowRasterizer, "raster",
+                Object shadowRasterizer = NvidiumTerrainPassBridge.isCutoutPass(terrainPass)
+                        ? state.cutoutShadowRasterizer : state.shadowRasterizer;
+                invoke(shadowRasterizer, "raster",
                         terrainPass, regionCount, address(state.terrainCommands), terrainSampler);
             } finally {
                 SHADOW_RASTERIZATION.remove();
@@ -463,6 +465,7 @@ public final class NvidiumShadowRenderer {
         private final int translucentDepthTexture;
         private final int translucentFramebuffer;
         private Object shadowRasterizer;
+        private Object cutoutShadowRasterizer;
         private Object translucentShadowRasterizer;
         private int resolution;
         private int frameId;
@@ -511,18 +514,24 @@ public final class NvidiumShadowRenderer {
         private void createShadowRasterizer() {
             if (shadowRasterizer != null) return;
             try {
-                NvidiumShaderProgramBridge.beginPipelineCompile(
-                        NvidiumShaderProgramBridge.PipelineKind.SHADOW);
-                try {
-                    Class<?> type = Class.forName("me.cortex.nvidium.renderers.PrimaryTerrainRasterizer");
-                    shadowRasterizer = type.getConstructor().newInstance();
-                    Class<?> translucentType = Class.forName("me.cortex.nvidium.renderers.TranslucentTerrainRasterizer");
-                    translucentShadowRasterizer = translucentType.getConstructor().newInstance();
-                } finally {
-                    NvidiumShaderProgramBridge.endPipelineCompile();
-                }
+                Class<?> primaryType = Class.forName("me.cortex.nvidium.renderers.PrimaryTerrainRasterizer");
+                Class<?> translucentType = Class.forName("me.cortex.nvidium.renderers.TranslucentTerrainRasterizer");
+                shadowRasterizer = createRasterizer(primaryType, NvidiumShaderProgramBridge.PipelineKind.SHADOW);
+                cutoutShadowRasterizer = createRasterizer(primaryType, NvidiumShaderProgramBridge.PipelineKind.SHADOW_CUTOUT);
+                translucentShadowRasterizer = createRasterizer(translucentType, NvidiumShaderProgramBridge.PipelineKind.SHADOW_TRANSLUCENT);
             } catch (ReflectiveOperationException | RuntimeException exception) {
-                throw new IllegalStateException("Could not compile Nvidium's independent shadow terrain rasterizer.", exception);
+                deleteShadowRasterizer();
+                throw new IllegalStateException("Could not compile Nvidium's independent shadow terrain rasterizers.", exception);
+            }
+        }
+
+        private Object createRasterizer(Class<?> type, NvidiumShaderProgramBridge.PipelineKind pipelineKind)
+                throws ReflectiveOperationException {
+            NvidiumShaderProgramBridge.beginPipelineCompile(pipelineKind);
+            try {
+                return type.getConstructor().newInstance();
+            } finally {
+                NvidiumShaderProgramBridge.endPipelineCompile();
             }
         }
 
@@ -533,6 +542,13 @@ public final class NvidiumShadowRenderer {
                     CaustiqClient.LOGGER.warn("Unable to release Nvidium shadow rasterizer cleanly.", exception);
                 }
                 shadowRasterizer = null;
+            }
+            if (cutoutShadowRasterizer != null) {
+                try { invoke(cutoutShadowRasterizer, "delete"); }
+                catch (ReflectiveOperationException | RuntimeException exception) {
+                    CaustiqClient.LOGGER.warn("Unable to release Nvidium cutout shadow rasterizer cleanly.", exception);
+                }
+                cutoutShadowRasterizer = null;
             }
             if (translucentShadowRasterizer != null) {
                 try { invoke(translucentShadowRasterizer, "delete"); }

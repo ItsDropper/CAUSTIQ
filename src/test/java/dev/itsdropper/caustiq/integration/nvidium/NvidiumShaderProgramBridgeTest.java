@@ -144,6 +144,58 @@ class NvidiumShaderProgramBridgeTest {
         assertFalse(primary.get(Stage.MESH).contains("iris shadow"));
     }
 
+    @Test void selectsIndependentSolidCutoutAndTranslucentShadowAdapters() {
+        NvidiumShaderProgramBridge.registerShadowTerrainAdapter(sources -> append(sources, "// solid"));
+        NvidiumShaderProgramBridge.registerShadowCutoutTerrainAdapter(sources -> append(sources, "// cutout"));
+        NvidiumShaderProgramBridge.registerShadowTranslucentTerrainAdapter(sources -> append(sources, "// water"));
+        assertPipelineMarker(NvidiumShaderProgramBridge.PipelineKind.SHADOW, "// solid");
+        assertPipelineMarker(NvidiumShaderProgramBridge.PipelineKind.SHADOW_CUTOUT, "// cutout");
+        assertPipelineMarker(NvidiumShaderProgramBridge.PipelineKind.SHADOW_TRANSLUCENT, "// water");
+    }
+
+    @Test void translucentConstructorPreservesShadowTranslucentCompileScope() {
+        NvidiumShaderProgramBridge.registerTranslucentTerrainAdapter(
+                sources -> append(sources, "// regular translucent"));
+        NvidiumShaderProgramBridge.registerShadowTranslucentTerrainAdapter(
+                sources -> append(sources, "// translucent shadow"));
+        NvidiumShaderProgramBridge.beginPipelineCompile(
+                NvidiumShaderProgramBridge.PipelineKind.SHADOW_TRANSLUCENT);
+        try {
+            NvidiumShaderProgramBridge.beginTranslucentPipelineCompile();
+            Map<Object, String> shadowSources = terrainSources();
+            NvidiumShaderProgramBridge.transformBeforeCompile(shadowSources);
+            assertTrue(shadowSources.get(Stage.MESH).endsWith("// translucent shadow"));
+        } finally {
+            NvidiumShaderProgramBridge.endPipelineCompile();
+        }
+        NvidiumShaderProgramBridge.beginTranslucentPipelineCompile();
+        try {
+            Map<Object, String> sources = terrainSources();
+            NvidiumShaderProgramBridge.transformBeforeCompile(sources);
+            assertTrue(sources.get(Stage.MESH).endsWith("// regular translucent"));
+        } finally {
+            NvidiumShaderProgramBridge.endPipelineCompile();
+        }
+    }
+
+    private static Map<String, String> append(Map<String, String> sources, String marker) {
+        return Map.of("TASK", sources.get("TASK") + marker,
+                "MESH", sources.get("MESH") + marker,
+                "FRAGMENT", sources.get("FRAGMENT") + marker);
+    }
+
+    private static void assertPipelineMarker(
+            NvidiumShaderProgramBridge.PipelineKind pipeline, String marker) {
+        NvidiumShaderProgramBridge.beginPipelineCompile(pipeline);
+        try {
+            Map<Object, String> sources = terrainSources();
+            NvidiumShaderProgramBridge.transformBeforeCompile(sources);
+            assertTrue(sources.get(Stage.MESH).endsWith(marker));
+        } finally {
+            NvidiumShaderProgramBridge.endPipelineCompile();
+        }
+    }
+
     @Test void ignoresNonTerrainPrograms() {
         Map<Object, String> sources = new LinkedHashMap<>();
         sources.put(Stage.COMPUTE, "compute source");
