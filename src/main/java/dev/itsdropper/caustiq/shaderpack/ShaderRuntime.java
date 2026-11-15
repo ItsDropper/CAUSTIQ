@@ -242,6 +242,7 @@ public final class ShaderRuntime {
             preparedPackModel = null;
             preparedPackId = "";
             preparedTerrainTranslators = Map.of();
+            preparedTranslucentTerrainTranslators = Map.of();
             preparedUnsupportedTerrainDimensions = Set.of();
             preparedTerrainPlan = null;
             preparedDimensionMappings = Map.of();

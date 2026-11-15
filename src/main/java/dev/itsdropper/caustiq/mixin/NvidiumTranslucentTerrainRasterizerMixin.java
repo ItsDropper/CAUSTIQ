@@ -4,6 +4,7 @@ import dev.itsdropper.caustiq.integration.nvidium.NvidiumShaderProgramBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumGBufferTargets;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTextureBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -28,6 +29,7 @@ public abstract class NvidiumTranslucentTerrainRasterizerMixin {
     private void caustiq$attachTranslucentGBuffer(
             @Coerce Object pass, int regionCount, long commandAddress,
             @Coerce Object terrainSampler, CallbackInfo callbackInfo) {
+        if (NvidiumShadowRenderer.isShadowRasterization()) return;
         NvidiumGBufferTargets.configureOutputRouting(
                 NvidiumShaderProgramBridge.outputRoutingFor(NvidiumShaderProgramBridge.PipelineKind.TRANSLUCENT));
         NvidiumGBufferTargets.begin(false);
@@ -47,7 +49,9 @@ public abstract class NvidiumTranslucentTerrainRasterizerMixin {
     private void caustiq$restoreTranslucentGBuffer(
             @Coerce Object pass, int regionCount, long commandAddress,
             @Coerce Object terrainSampler, CallbackInfo callbackInfo) {
-        NvidiumGBufferTargets.end();
+        if (!NvidiumShadowRenderer.isShadowRasterization()) {
+            NvidiumGBufferTargets.end();
+        }
         NvidiumIrisTextureBridge.restoreBindings();
     }
 }
