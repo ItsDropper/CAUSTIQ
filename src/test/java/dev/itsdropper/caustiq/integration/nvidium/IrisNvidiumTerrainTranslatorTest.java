@@ -191,6 +191,23 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesHeldItemIdToTheRuntimeItemRegistryUniform() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform int heldItemId;
+                void main() { gl_FragColor = vec4(float(heldItemId)); }
+                """);
+
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform int caustiqHeldItemId;"));
+        assertTrue(fragment.contains("float(caustiqHeldItemId)"));
+        assertFalse(fragment.contains("uniform int heldItemId;"));
+    }
+
+    @Test
     void translatesMainAndOffHandHeldBlockLightUniformsToSeparateRuntimeValues() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150
