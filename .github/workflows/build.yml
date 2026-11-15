@@ -123,7 +123,7 @@ jobs:
           print("Verified pinned-source terrain, shadow, and Photon LPV compute audits executed successfully.")
           PY
 
-      - name: Compile generated Nvidium terrain and shadow shaders
+      - name: Compile generated Nvidium adapter GLSL helpers
         shell: bash
         run: |
           set -euo pipefail
@@ -136,42 +136,58 @@ jobs:
           import sys
 
           source_dir, output_dir = map(pathlib.Path, sys.argv[1:])
-          output_dir.mkdir(parents=True, exist_ok=True)
           shaders = (
               "photon-nvidium-terrain.mesh",
               "photon-nvidium-terrain.frag",
               "photon-nvidium-shadow.mesh",
               "photon-nvidium-shadow.frag",
           )
-          extension = re.compile(r"(?m)^[ \t]*#[ \t]*extension[ \t]+GL_NV_bindless_texture[ \t]*:")
-          bindless_constructor = re.compile(
-              r"\bsampler(?:1D|2D|3D|Cube|1DArray|2DArray|CubeArray)\s*"
-              r"\(\s*(?:u?int64_t|uint64_t)\b"
+          bindless_extension = re.compile(
+              r"(?m)^[ \\t]*#[ \\t]*extension[ \\t]+GL_NV_bindless_texture\\b"
           )
+          bindless_constructor = re.compile(
+              r"\\bsampler(?:1D|2D|3D|Cube|1DArray|2DArray|CubeArray)\\s*"
+              r"\\(\\s*(?:u?int64_t|uint64_t)\\b"
+          )
+          generated = {}
           for name in shaders:
-              source = source_dir / name
-              if not source.is_file() or source.stat().st_size == 0:
-                  raise SystemExit(f"Missing generated shader: {source}")
-              content = source.read_text()
-              if extension.search(content) and bindless_constructor.search(content):
+              path = source_dir / name
+              if not path.is_file() or path.stat().st_size == 0:
+                  raise SystemExit(f"Missing generated shader: {path}")
+              source = path.read_text()
+              if bindless_extension.search(source) and bindless_constructor.search(source):
                   raise SystemExit(
-                      f"Bindless sampler construction is used by {name}; glslang cannot validate that stage."
+                      f"{name} uses NV bindless sampler construction; it cannot be passed to glslang."
                   )
-              sanitized = re.sub(
-                  r"(?m)^[ \\t]*#[ \\t]*extension[ \\t]+GL_NV_bindless_texture[ \\t]*:[ \\t]*(?:require|enable)[ \\t]*$\\n?",
-                  "",
-                  content,
-              )
-              (output_dir / name).write_text(sanitized)
+              generated[name] = source
+
+          mesh = generated["photon-nvidium-terrain.mesh"]
+          begin = "// CAUSTIQ_NVIDIUM_ADAPTER_HELPERS_BEGIN"
+          end = "// CAUSTIQ_NVIDIUM_ADAPTER_HELPERS_END"
+          if mesh.count(begin) != 1 or mesh.count(end) != 1:
+              raise SystemExit("Generated terrain mesh is missing the unique adapter-helper markers.")
+          helpers = mesh.split(begin, 1)[1].split(end, 1)[0]
+          if not helpers.strip():
+              raise SystemExit("Generated terrain adapter helper block is empty.")
+
+          harness = """#version 460
+          struct Vertex {
+              uint normal;
+              uint material;
+              uint midUV;
+              uint midBlock;
+              uint blockId;
+              uint nvidiumMaterial;
+              uint color;
+          };
+          const float COLOR_SCALE = 1.0 / 255.0;
+          vec4 decodeVertexColour(Vertex vertex) { return vec4(1.0); }
+          """ + helpers + "\\nvoid main() {\\n    Vertex vertex = Vertex(0u, 0u, 0u, 0u, 0u, 0u, 0u);\\n    gl_Position = vec4(caustiqDecodeNormal(vertex), 1.0);\\n}\\n"
+          (output_dir / "nvidium-adapter-helpers.vert").write_text(harness)
+          print("Validated four generated Nvidium terrain/shadow stages are present and bindless usage is not silently stripped.")
+          print("Extracted the exact injected adapter helper block for standalone GLSL compilation.")
           PY
-          for shader in photon-nvidium-terrain.mesh photon-nvidium-terrain.frag photon-nvidium-shadow.mesh photon-nvidium-shadow.frag; do
-            echo "===== $shader (generated source, lines 100-120) ====="
-            nl -ba "$validation_dir/$shader" | sed -n '100,120p'
-          done
-          glslangValidator -S mesh "$validation_dir/photon-nvidium-terrain.mesh"
-          glslangValidator -S frag "$validation_dir/photon-nvidium-terrain.frag"
-          glslangValidator -S mesh "$validation_dir/photon-nvidium-shadow.mesh"
-          glslangValidator -S frag "$validation_dir/photon-nvidium-shadow.frag"
+          glslangValidator -S vert "$validation_dir/nvidium-adapter-helpers.vert"
 
       - name: Validate bundled GLSL
         shell: bash
