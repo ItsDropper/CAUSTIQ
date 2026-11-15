@@ -145,7 +145,7 @@ public final class NvidiumGBufferTargets {
                         + Integer.toHexString(status) + ").");
                 return false;
             }
-            clearAuxiliaryAttachments();
+            if (clearAttachments) clearAuxiliaryAttachments();
             GL20C.glDrawBuffers(drawBuffers);
             activeState = state;
             warnedUnavailable = false;
