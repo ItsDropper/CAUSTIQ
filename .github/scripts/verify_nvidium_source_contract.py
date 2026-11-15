@@ -6,12 +6,28 @@ import sys
 
 root = Path(sys.argv[1])
 caustiq_root = Path(sys.argv[2])
+sodium_root = Path(sys.argv[3])
 
 def source(relative: str) -> str:
     path = root / relative
     if not path.is_file():
         raise SystemExit(f"Missing pinned Nvidium source: {relative}")
     return path.read_text(encoding="utf-8")
+
+# Sodium's base FluidRenderer is abstract: it has no executable method body
+# for HEAD/RETURN injection points. The Fabric implementation is the concrete
+# class used by the installed Fabric distribution and owns the render body.
+sodium_base = (sodium_root / "common/src/main/java/net/caffeinemc/mods/sodium/client/render/chunk/compile/pipeline/FluidRenderer.java").read_text(encoding="utf-8")
+sodium_fabric = (sodium_root / "fabric/src/main/java/net/caffeinemc/mods/sodium/fabric/render/FluidRendererImpl.java").read_text(encoding="utf-8")
+fluid_mixin = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/mixin/NvidiumFluidRendererVertexContextMixin.java").read_text(encoding="utf-8")
+assert "public abstract class FluidRenderer" in sodium_base
+assert "public abstract void render(" in sodium_base
+assert "public class FluidRendererImpl extends FluidRenderer" in sodium_fabric
+assert "public void render(" in sodium_fabric
+assert 'net.caffeinemc.mods.sodium.fabric.render.FluidRendererImpl' in fluid_mixin
+assert 'net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.FluidRenderer"' not in fluid_mixin
+assert 'method = "render", at = @At("HEAD")' in fluid_mixin
+assert 'method = "render", at = @At("RETURN")' in fluid_mixin
 
 shader = source("src/main/java/me/cortex/nvidium/gl/shader/Shader.java")
 iris_check = source("src/main/java/me/cortex/nvidium/sodiumCompat/IrisCheck.java")

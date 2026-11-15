@@ -30,11 +30,15 @@ jobs:
         run: |
           set -euo pipefail
           nvidium_dir="$RUNNER_TEMP/nvidium-source"
-          mkdir -p "$nvidium_dir"
+          sodium_dir="$RUNNER_TEMP/sodium-source"
+          mkdir -p "$nvidium_dir" "$sodium_dir"
           curl --fail --silent --show-error --location \
             "https://github.com/MCRcortex/nvidium/archive/e600501ab840ba821bbea8bb36616feec8e476ef.tar.gz" \
             | tar -xz --strip-components=1 -C "$nvidium_dir"
-          python3 .github/scripts/verify_nvidium_source_contract.py "$nvidium_dir" "$GITHUB_WORKSPACE"
+          curl --fail --silent --show-error --location \
+            "https://github.com/CaffeineMC/sodium/archive/4d408fb488fda38d9bc8cba66ca62384e000fcdc.tar.gz" \
+            | tar -xz --strip-components=1 -C "$sodium_dir"
+          python3 .github/scripts/verify_nvidium_source_contract.py "$nvidium_dir" "$GITHUB_WORKSPACE" "$sodium_dir"
           echo "NVIDIUM_SOURCE_DIR=$nvidium_dir" >> "$GITHUB_ENV"
 
       - name: Check out pinned Photon shader-pack sources

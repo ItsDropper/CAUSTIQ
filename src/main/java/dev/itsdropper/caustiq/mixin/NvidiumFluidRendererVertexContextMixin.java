@@ -12,9 +12,9 @@ import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Captures the material identity for fluid quads emitted by Sodium's fluid mesher. */
+/** Captures fluid material identity in Sodium's concrete Fabric renderer implementation. */
 @Pseudo
-@Mixin(targets = "net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.FluidRenderer",
+@Mixin(targets = "net.caffeinemc.mods.sodium.fabric.render.FluidRendererImpl",
         remap = false)
 public abstract class NvidiumFluidRendererVertexContextMixin {
     @Unique private NvidiumIrisVertexContext.Scope caustiq$scope;
