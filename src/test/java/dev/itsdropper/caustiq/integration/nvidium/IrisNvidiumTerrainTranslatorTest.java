@@ -1,8 +1,16 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
 import dev.itsdropper.caustiq.shaderpack.IrisShaderPackModel;
+import dev.itsdropper.caustiq.shaderpack.IrisShaderPackParser;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackDescriptor;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackLayout;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackSourceType;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackSources;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackProgramCatalog;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
+
+import java.nio.file.Path;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,6 +63,26 @@ class IrisNvidiumTerrainTranslatorTest {
         assertTrue(fragment.contains("texture(tex_diffuse, texCoord)"));
         assertTrue(fragment.contains("caustiqIrisTexCoord[0] = v_irisTexCoord0;"));
         assertFalse(fragment.contains("caustiqGBufferNormal"));
+    }
+
+    @Test
+    void translatesPinnedPhotonTerrainIntoTheRealNvidiumStageAbiWhenCiProvidesItsSource() throws Exception {
+        String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
+        Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),
+                "Photon source checkout is supplied by CI only");
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("photon", "Photon",
+                Path.of(photonDirectory), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(model);
+            Map<String, String> translated = translator.adapt(nativeStages());
+            assertTrue(translated.get("MESH").contains("void caustiqIrisVertexMain()"));
+            assertTrue(translated.get("FRAGMENT").contains("void caustiqIrisFragmentMain()"));
+            assertTrue(translated.get("MESH").contains("OUT[id].scene_pos ="));
+            assertTrue(translated.get("FRAGMENT").contains("gbuffer_data_0"));
+            assertEquals(List.of(1), translator.renderTargetIndices());
+        }
     }
 
     @Test
