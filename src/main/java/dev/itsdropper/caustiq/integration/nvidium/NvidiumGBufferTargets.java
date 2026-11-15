@@ -63,8 +63,14 @@ public final class NvidiumGBufferTargets {
     }
 
     static int[] createOutputRouting(java.util.List<Integer> targetIndices) {
+        // Nvidium's unmodified translucent pipeline uses location 0 for native
+        // color and locations 1-7 for CAUSTIQ's auxiliary outputs. Preserve
+        // that identity mapping when no Iris terrain adapter is installed.
+        if (targetIndices.equals(java.util.List.of(0, 1, 2, 3, 4, 5, 6, 7))) {
+            return new int[]{0, 1, 2, 3, 4, 5, 6, 7};
+        }
         if (targetIndices.size() > MAX_ATTACHMENT) {
-            throw new IllegalArgumentException("Nvidium reserves one draw-buffer location for native color; at most seven Iris MRT outputs are supported.");
+            throw new IllegalArgumentException("Nvidium supports at most seven Iris terrain MRT outputs in addition to native color.");
         }
         int[] routing = new int[REQUIRED_DRAW_BUFFERS];
         Arrays.fill(routing, -1);
