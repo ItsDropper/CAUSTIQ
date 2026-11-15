@@ -1,0 +1,100 @@
+name: Photon Render Screenshot
+
+on:
+  push:
+    branches: [nvidium]
+    paths:
+      - ".github/workflows/photon-render.yml"
+      - "src/**"
+      - "build.gradle.kts"
+      - "gradle.properties"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: photon-render-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  photon-render:
+    name: Render pinned Photon terrain stages (Mesa)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out CAUSTIQ
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Mesa and virtual display
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes xvfb libgl1-mesa-dri libglx-mesa0 libglfw3
+
+      - name: Download pinned Photon shader pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          photon_dir="$RUNNER_TEMP/photon-source"
+          mkdir -p "$photon_dir"
+          curl --fail --silent --show-error --location \
+            "https://github.com/sixthsurge/photon/archive/2a3d502c17d2e310412c717be47241f014cba7fc.tar.gz" \
+            | tar -xz --strip-components=1 -C "$photon_dir"
+          test -s "$photon_dir/shaders/world0/gbuffers_terrain.vsh"
+          test -s "$photon_dir/shaders/world0/gbuffers_terrain.fsh"
+          echo "PHOTON_SOURCE_DIR=$photon_dir" >> "$GITHUB_ENV"
+          echo "Pinned Photon revision: 2a3d502c17d2e310412c717be47241f014cba7fc" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Render Photon terrain stages and capture PNG
+        shell: bash
+        env:
+          CAUSTIQ_GL_SMOKE: "1"
+          CAUSTIQ_SCREENSHOT_DIR: ${{ github.workspace }}/build/caustiq-photon-screenshots
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -o pipefail
+          xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew test \
+            --tests "dev.itsdropper.caustiq.integration.nvidium.PhotonTerrainScreenshotTest" \
+            --stacktrace --info 2>&1 | tee photon-render.log
+
+      - name: Verify screenshot was produced
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          screenshot="build/caustiq-photon-screenshots/photon-terrain-mesa.png"
+          test -s "$screenshot"
+          file "$screenshot"
+          echo "Photon terrain screenshot captured successfully." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Photon screenshot
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: caustiq-photon-terrain-screenshot-${{ github.sha }}
+          path: build/caustiq-photon-screenshots/photon-terrain-mesa.png
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload render logs and test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: caustiq-photon-render-diagnostics-${{ github.sha }}
+          path: |
+            photon-render.log
+            build/test-results/test/
+            build/reports/tests/test/
+          if-no-files-found: ignore
+          retention-days: 14
