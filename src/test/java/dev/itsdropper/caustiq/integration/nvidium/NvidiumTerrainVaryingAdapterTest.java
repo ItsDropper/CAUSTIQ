@@ -19,7 +19,7 @@ class NvidiumTerrainVaryingAdapterTest {
         String fragment = adapted.get("FRAGMENT");
 
         assertTrue(mesh.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4"));
-        assertTrue(fragment.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 3"));
+        assertTrue(fragment.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4"));
         for (String varying : new String[]{
                 "vec2 uv;", "vec3 v_colour;", "vec3 v_vertexColour;",
                 "vec2 v_lightmapCoord;", "vec3 v_renderPosition;", "vec2 v_quadMidUv;",

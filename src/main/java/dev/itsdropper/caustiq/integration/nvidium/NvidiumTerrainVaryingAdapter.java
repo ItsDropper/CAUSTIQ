@@ -16,7 +16,7 @@ public final class NvidiumTerrainVaryingAdapter {
     private static final String MARKER = "#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4";
     private static final String TRANSLUCENT_MARKER = "#define CAUSTIQ_NVIDIUM_TRANSLUCENT_VERTEX_ABI 1";
     private static final Pattern BARYCENTRIC_DEFINE = Pattern.compile(
-            "(?m)^\\s*#\\s*define\\s+USE_NV_FRAGMENT_SHADER_BARYCENTRIC\\b[^\\r\\n]*");
+            "(?m)^\\s*#\\s*define\\s+USE_NV_FRAGMENT_SHADER_BARYCENTRIC\\b[^\\r\n]*");
     private static final Pattern PRIMARY_FRAGMENT_INTERFACE = Pattern.compile(
             "layout\\s*\\(\\s*location\\s*=\\s*1\\s*\\)\\s*in\\s+Interpolants\\s*\\{");
     private static final String MESH_VARYINGS = String.join("\n",
@@ -235,9 +235,9 @@ public final class NvidiumTerrainVaryingAdapter {
             throw new IllegalStateException("Nvidium translucent shader no longer matches the pinned Sodium vertex ABI.");
         }
         mesh = replaceOnce(mesh, "    uint8_t section;",
-                "    uint8_t section;\\n" + VERTEX_FORMAT_EXTENSION, "translucent mesh vertex storage");
+                "    uint8_t section;\n" + VERTEX_FORMAT_EXTENSION, "translucent mesh vertex storage");
         fragment = replaceOnce(fragment, "    uint8_t section;",
-                "    uint8_t section;\\n" + VERTEX_FORMAT_EXTENSION, "translucent fragment vertex storage");
+                "    uint8_t section;\n" + VERTEX_FORMAT_EXTENSION, "translucent fragment vertex storage");
         mesh = replaceOnce(mesh, "return bool(int(v.material) & 1);",
                 "return bool(int(v.nvidiumMaterial) & 1);", "translucent Nvidium mip flag");
         mesh = replaceOnce(mesh, "return (int(v.material) >> 1) & 3;",
@@ -246,9 +246,9 @@ public final class NvidiumTerrainVaryingAdapter {
                 "return bool(int(v.nvidiumMaterial) & 1);", "translucent fragment mip flag");
         fragment = replaceOnce(fragment, "return (int(v.material) >> 1) & 3;",
                 "return (int(v.nvidiumMaterial) >> 1) & 3;", "translucent fragment alpha cutoff");
-        mesh = replaceOnce(mesh, "#version 460", "#version 460\\n" + TRANSLUCENT_MARKER,
+        mesh = replaceOnce(mesh, "#version 460", "#version 460\n" + TRANSLUCENT_MARKER,
                 "translucent mesh version");
-        fragment = replaceOnce(fragment, "#version 460", "#version 460\\n" + TRANSLUCENT_MARKER,
+        fragment = replaceOnce(fragment, "#version 460", "#version 460\n" + TRANSLUCENT_MARKER,
                 "translucent fragment version");
         Map<String, String> adapted = new LinkedHashMap<>(sourceStages);
         adapted.put("MESH", mesh);
