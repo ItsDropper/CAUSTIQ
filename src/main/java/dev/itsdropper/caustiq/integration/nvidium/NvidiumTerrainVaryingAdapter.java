@@ -12,8 +12,9 @@ import java.util.regex.Pattern;
  * Nvidium material flags kept separate from tangent handedness.
  */
 public final class NvidiumTerrainVaryingAdapter {
-    public static final String PROFILE_ID = "caustiq-iris-vertex-abi-v3";
-    private static final String MARKER = "#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 3";
+    public static final String PROFILE_ID = "caustiq-iris-vertex-abi-v4";
+    private static final String MARKER = "#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4";
+    private static final String TRANSLUCENT_MARKER = "#define CAUSTIQ_NVIDIUM_TRANSLUCENT_VERTEX_ABI 1";
     private static final Pattern BARYCENTRIC_DEFINE = Pattern.compile(
             "(?m)^\\s*#\\s*define\\s+USE_NV_FRAGMENT_SHADER_BARYCENTRIC\\b[^\\r\\n]*");
     private static final Pattern PRIMARY_FRAGMENT_INTERFACE = Pattern.compile(
@@ -60,7 +61,7 @@ public final class NvidiumTerrainVaryingAdapter {
             "    OUT[id].v_normal = caustiqDecodeNormal(V);",
             "    OUT[id].v_tangent = caustiqDecodeTangent(V);",
             "    OUT[id].v_tbn = caustiqDecodeTbn(V);",
-            "    OUT[id].v_materialFlags = V.nvidiumMaterial;");
+            "    OUT[id].v_materialFlags = V.nvidiumMaterial & 0xFFu;");
     private static final String VERTEX_FORMAT_EXTENSION = String.join("\n",
             "    uint blockId;",
             "    uint normal;",
@@ -120,15 +121,32 @@ public final class NvidiumTerrainVaryingAdapter {
             "",
             "vec3 caustiqDecodeBlockEntity(uint packed) {",
             "    return vec3(float(int(packed >> 1u) - 1), float(packed & 1u), 0.0);",
+            "}",
+            "",
+            "vec4 caustiqDecodeIrisColor(Vertex vertex) {",
+            "    vec4 color = decodeVertexColour(vertex);",
+            "    color.a = float((vertex.nvidiumMaterial >> 8u) & 0xFFu) * COLOR_SCALE;",
+            "    return color;",
             "}");
 
     private NvidiumTerrainVaryingAdapter() { }
 
     /** Adapts the pinned Nvidium terrain shader ABI; unknown layouts fail closed. */
     public static boolean isPrimary(Map<String, String> sourceStages) {
+        return isPrimaryMesh(sourceStages) || isTranslucentMesh(sourceStages);
+    }
+
+    public static boolean isPrimaryMesh(Map<String, String> sourceStages) {
         String mesh = sourceStages.get("MESH");
         return mesh != null
                 && mesh.contains("layout(triangles, max_vertices=64, max_primitives=32) out;");
+    }
+
+    public static boolean isTranslucentMesh(Map<String, String> sourceStages) {
+        String mesh = sourceStages.get("MESH");
+        return mesh != null
+                && mesh.contains("layout(triangles, max_vertices=128, max_primitives=64) out;")
+                && mesh.contains("void emitVertex(uint vertexBaseId, uint innerId)");
     }
 
     public static Map<String, String> adapt(Map<String, String> sourceStages) {
@@ -141,6 +159,8 @@ public final class NvidiumTerrainVaryingAdapter {
         String fragment = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("FRAGMENT"), "FRAGMENT source"));
         boolean meshMarked = mesh.contains(MARKER);
         boolean fragmentMarked = fragment.contains(MARKER);
+        boolean translucentMeshMarked = mesh.contains(TRANSLUCENT_MARKER);
+        boolean translucentFragmentMarked = fragment.contains(TRANSLUCENT_MARKER);
         if (meshMarked || fragmentMarked) {
             boolean complete = meshMarked && fragmentMarked
                     && mesh.contains(MESH_VARYINGS) && fragment.contains(FRAGMENT_VARYINGS)
@@ -155,6 +175,14 @@ public final class NvidiumTerrainVaryingAdapter {
             if (complete) return Map.copyOf(sourceStages);
             throw new IllegalStateException("Nvidium terrain varying profile is only partially applied or has an incompatible ABI.");
         }
+        if (translucentMeshMarked || translucentFragmentMarked) {
+            boolean complete = translucentMeshMarked && translucentFragmentMarked
+                    && mesh.contains(VERTEX_FORMAT_EXTENSION) && fragment.contains(VERTEX_FORMAT_EXTENSION)
+                    && mesh.contains("v.nvidiumMaterial") && fragment.contains("v.nvidiumMaterial");
+            if (complete) return Map.copyOf(sourceStages);
+            throw new IllegalStateException("Nvidium translucent vertex ABI is only partially applied or incompatible.");
+        }
+        if (isTranslucentMesh(sourceStages)) return adaptTranslucent(sourceStages);
         boolean primaryMeshSignature = mesh.contains("layout(triangles, max_vertices=64, max_primitives=32) out;");
         if (!primaryMeshSignature) return Map.copyOf(sourceStages);
         boolean hasPrimaryMeshAnchors = mesh.contains("void putVertex(uint id, Vertex V) {")
@@ -166,12 +194,6 @@ public final class NvidiumTerrainVaryingAdapter {
         }
         mesh = replaceOnce(mesh, "    uint8_t section;", "    uint8_t section;\n" + VERTEX_FORMAT_EXTENSION,
                 "extended mesh vertex storage layout");
-        String opaqueColourDecode = "return vec4(vec3(packed_color) * COLOR_SCALE, 1);";
-        String aoColourDecode = "return vec4(vec3(packed_color) * COLOR_SCALE, float((uint(v.color) >> 24u) & 0xFFu) * COLOR_SCALE);";
-        if (!mesh.contains(opaqueColourDecode)) {
-            throw new IllegalStateException("Nvidium terrain vertex color decoder no longer exposes its alpha channel.");
-        }
-        mesh = mesh.replace(opaqueColourDecode, aoColourDecode);
         fragment = replaceOnce(fragment, "    uint8_t section;", "    uint8_t section;\n" + VERTEX_FORMAT_EXTENSION,
                 "extended fragment vertex storage layout");
         mesh = replaceOnce(mesh, "return bool(int(v.material) & 1);",
@@ -199,6 +221,35 @@ public final class NvidiumTerrainVaryingAdapter {
                 MESH_ASSIGNMENTS, "mesh varying assignments");
         fragment = appendBeforeFinalBrace(fragment, FRAGMENT_GBUFFER_WRITES);
 
+        Map<String, String> adapted = new LinkedHashMap<>(sourceStages);
+        adapted.put("MESH", mesh);
+        adapted.put("FRAGMENT", fragment);
+        return Map.copyOf(adapted);
+    }
+
+    private static Map<String, String> adaptTranslucent(Map<String, String> sourceStages) {
+        String mesh = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("MESH"), "MESH source"));
+        String fragment = disableBarycentricPath(Objects.requireNonNull(sourceStages.get("FRAGMENT"), "FRAGMENT source"));
+        if (!mesh.contains("    uint8_t section;") || !fragment.contains("    uint8_t section;")
+                || !mesh.contains("OUT[outId].uv = decodeVertexUV(V);")) {
+            throw new IllegalStateException("Nvidium translucent shader no longer matches the pinned Sodium vertex ABI.");
+        }
+        mesh = replaceOnce(mesh, "    uint8_t section;",
+                "    uint8_t section;\\n" + VERTEX_FORMAT_EXTENSION, "translucent mesh vertex storage");
+        fragment = replaceOnce(fragment, "    uint8_t section;",
+                "    uint8_t section;\\n" + VERTEX_FORMAT_EXTENSION, "translucent fragment vertex storage");
+        mesh = replaceOnce(mesh, "return bool(int(v.material) & 1);",
+                "return bool(int(v.nvidiumMaterial) & 1);", "translucent Nvidium mip flag");
+        mesh = replaceOnce(mesh, "return (int(v.material) >> 1) & 3;",
+                "return (int(v.nvidiumMaterial) >> 1) & 3;", "translucent Nvidium alpha cutoff");
+        fragment = replaceOnce(fragment, "return bool(int(v.material) & 1);",
+                "return bool(int(v.nvidiumMaterial) & 1);", "translucent fragment mip flag");
+        fragment = replaceOnce(fragment, "return (int(v.material) >> 1) & 3;",
+                "return (int(v.nvidiumMaterial) >> 1) & 3;", "translucent fragment alpha cutoff");
+        mesh = replaceOnce(mesh, "#version 460", "#version 460\\n" + TRANSLUCENT_MARKER,
+                "translucent mesh version");
+        fragment = replaceOnce(fragment, "#version 460", "#version 460\\n" + TRANSLUCENT_MARKER,
+                "translucent fragment version");
         Map<String, String> adapted = new LinkedHashMap<>(sourceStages);
         adapted.put("MESH", mesh);
         adapted.put("FRAGMENT", fragment);
