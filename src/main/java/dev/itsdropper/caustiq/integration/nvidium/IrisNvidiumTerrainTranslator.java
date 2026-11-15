@@ -351,7 +351,9 @@ public final class IrisNvidiumTerrainTranslator {
                 .append("    caustiqCurrentTransform = transformMat;\n")
                 .append("    caustiqIrisTexCoord[0] = vec4(decodeVertexUV(V), 0.0, 1.0);\n")
                 .append("    caustiqIrisTexCoord[1] = vec4(decodeLightUV(V), 0.0, 1.0);\n")
-                .append("    caustiqIrisClipPosition = gl_MeshVerticesNV[id].gl_Position;\n");
+                // putVertex() runs before the caller writes gl_MeshVerticesNV[id].gl_Position.
+                // Recompute Nvidium's native clip position instead of reading an uninitialized mesh output.
+                .append("    caustiqIrisClipPosition = transformVertex(V);\n");
         for (int index = 2; index < 8; index++) {
             invocation.append("    caustiqIrisTexCoord[").append(index).append("] = vec4(0.0);\n");
         }
