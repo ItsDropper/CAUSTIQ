@@ -695,8 +695,11 @@ public final class IrisNvidiumTerrainTranslator {
             }
         }
 
-        if (Pattern.compile("\\buniform\\b").matcher(working).find()) {
-            throw new IllegalArgumentException("Iris terrain stage contains an unsupported uniform declaration.");
+        Matcher remainingUniforms = UNIFORM.matcher(working);
+        while (remainingUniforms.find()) {
+            if (!UNSUPPORTED_RUNTIME_UNIFORMS.contains(remainingUniforms.group(2))) {
+                throw new IllegalArgumentException("Iris terrain stage contains an unsupported uniform declaration.");
+            }
         }
         if (Pattern.compile("\\bgl_ClipDistance\\b|\\bgl_PointSize\\b").matcher(working).find()) {
             throw new IllegalArgumentException("Iris terrain stage writes a built-in output not represented by Nvidium's mesh/fragment ABI.");
