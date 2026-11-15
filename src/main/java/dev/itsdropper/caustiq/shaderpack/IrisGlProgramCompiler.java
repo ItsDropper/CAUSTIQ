@@ -19,7 +19,7 @@ public final class IrisGlProgramCompiler {
     private static final Pattern FRAG_DATA = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]");
     private static final Pattern TEXCOORD = Pattern.compile("\\bgl_TexCoord\\s*\\[\\s*(\\d+)\\s*]");
     private static final String FULLSCREEN_VERTEX = """
-            #version 460 core
+            #version 430 core
             out vec2 texCoord;
             out vec2 texcoord;
             out vec2 vTexCoord;
