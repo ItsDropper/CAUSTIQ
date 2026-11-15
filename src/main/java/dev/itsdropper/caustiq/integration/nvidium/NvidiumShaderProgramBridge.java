@@ -117,7 +117,7 @@ public final class NvidiumShaderProgramBridge {
         if (!original.keySet().containsAll(TERRAIN_STAGES)) return;
 
         LAST_TERRAIN_PROGRAM.set(Snapshot.from(original));
-        if (!NvidiumCompatibility.isExtendedVertexFormatCommitted()) return;
+        if (!NvidiumVertexAbiState.isCommitted()) return;
         dumpShaderSources("before-adaptation", original);
         Map<String, String> transformed = original;
         UnaryOperator<Map<String, String>> nativeAdapter = nativeSourceAdapter;
