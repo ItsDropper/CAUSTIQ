@@ -472,10 +472,14 @@ public final class IrisNvidiumTerrainTranslator {
     private String addPackMrtOutputs(String fragment) {
         Set<Integer> locations = new LinkedHashSet<>();
         for (FragmentOutput output : outputs) {
-            if (output.location() > 0) locations.add(output.location());
+            if (output.location() > 0 && output.location() < renderTargetIndices.size()) {
+                locations.add(output.location());
+            }
         }
         if (usesFragData) {
-            for (int index = 1; index < fragDataCount; index++) locations.add(index);
+            for (int index = 1; index < fragDataCount && index < renderTargetIndices.size(); index++) {
+                locations.add(index);
+            }
         }
         for (int location : locations) {
             fragment = insertAfter(fragment, "layout(location = 0) out vec4 colour;",
