@@ -89,6 +89,7 @@ public final class NvidiumShadowRenderer {
             state.ensureResolution(requestedResolution);
             int regionCount = state.uploadScene(terrainPass, fogParameters, cameraX, cameraY, cameraZ,
                     requestedDistance);
+            NvidiumIrisUniformBridge.clearShadowVoxelImageForCurrentFrame();
             if (regionCount == 0) {
                 if (NvidiumTerrainPassBridge.shouldClearAttachments(terrainPass)) {
                     state.clearDepth();

@@ -63,9 +63,6 @@ public final class NvidiumIrisUniformBridge {
     public static void upload(Object rasterizer) {
         Snapshot snapshot = CURRENT.get();
         if (snapshot == null || rasterizer == null) return;
-        if (NvidiumShadowRenderer.isShadowRasterization()) {
-            ShaderRuntime.prepareShadowVoxelImage(snapshot.frameCounter());
-        }
         try {
             Field shaderField = rasterizer.getClass().getDeclaredField("shader");
             shaderField.setAccessible(true);
@@ -248,6 +245,11 @@ public final class NvidiumIrisUniformBridge {
     }
 
     /** Uploads the captured camera/time state to a CAUSTIQ OpenGL post-process program. */
+    public static void clearShadowVoxelImageForCurrentFrame() {
+        Snapshot snapshot = CURRENT.get();
+        if (snapshot != null) ShaderRuntime.prepareShadowVoxelImage(snapshot.frameCounter());
+    }
+
     public static void uploadProgram(int program) {
         Snapshot snapshot = CURRENT.get();
         if (snapshot == null || program == 0) return;
