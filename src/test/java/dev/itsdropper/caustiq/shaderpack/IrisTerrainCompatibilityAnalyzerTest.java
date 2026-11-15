@@ -115,6 +115,23 @@ class IrisTerrainCompatibilityAnalyzerTest {
     }
 
     @Test
+    void acceptsShadowMatricesExposedByTheIndependentNvidiumShadowRenderer() {
+        String vertex = """
+                #version 400
+                uniform mat4 shadowModelView;
+                uniform mat4 shadowProjection;
+                void main() { gl_Position = shadowProjection * shadowModelView * gl_Vertex; }
+                """;
+        String fragment = """
+                #version 400
+                layout(location = 0) out vec4 color;
+                void main() { color = vec4(1.0); }
+                """;
+        var result = analyzer.analyze(vertex, fragment);
+        assertTrue(result.compatible(), result.issues().toString());
+    }
+
+    @Test
     void rejectsMissingShaderStages() {
         assertThrows(IllegalArgumentException.class, () -> analyzer.analyze("", "void main(){}"));
     }

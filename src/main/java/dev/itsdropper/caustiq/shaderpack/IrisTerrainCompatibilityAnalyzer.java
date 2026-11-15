@@ -58,12 +58,12 @@ public final class IrisTerrainCompatibilityAnalyzer {
             "mc_midBlock", "vaNormal", "gl_MultiTexCoord2", "gl_MultiTexCoord3",
             "gl_MultiTexCoord4", "gl_MultiTexCoord5", "gl_MultiTexCoord6", "gl_MultiTexCoord7",
             "gl_SecondaryColor", "gl_FogCoord", "gl_ClipVertex", "gl_PointSize");
-    private static final Set<String> UNAVAILABLE_TRANSFORMS = Set.of(
-            "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse");
+    private static final Set<String> UNAVAILABLE_TRANSFORMS = Set.of();
     private static final Set<String> AVAILABLE_VERTEX_UNIFORMS = Set.of(
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection",
             "gbufferProjectionInverse", "gbufferPreviousModelView", "gbufferPreviousModelViewInverse",
             "gbufferPreviousProjection", "gbufferPreviousProjectionInverse", "previousCameraPosition",
+            "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse",
             "cameraPosition", "frameTimeCounter", "frameCounter",
             "near", "far", "atlasSize", "rainStrength", "wetness", "taa_offset", "light_dir",
             "world_age", "worldTime", "worldDay", "day_factor", "eyePosition", "time_sunrise", "time_noon", "time_sunset",
