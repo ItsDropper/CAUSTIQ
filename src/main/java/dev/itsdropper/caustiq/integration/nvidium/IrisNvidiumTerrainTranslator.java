@@ -465,10 +465,10 @@ public final class IrisNvidiumTerrainTranslator {
         }
         invocation.append("    caustiqIrisFragmentMain();\n");
         if (usesFragData) {
-            invocation.append("    colour = caustiqIrisFragData[0];\n");
+            invocation.append("    caustiqIrisOutput0 = caustiqIrisFragData[0];\n");
             for (int index = 1; index < fragDataCount && index < renderTargetIndices.size(); index++) {
                 invocation.append("    caustiqIrisOutput").append(index)
-                        .append(" = caustiqIrisFragData[").append(index).append("];\\n");
+                        .append(" = caustiqIrisFragData[").append(index).append("];\n");
             }
         }
         return invocation.toString();
