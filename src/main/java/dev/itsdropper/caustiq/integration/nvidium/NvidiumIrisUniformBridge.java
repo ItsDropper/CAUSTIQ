@@ -8,6 +8,7 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL20C;
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.InteractionHand;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -145,6 +146,7 @@ public final class NvidiumIrisUniformBridge {
         integer(program, "caustiqNoiseTexture", 2);
         integer(program, "caustiqHeavyFog", isHeavyFog() ? 1 : 0);
         integer(program, "caustiqIsElytraFlying", isElytraFlying() ? 1 : 0);
+        integer(program, "caustiqHeldBlockLightValue", heldBlockLightValue());
         integer(program, "caustiqColortex1", 5);
         integer(program, "caustiqColortex2", 6);
         integer(program, "caustiqColortex4", 7);
@@ -153,6 +155,33 @@ public final class NvidiumIrisUniformBridge {
     /** Mirrors Iris IrisExclusiveUniforms.isElytraFlying(): the local player's fall-flying state. */
     private static boolean isElytraFlying() {
         return invokeBoolean(Minecraft.getInstance().player, "isFallFlying", false);
+    }
+
+    /**
+     * Mirrors Iris IdMapUniforms' main-hand heldBlockLightValue supplier.
+     * Iris adds getLightEmission(Player, ItemStack) to items through its item-light
+     * provider interface; reflection keeps CAUSTIQ independent of an Iris runtime dependency.
+     */
+    private static int heldBlockLightValue() {
+        Object player = Minecraft.getInstance().player;
+        if (player == null) return 0;
+        try {
+            Object stack = player.getClass()
+                    .getMethod("getItemInHand", InteractionHand.class)
+                    .invoke(player, InteractionHand.MAIN_HAND);
+            if (stack == null) return 0;
+            Object item = stack.getClass().getMethod("getItem").invoke(stack);
+            if (item == null) return 0;
+            for (Method method : item.getClass().getMethods()) {
+                if (method.getName().equals("getLightEmission") && method.getParameterCount() == 2) {
+                    Object value = method.invoke(item, player, stack);
+                    return value instanceof Number number ? Math.max(0, number.intValue()) : 0;
+                }
+            }
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            // Without Iris' item-light provider, its documented default is no held-item light.
+        }
+        return 0;
     }
 
     /** Mirrors Iris IrisExclusiveUniforms.isHeavyFog(): boss-overlay world-fog request. */

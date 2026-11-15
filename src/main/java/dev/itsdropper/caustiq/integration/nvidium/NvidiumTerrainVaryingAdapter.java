@@ -206,12 +206,10 @@ public final class NvidiumTerrainVaryingAdapter {
                 "return (int(v.nvidiumMaterial) >> 1) & 3;", "fragment Nvidium alpha cutoff source");
         mesh = replaceOnce(mesh, "#version 460", "#version 460\n" + MARKER, "mesh version");
         fragment = replaceOnce(fragment, "#version 460", "#version 460\n" + MARKER, "fragment version");
-        mesh = replaceOnce(mesh, MARKER + "\n", MARKER + "\n" + MESH_UNIFORM_ALIASES,
-                "mesh Iris uniform aliases");
+        mesh = insertAfterExtensions(mesh, MESH_UNIFORM_ALIASES, "mesh Iris uniform aliases");
         mesh = replaceOnce(mesh, "    vec2 uv;\n    vec3 v_colour;", MESH_VARYINGS, "mesh interpolant declaration");
         fragment = replaceOnce(fragment, "    vec2 uv;\n    vec3 v_colour;", FRAGMENT_VARYINGS, "fragment interpolant declaration");
-        fragment = replaceOnce(fragment, MARKER + "\n",
-                MARKER + "\n" + FRAGMENT_UNIFORM_ALIASES, "fragment uniform aliases");
+        fragment = insertAfterExtensions(fragment, FRAGMENT_UNIFORM_ALIASES, "fragment uniform aliases");
         fragment = replaceOnce(fragment, "layout(location = 0) out vec4 colour;",
                 "layout(location = 0) out vec4 colour;\n" + FRAGMENT_GBUFFER_OUTPUTS,
                 "G-buffer fragment outputs");
@@ -254,6 +252,24 @@ public final class NvidiumTerrainVaryingAdapter {
         adapted.put("MESH", mesh);
         adapted.put("FRAGMENT", fragment);
         return Map.copyOf(adapted);
+    }
+
+    private static String insertAfterExtensions(String source, String declarations, String label) {
+        java.util.regex.Matcher extensions = Pattern.compile(
+                "(?m)^[\\t ]*#[\\t ]*extension\\b[^\\r\\n]*(?:\\r?\\n|$)")
+                .matcher(source);
+        int insertion = -1;
+        while (extensions.find()) insertion = extensions.end();
+        if (insertion < 0) {
+            java.util.regex.Matcher marker = Pattern.compile(
+                    "(?m)^[\\t ]*#\\s*define\\s+CAUSTIQ_NVIDIUM_(?:TERRAIN_VARYINGS|TRANSLUCENT_VERTEX_ABI)\\b[^\\r\\n]*(?:\\r?\\n|$)")
+                    .matcher(source);
+            if (marker.find()) insertion = marker.end();
+        }
+        if (insertion < 0) {
+            throw new IllegalStateException("Could not locate a legal GLSL declaration point for " + label + ".");
+        }
+        return source.substring(0, insertion) + declarations + "\n" + source.substring(insertion);
     }
 
     private static String appendBeforeFinalBrace(String source, String statements) {

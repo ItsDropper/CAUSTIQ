@@ -20,6 +20,12 @@ class NvidiumTerrainVaryingAdapterTest {
 
         assertTrue(mesh.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4"));
         assertTrue(fragment.contains("#define CAUSTIQ_NVIDIUM_TERRAIN_VARYINGS 4"));
+        assertTrue(mesh.indexOf("#extension GL_ARB_gpu_shader5 : require")
+                < mesh.indexOf("uniform mat4 caustiqProjection;"),
+                "Mesh uniform declarations must follow GLSL extension directives");
+        assertTrue(fragment.indexOf("#extension GL_ARB_gpu_shader5 : require")
+                < fragment.indexOf("uniform mat4 caustiqProjection;"),
+                "Fragment uniform declarations must follow GLSL extension directives");
         for (String varying : new String[]{
                 "vec2 uv;", "vec3 v_colour;", "vec3 v_vertexColour;",
                 "vec2 v_lightmapCoord;", "vec3 v_renderPosition;", "vec2 v_quadMidUv;",
@@ -148,6 +154,7 @@ class NvidiumTerrainVaryingAdapterTest {
     private static Map<String, String> sourceStages() {
         String mesh = """
                 #version 460
+                #extension GL_ARB_gpu_shader5 : require
                 layout(triangles, max_vertices=64, max_primitives=32) out;
                 struct Vertex {
                     uint hi;
