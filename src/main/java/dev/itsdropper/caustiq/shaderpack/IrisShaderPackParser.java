@@ -213,7 +213,8 @@ public final class IrisShaderPackParser {
                 } else if (index > 0 && !NVIDIUM_COLOR_FORMATS.contains(format)) {
                     diagnostics.add("Unsupported Nvidium colortex format in " + key + "=" + value + ".");
                 }
-            } else {
+            } else if (property.equals("scale") || property.equals("scalex")
+                    || property.equals("scaley")) {
                 try {
                     float scale = Float.parseFloat(value.trim());
                     if (!Float.isFinite(scale) || scale <= 0.0f || scale != 1.0f) {
