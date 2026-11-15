@@ -412,8 +412,7 @@ public final class ShaderRuntime {
                         || program.group() == ShaderPackProgramCatalog.Group.DEFERRED
                         || program.group() == ShaderPackProgramCatalog.Group.COMPOSITE
                         || program.group() == ShaderPackProgramCatalog.Group.FINAL
-                        || program.group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE
-                        || program.group() == ShaderPackProgramCatalog.Group.FINAL) {
+                        || program.group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE) {
                     Set<String> defines = selectedDefines.entrySet().stream()
                             .map(entry -> entry.getKey() + "=" + entry.getValue())
                             .collect(java.util.stream.Collectors.toUnmodifiableSet());
@@ -440,7 +439,8 @@ public final class ShaderRuntime {
                         || scheduled.pass().group() == ShaderPackProgramCatalog.Group.PREPARE
                         || scheduled.pass().group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE
                         || scheduled.pass().group() == ShaderPackProgramCatalog.Group.DEFERRED
-                        || scheduled.pass().group() == ShaderPackProgramCatalog.Group.COMPOSITE);
+                        || scheduled.pass().group() == ShaderPackProgramCatalog.Group.COMPOSITE
+                        || scheduled.pass().group() == ShaderPackProgramCatalog.Group.FINAL);
         if (!hasWorldPasses || irisPassFailureLogged) return;
         try {
             observeNvidiumTerrainBackend();
@@ -465,7 +465,8 @@ public final class ShaderRuntime {
                                 || scheduled.pass().group() == ShaderPackProgramCatalog.Group.PREPARE
                                 || scheduled.pass().group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE
                                 || scheduled.pass().group() == ShaderPackProgramCatalog.Group.DEFERRED
-                                || scheduled.pass().group() == ShaderPackProgramCatalog.Group.COMPOSITE)) return;
+                                || scheduled.pass().group() == ShaderPackProgramCatalog.Group.COMPOSITE
+                                || scheduled.pass().group() == ShaderPackProgramCatalog.Group.FINAL)) return;
         if (postProcessFailureLogged) return;
         CompiledShaderProgram finalProgram = COMPILED.stream()
                 .filter(program -> program.name().equalsIgnoreCase("final"))
@@ -652,7 +653,10 @@ public final class ShaderRuntime {
             }
             boolean hasMultiPass = catalog.programs().stream().anyMatch(program ->
                     program.group() == ShaderPackProgramCatalog.Group.SETUP
+                            || program.group() == ShaderPackProgramCatalog.Group.BEGIN
+                            || program.group() == ShaderPackProgramCatalog.Group.PREPARE
                             || program.group() == ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE
+                            || program.group() == ShaderPackProgramCatalog.Group.FINAL
                             || program.group() == ShaderPackProgramCatalog.Group.DEFERRED
                             || program.group() == ShaderPackProgramCatalog.Group.COMPOSITE);
             if (hasMultiPass && !FabricLoader.getInstance().isModLoaded("nvidium")) {
