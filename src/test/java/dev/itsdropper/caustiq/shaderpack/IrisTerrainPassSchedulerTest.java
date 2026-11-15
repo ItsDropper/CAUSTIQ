@@ -151,8 +151,8 @@ class IrisTerrainPassSchedulerTest {
         try (ShaderPackSources sources = ShaderPackSources.open(descriptor("ExtendedTargets", 3))) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
             IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
-            assertEquals(java.util.Set.of(8, 12, 15), plan.passes().getFirst().pass().writes());
-            assertTrue(plan.targets().keySet().containsAll(Set.of(8, 12, 15)));
+            assertEquals(java.util.java.util.Set.of(8, 12, 15), plan.passes().getFirst().pass().writes());
+            assertTrue(plan.targets().keySet().containsAll(java.util.Set.of(8, 12, 15)));
         }
     }
 
