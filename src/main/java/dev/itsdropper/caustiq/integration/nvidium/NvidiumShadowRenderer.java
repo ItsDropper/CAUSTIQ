@@ -129,6 +129,12 @@ public final class NvidiumShadowRenderer {
                 ? 0 : state.depthTexture;
     }
 
+    /** Iris shadowcolor0 attachment written by the shadow terrain fragment program. */
+    public static int shadowColorTexture() {
+        State state = activeState;
+        return state == null || !state.depthValid ? 0 : state.shadowColorTexture;
+    }
+
     public static int shadowResolution() {
         State state = activeState;
         return state == null ? 0 : state.resolution;
