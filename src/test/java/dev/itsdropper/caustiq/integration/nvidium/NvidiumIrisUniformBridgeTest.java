@@ -83,7 +83,9 @@ class NvidiumIrisUniformBridgeTest {
                 "iris_FogStart", "iris_FogEnd", "iris_FogDensity", "iris_FogColor.r",
                 "iris_ColorModulator.a", "iris_TextureScale", "iris_GlintAlpha",
                 "iris_ModelScale.x", "iris_ModelOffset.x", "iris_CameraTranslation.x",
-                "u_RegionOffset.z"
+                "u_RegionOffset.z", "iris_ScreenSize.x", "u_TextureScale.y",
+                "u_ModelScale.z", "dhNearPlane", "dhFarPlane", "dhRenderDistance",
+                "CAT_NONE", "aspectRatio", "viewWidth", "viewHeight", "frameTime"
         };
         for (String name : required) {
             assertTrue(values.containsKey(name), "Missing Iris expression symbol: " + name);
