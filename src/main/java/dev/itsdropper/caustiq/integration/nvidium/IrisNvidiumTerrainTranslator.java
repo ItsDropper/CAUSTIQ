@@ -89,15 +89,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("noisetex", "caustiqNoiseTexture"),
             Map.entry("colortex1", "caustiqColortex1"),
             Map.entry("colortex2", "caustiqColortex2"),
-            Map.entry("colortex3", "caustiqColortex3"),
             Map.entry("colortex4", "caustiqColortex4"),
-            Map.entry("colortex5", "caustiqColortex5"),
-            Map.entry("colortex6", "caustiqColortex6"),
-            Map.entry("colortex7", "caustiqColortex7"),
-            Map.entry("gaux1", "caustiqColortex4"),
-            Map.entry("gaux2", "caustiqColortex5"),
-            Map.entry("gaux3", "caustiqColortex6"),
-            Map.entry("gaux4", "caustiqColortex7"),
             Map.entry("shadowcolor0", "caustiqShadowcolor0"),
             Map.entry("shadowcolor1", "caustiqShadowcolor1"),
             Map.entry("depthtex1", "caustiqDepthTexture1"),
@@ -963,11 +955,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform mat4 caustiqShadowProjectionInverse;
                 layout(binding = 5) uniform sampler2D caustiqColortex1;
                 layout(binding = 6) uniform sampler2D caustiqColortex2;
-                layout(binding = 7) uniform sampler2D caustiqColortex3;
-                layout(binding = 8) uniform sampler2D caustiqColortex4;
-                layout(binding = 9) uniform sampler2D caustiqColortex5;
-                layout(binding = 10) uniform sampler2D caustiqColortex6;
-                layout(binding = 11) uniform sampler2D caustiqColortex7;
+                layout(binding = 7) uniform sampler2D caustiqColortex4;
                 uniform float caustiqNear;
                 uniform float caustiqFar;
                 uniform ivec2 caustiqAtlasSize;
@@ -1004,8 +992,7 @@ public final class IrisNvidiumTerrainTranslator {
     private static String expectedUniformType(String name) {
         return switch (name) {
             case "gtexture", "tex", "lightmap", "noisetex", "normals", "specular", "shadowtex0", "shadowtex1", "shadow",
-                    "colortex1", "colortex2", "colortex3", "colortex4", "colortex5", "colortex6", "colortex7",
-                    "gaux1", "gaux2", "gaux3", "gaux4", "shadowcolor0", "shadowcolor1",
+                    "colortex1", "colortex2", "colortex4", "shadowcolor0", "shadowcolor1",
                     "depthtex1", "colortex15",
                     "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans" -> "sampler2D";
             case "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",

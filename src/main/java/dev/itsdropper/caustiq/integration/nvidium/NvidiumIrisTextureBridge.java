@@ -30,17 +30,12 @@ public final class NvidiumIrisTextureBridge {
         ensureTextures();
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
         int[] units = {
-                GL13C.GL_TEXTURE2,
-                GL13C.GL_TEXTURE5, GL13C.GL_TEXTURE6, GL13C.GL_TEXTURE7,
-                GL13C.GL_TEXTURE8, GL13C.GL_TEXTURE9, GL13C.GL_TEXTURE10, GL13C.GL_TEXTURE11,
+                GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE5, GL13C.GL_TEXTURE6, GL13C.GL_TEXTURE7,
                 GL13C.GL_TEXTURE12, GL13C.GL_TEXTURE13, GL13C.GL_TEXTURE14, GL13C.GL_TEXTURE15
         };
         int[] textures = {
-                noiseTexture,
-                NvidiumGBufferTargets.texture(1), NvidiumGBufferTargets.texture(2),
-                NvidiumGBufferTargets.texture(3), NvidiumGBufferTargets.texture(4),
-                NvidiumGBufferTargets.texture(5), NvidiumGBufferTargets.texture(6),
-                NvidiumGBufferTargets.texture(7),
+                noiseTexture, NvidiumGBufferTargets.texture(1), NvidiumGBufferTargets.texture(2),
+                NvidiumGBufferTargets.texture(4),
                 shadowOrFallback(NvidiumShadowRenderer.shadowTexture()),
                 shadowOrFallback(NvidiumShadowRenderer.shadowTexture1()),
                 colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0)),
@@ -105,7 +100,7 @@ public final class NvidiumIrisTextureBridge {
     public static void bindCustomTextures(IrisShaderResources resources, int program) {
         if (customResources != null) customResources.restoreTerrainTextures();
         customResources = resources;
-        if (resources != null) resources.bindTerrainTextures(program, 16);
+        if (resources != null) resources.bindTerrainTextures(program, 8);
     }
 
     public static void restoreBindings() {

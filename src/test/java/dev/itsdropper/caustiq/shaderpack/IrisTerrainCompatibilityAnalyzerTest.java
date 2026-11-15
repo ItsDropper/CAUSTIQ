@@ -141,12 +141,12 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 """;
         String fragment = """
                 #version 400
-                uniform sampler2D colortex7;
+                uniform sampler2D colortex4;
                 uniform sampler2D shadowtex1;
                 uniform sampler2D shadowcolor1;
                 layout(location = 0) out vec4 color;
                 void main() {
-                    color = texture(colortex7, vec2(0.5))
+                    color = texture(colortex4, vec2(0.5))
                             + texture(shadowtex1, vec2(0.5))
                             + texture(shadowcolor1, vec2(0.5));
                 }
