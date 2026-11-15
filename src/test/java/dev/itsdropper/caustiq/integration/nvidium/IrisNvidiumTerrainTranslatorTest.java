@@ -555,8 +555,8 @@ class IrisNvidiumTerrainTranslatorTest {
         String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
         assertTrue(fragment.contains("uniform float caustiqAspectRatio;"));
         assertTrue(fragment.contains("caustiqIrisOutput0 = vec4(caustiqAspectRatio);"));
-        assertTrue(fragment.contains("layout(location = 2) out vec4 caustiqIrisOutput0;\n"));
-        assertTrue(fragment.contains("layout(location = 3) out vec4 caustiqIrisOutput1;\n"));
+        assertTrue(fragment.contains("layout(location = 1) out vec4 caustiqIrisOutput0;\n"));
+        assertTrue(fragment.contains("layout(location = 2) out vec4 caustiqIrisOutput1;\n"));
         assertFalse(fragment.contains("\\n"),
                 "Generated GLSL must not contain literal backslash-n tokens from MRT declarations.");
     }
