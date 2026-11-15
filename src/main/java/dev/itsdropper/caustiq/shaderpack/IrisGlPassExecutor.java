@@ -8,6 +8,7 @@ import dev.itsdropper.caustiq.integration.nvidium.NvidiumGBufferTargets;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTextureBridge;
 import org.lwjgl.opengl.GL11C;
+import org.lwjgl.opengl.GL12C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL30C;
