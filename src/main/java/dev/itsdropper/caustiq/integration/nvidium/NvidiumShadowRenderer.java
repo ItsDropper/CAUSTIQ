@@ -773,11 +773,22 @@ public final class NvidiumShadowRenderer {
                 resolution, resolution, 0, GL11C.GL_DEPTH_COMPONENT, GL11C.GL_FLOAT,
                 (ByteBuffer) null);
 
+        int colorTexture = GL11C.glGenTextures();
+        GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, colorTexture);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_LINEAR);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_LINEAR);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, 0x812D);
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, 0x812D);
+        GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_RGBA16F,
+                resolution, resolution, 0, GL11C.GL_RGBA, GL11C.GL_FLOAT, (ByteBuffer) null);
+
         int framebuffer = GL30C.glGenFramebuffers();
         GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, framebuffer);
         GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
                 GL11C.GL_TEXTURE_2D, texture, 0);
-        GL11C.glDrawBuffer(GL11C.GL_NONE);
+        GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_COLOR_ATTACHMENT1,
+                GL11C.GL_TEXTURE_2D, colorTexture, 0);
+        GL20C.glDrawBuffers(new int[]{GL11C.GL_NONE, GL30C.GL_COLOR_ATTACHMENT1});
         GL11C.glReadBuffer(GL11C.GL_NONE);
         int status = GL30C.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER);
         GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
