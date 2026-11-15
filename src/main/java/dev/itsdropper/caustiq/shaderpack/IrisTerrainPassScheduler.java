@@ -24,9 +24,9 @@ public final class IrisTerrainPassScheduler {
             "(?m)layout\\s*\\([^)]*location\\s*=\\s*(\\d+)[^)]*\\)\\s*out\\s+");
     private static final Pattern FRAG_DATA = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]");
     private static final Pattern RENDERTARGETS = Pattern.compile(
-            "/\\\\*\\\\s*RENDERTARGETS\\\\s*:\\s*([^*]*?)\\\\*/", Pattern.CASE_INSENSITIVE);
+            "/\\*\\s*RENDERTARGETS\\s*:\\s*([^*]*?)\\*/", Pattern.CASE_INSENSITIVE);
     private static final Pattern DRAWBUFFERS = Pattern.compile(
-            "/\\\\*\\\\s*DRAWBUFFERS\\\\s*:\\s*([^*]*?)\\\\*/", Pattern.CASE_INSENSITIVE);
+            "/\\*\\s*DRAWBUFFERS\\s*:\\s*([^*]*?)\\*/", Pattern.CASE_INSENSITIVE);
     private static final Pattern TARGET_KEY = Pattern.compile(
             "^([0-9]+)(Format|Clear|ClearColor|Mipmap|Persistent|Scale|ScaleX|ScaleY|Nearest)$",
             Pattern.CASE_INSENSITIVE);
@@ -142,10 +142,12 @@ public final class IrisTerrainPassScheduler {
     private static List<Integer> parseOutputTargetMapping(String source) {
         Matcher renderTargets = RENDERTARGETS.matcher(source);
         Matcher drawBuffers = DRAWBUFFERS.matcher(source);
-        if (renderTargets.find() && drawBuffers.find()) {
+        boolean hasRenderTargets = renderTargets.find();
+        boolean hasDrawBuffers = drawBuffers.find();
+        if (hasRenderTargets && hasDrawBuffers) {
             throw new IllegalArgumentException("A fragment shader cannot declare both RENDERTARGETS and DRAWBUFFERS.");
         }
-        if (renderTargets.reset().find()) {
+        if (hasRenderTargets) {
             List<Integer> result = new ArrayList<>();
             for (String token : renderTargets.group(1).trim().split("\\s*,\\s*")) {
                 if (!token.matches("\\d+")) {
@@ -156,7 +158,7 @@ public final class IrisTerrainPassScheduler {
             if (result.isEmpty()) throw new IllegalArgumentException("Iris RENDERTARGETS directive is empty.");
             return List.copyOf(result);
         }
-        if (drawBuffers.reset().find()) {
+        if (hasDrawBuffers) {
             String digits = drawBuffers.group(1).replaceAll("\\s+", "");
             if (digits.isEmpty() || !digits.matches("[0-7]+")) {
                 throw new IllegalArgumentException("Invalid Iris DRAWBUFFERS directive: " + drawBuffers.group(1));
