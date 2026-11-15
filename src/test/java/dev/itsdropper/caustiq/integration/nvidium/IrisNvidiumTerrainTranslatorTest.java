@@ -72,26 +72,6 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
-    void translatesPinnedPhotonTerrainIntoTheRealNvidiumStageAbiWhenCiProvidesItsSource() throws Exception {
-        String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
-        Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),
-                "Photon source checkout is supplied by CI only");
-        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("photon", "Photon",
-                Path.of(photonDirectory), "", ShaderPackSourceType.DIRECTORY,
-                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
-        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
-            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
-            IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(model);
-            Map<String, String> translated = translator.adapt(nativeStages());
-            assertTrue(translated.get("MESH").contains("void caustiqIrisVertexMain()"));
-            assertTrue(translated.get("FRAGMENT").contains("void caustiqIrisFragmentMain()"));
-            assertTrue(translated.get("MESH").contains("OUT[id].scene_pos ="));
-            assertTrue(translated.get("FRAGMENT").contains("caustiqIrisOutput1"));
-            assertEquals(List.of(1), translator.renderTargetIndices());
-        }
-    }
-
-    @Test
     void translatesEveryPinnedPhotonDimensionAgainstTheActualPinnedNvidiumShaderStages() throws Exception {
         String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
         Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),
@@ -222,7 +202,6 @@ class IrisNvidiumTerrainTranslatorTest {
             assertTrue(combined.get("MESH").contains("caustiqIrisVertexMain"));
             assertTrue(combined.get("FRAGMENT").contains("caustiqIrisFragmentMain"));
             assertTrue(combined.get("MESH").contains("gl_MeshVerticesNV[id].gl_Position = caustiqIrisClipPosition;"));
-            assertTrue(combined.get("FRAGMENT").contains("layout(location = 1) out vec4 caustiqIrisOutput1;"));
             assertFalse(combined.get("FRAGMENT").contains("layout(location = 1) out vec4 caustiqIrisOutput1;"),
                     "Photon's default RENDERTARGETS: 1 must not expose its disabled second MRT output");
             String outputDirectory = System.getenv("CAUSTIQ_COMPAT_OUTPUT_DIR");
