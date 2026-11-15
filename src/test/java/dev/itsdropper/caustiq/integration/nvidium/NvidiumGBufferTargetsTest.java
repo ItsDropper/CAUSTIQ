@@ -15,6 +15,12 @@ class NvidiumGBufferTargetsTest {
     }
 
     @Test
+    void preservesNvidiumsIdentityRoutingWhenNoIrisAdapterIsInstalled() {
+        assertArrayEquals(new int[]{0, 1, 2, 3, 4, 5, 6, 7},
+                NvidiumGBufferTargets.createOutputRouting(List.of(0, 1, 2, 3, 4, 5, 6, 7)));
+    }
+
+    @Test
     void reservesColortexZeroForNativeNvidiumColor() {
         assertThrows(IllegalArgumentException.class,
                 () -> NvidiumGBufferTargets.createOutputRouting(List.of(0, 1)));
