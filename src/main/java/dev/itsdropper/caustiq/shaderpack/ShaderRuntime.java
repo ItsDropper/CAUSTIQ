@@ -41,6 +41,7 @@ public final class ShaderRuntime {
     private static Map<String, String> selectedDefines = Map.of();
     private static int nextProgram;
     private static boolean postProcessFailureLogged;
+    private static boolean irisPassFailureLogged;
     private static long lastReportedNvidiumSolidFrames;
     private static boolean warnedNvidiumBackendNotObserved;
 
@@ -94,6 +95,7 @@ public final class ShaderRuntime {
      */
     private static void prepareSelectedNvidiumTerrainAdapter() {
         NvidiumShaderProgramBridge.unregisterTerrainAdapter();
+        NvidiumGBufferTargets.destroy();
         preparedPackModel = null;
         preparedPackId = "";
         preparedTerrainTranslators = Map.of();
@@ -256,7 +258,7 @@ public final class ShaderRuntime {
         if (!preparedTerrainAdapterRegistered) return;
         NvidiumShaderProgramBridge.unregisterTerrainAdapter();
         NvidiumGBufferTargets.resetOutputRouting();
-        NvidiumGBufferTargets.configureTargets(Map.of());
+        NvidiumGBufferTargets.destroy();
         preparedTerrainAdapterRegistered = false;
         activeTerrainDimensionKey = "";
         NvidiumRenderBridge.reloadShaders();
@@ -320,8 +322,10 @@ public final class ShaderRuntime {
     }
 
     private static void executeScheduledIrisPasses() {
-        if (!FabricLoader.getInstance().isModLoaded("nvidium") || activePassPlan == null
-                || IRIS_GL_PROGRAMS.isEmpty()) return;
+        // Do not execute a partially linked schedule while the per-frame compile budget
+        // is still preparing later deferred/composite programs.
+        if (!discoveryFinished || !FabricLoader.getInstance().isModLoaded("nvidium")
+                || activePassPlan == null || IRIS_GL_PROGRAMS.isEmpty()) return;
         boolean hasWorldPasses = activePassPlan.passes().stream().anyMatch(scheduled ->
                 scheduled.pass().group() == ShaderPackProgramCatalog.Group.DEFERRED
                         || scheduled.pass().group() == ShaderPackProgramCatalog.Group.COMPOSITE);
