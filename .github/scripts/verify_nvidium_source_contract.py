@@ -121,7 +121,8 @@ assert "NvidiumIrisTextureBridge.bindForTerrain()" in uniform_bridge
 assert "GL_TEXTURE2" in texture_bridge and "GL_TEXTURE3" in texture_bridge and "GL_TEXTURE4" in texture_bridge
 vertex_encoder = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
 assert "STRIDE = 40" in vertex_encoder
-assert "ColorABGR.pack(red, green, blue, alpha)" in vertex_encoder
+assert "ColorARGB.mulRGB(color, brightness)" in vertex_encoder
+assert "MemoryUtil.memPutInt(ptr + 36L, nvidiumMaterial)" in vertex_encoder
 assert "float((uint(v.color) >> 24u) & 0xFFu) * COLOR_SCALE" in adapter
 for field in ("blockId", "normalTangent", "midpointUv", "midBlock", "nvidiumMaterial"):
     assert field in vertex_encoder
