@@ -55,6 +55,7 @@ public final class IrisGlProgramCompiler {
             }
             String compute = preprocessor.preprocess(
                     program.stages().get(ShaderPackProgramCatalog.Stage.COMPUTE), sourceProvider).source();
+            compute = normalizeComputeVersion(compute);
             compute = injectDefines(removePackOptionDefinitions(compute, compilationDefines), compilationDefines);
             int shader = compileShader(GL43C.GL_COMPUTE_SHADER, compute, program.name() + " compute");
             int linked = 0;
@@ -325,6 +326,17 @@ public final class IrisGlProgramCompiler {
         result.add("MC_RENDER_QUALITY=1.0");
         result.add("MC_SHADOW_QUALITY=1.0");
         return Set.copyOf(result);
+    }
+
+    private static String normalizeComputeVersion(String source) {
+        Pattern version = Pattern.compile("(?m)^\\\\s*#\\\\s*version\\\\s+(\\\\d+)(?:\\\\s+(?:core|compatibility))?\\\\s*$");
+        Matcher matcher = version.matcher(source);
+        if (!matcher.find()) return source;
+        int declaredVersion = Integer.parseInt(matcher.group(1));
+        if (declaredVersion <= 430) {
+            return matcher.replaceFirst("#version " + declaredVersion + " core");
+        }
+        return matcher.replaceFirst("#version 430 core");
     }
 
     private static String injectDefines(String source, Set<String> defines) {
