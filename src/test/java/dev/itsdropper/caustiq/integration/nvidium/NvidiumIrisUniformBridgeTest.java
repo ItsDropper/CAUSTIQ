@@ -1,5 +1,13 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
+import dev.itsdropper.caustiq.shaderpack.IrisShaderPackModel;
+import dev.itsdropper.caustiq.shaderpack.IrisShaderPackParser;
+import dev.itsdropper.caustiq.shaderpack.IrisShaderResources;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackDescriptor;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackLayout;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackSourceType;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackSources;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
