@@ -90,13 +90,8 @@ public final class NvidiumIrisUniformBridge {
             matrix(program, "caustiqPreviousModelViewInverse", previous.modelViewInverse());
             vector3(program, "caustiqPreviousCameraPosition",
                     previous.cameraX(), previous.cameraY(), previous.cameraZ());
-            if (NvidiumShadowRenderer.isShadowRasterization()) {
-                float[] shadowView = NvidiumShadowRenderer.shadowModelView();
-                float[] shadowProjection = NvidiumShadowRenderer.shadowProjection();
-                matrix(program, "caustiqShadowModelView", shadowView);
-                matrix(program, "caustiqShadowProjection", shadowProjection);
-                matrix(program, "caustiqShadowModelViewInverse", new org.joml.Matrix4f().set(shadowView).invert().get(new float[16]));
-                matrix(program, "caustiqShadowProjectionInverse", new org.joml.Matrix4f().set(shadowProjection).invert().get(new float[16]));
+            if (NvidiumShadowRenderer.isShadowRasterization() || NvidiumShadowRenderer.isAvailable()) {
+                uploadShadowMatrices(program);
             }
             vector3(program, "caustiqCameraPosition",
                     snapshot.cameraX(), snapshot.cameraY(), snapshot.cameraZ());
@@ -121,6 +116,17 @@ public final class NvidiumIrisUniformBridge {
                 CaustiqClient.LOGGER.warn("Unable to upload Iris terrain matrices to Nvidium's primary shader.", exception);
             }
         }
+    }
+
+    private static void uploadShadowMatrices(int program) {
+        float[] shadowView = NvidiumShadowRenderer.shadowModelView();
+        float[] shadowProjection = NvidiumShadowRenderer.shadowProjection();
+        matrix(program, "caustiqShadowModelView", shadowView);
+        matrix(program, "caustiqShadowProjection", shadowProjection);
+        matrix(program, "caustiqShadowModelViewInverse",
+                new org.joml.Matrix4f().set(shadowView).invert().get(new float[16]));
+        matrix(program, "caustiqShadowProjectionInverse",
+                new org.joml.Matrix4f().set(shadowProjection).invert().get(new float[16]));
     }
 
     private static void uploadPhotonUniforms(int program, Snapshot snapshot) {
@@ -396,6 +402,9 @@ public final class NvidiumIrisUniformBridge {
         matrix(program, "gl_ProjectionMatrixInverse", snapshot.projectionInverse());
         matrix(program, "gl_ModelViewMatrixInverse", snapshot.modelViewInverse());
         matrix3(program, "gl_NormalMatrix", snapshot.normalMatrix());
+        if (NvidiumShadowRenderer.isShadowRasterization() || NvidiumShadowRenderer.isAvailable()) {
+            uploadShadowMatrices(program);
+        }
         vector3(program, "cameraPosition", snapshot.cameraX(), snapshot.cameraY(), snapshot.cameraZ());
         Snapshot previous = PREVIOUS.get() == null ? snapshot : PREVIOUS.get();
         matrix(program, "gbufferPreviousModelView", previous.modelView());
