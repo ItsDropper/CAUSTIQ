@@ -382,13 +382,12 @@ public final class IrisNvidiumTerrainTranslator {
             case "mc_Entity" -> "caustiqDecodeBlockEntity(V.blockId)";
             case "at_midBlock" -> "caustiqDecodeMidBlock(V)";
             case "mc_midTexCoord", "at_midTexCoord" -> "caustiqDecodeMidUv(V)";
-            case "iris_Normal", "Normal" -> "caustiqDecodeNormal(V)";
+            case "iris_Normal", "Normal", "vaNormal" -> "caustiqDecodeNormal(V)";
             case "at_tangent" -> "caustiqDecodeTangent(V)";
             case "vaPosition", "Position" -> "(decodeVertexPosition(V) + origin)";
             case "vaUV0", "UV0" -> "decodeVertexUV(V)";
             case "vaUV2", "UV2" -> "(decodeLightUV(V) * 256.0)";
             case "vaColor", "Color" -> "caustiqDecodeIrisColor(V)";
-            case "vaNormal", "Normal" -> "caustiqDecodeNormal(V)";
             default -> null;
         };
     }
