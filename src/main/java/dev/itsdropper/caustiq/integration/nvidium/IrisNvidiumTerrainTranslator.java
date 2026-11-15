@@ -1057,8 +1057,7 @@ public final class IrisNvidiumTerrainTranslator {
     }
 
     private static String stripComments(String source) {
-        return source.replaceAll("(?s)/\\*.*?\\*/", "")
-                .replaceAll("(?m)//[^\\r\\n]*", "");
+        return IrisGlslConditionalPreprocessor.stripComments(source);
     }
 
     private static String translateLegacyTextureFunctions(String source) {
