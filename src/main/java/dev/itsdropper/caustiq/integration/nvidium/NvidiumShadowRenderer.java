@@ -6,6 +6,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.joml.Vector4i;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL12C;
 import org.lwjgl.opengl.GL13C;
@@ -248,23 +249,23 @@ public final class NvidiumShadowRenderer {
     }
 
     private static void enableUnifiedBuffers() {
-        GL11C.glEnableClientState(
+        GL11.glEnableClientState(
                 NVUniformBufferUnifiedMemory.GL_UNIFORM_BUFFER_UNIFIED_NV);
-        GL11C.glEnableClientState(
+        GL11.glEnableClientState(
                 NVVertexBufferUnifiedMemory.GL_VERTEX_ATTRIB_ARRAY_UNIFIED_NV);
-        GL11C.glEnableClientState(
+        GL11.glEnableClientState(
                 NVVertexBufferUnifiedMemory.GL_ELEMENT_ARRAY_UNIFIED_NV);
-        GL11C.glEnableClientState(GL_DRAW_INDIRECT_UNIFIED_NV);
+        GL11.glEnableClientState(GL_DRAW_INDIRECT_UNIFIED_NV);
     }
 
     private static void disableUnifiedBuffers() {
-        GL11C.glDisableClientState(
+        GL11.glDisableClientState(
                 NVUniformBufferUnifiedMemory.GL_UNIFORM_BUFFER_UNIFIED_NV);
-        GL11C.glDisableClientState(
+        GL11.glDisableClientState(
                 NVVertexBufferUnifiedMemory.GL_VERTEX_ATTRIB_ARRAY_UNIFIED_NV);
-        GL11C.glDisableClientState(
+        GL11.glDisableClientState(
                 NVVertexBufferUnifiedMemory.GL_ELEMENT_ARRAY_UNIFIED_NV);
-        GL11C.glDisableClientState(GL_DRAW_INDIRECT_UNIFIED_NV);
+        GL11.glDisableClientState(GL_DRAW_INDIRECT_UNIFIED_NV);
     }
 
     private static void clearBuffer(Object buffer) throws ReflectiveOperationException {
@@ -838,10 +839,10 @@ public final class NvidiumShadowRenderer {
             }
             GlStateManager._activeTexture(activeTexture);
             // Nvidium's renderFrame contract leaves these client states disabled on return.
-            GL11C.glDisableClientState(NVUniformBufferUnifiedMemory.GL_UNIFORM_BUFFER_UNIFIED_NV);
-            GL11C.glDisableClientState(NVVertexBufferUnifiedMemory.GL_VERTEX_ATTRIB_ARRAY_UNIFIED_NV);
-            GL11C.glDisableClientState(NVVertexBufferUnifiedMemory.GL_ELEMENT_ARRAY_UNIFIED_NV);
-            GL11C.glDisableClientState(GL_DRAW_INDIRECT_UNIFIED_NV);
+            GL11.glDisableClientState(NVUniformBufferUnifiedMemory.GL_UNIFORM_BUFFER_UNIFIED_NV);
+            GL11.glDisableClientState(NVVertexBufferUnifiedMemory.GL_VERTEX_ATTRIB_ARRAY_UNIFIED_NV);
+            GL11.glDisableClientState(NVVertexBufferUnifiedMemory.GL_ELEMENT_ARRAY_UNIFIED_NV);
+            GL11.glDisableClientState(GL_DRAW_INDIRECT_UNIFIED_NV);
         }
 
         private static void toggle(int capability, boolean enabled) {
