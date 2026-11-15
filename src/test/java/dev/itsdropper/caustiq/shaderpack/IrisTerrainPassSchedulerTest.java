@@ -112,7 +112,12 @@ class IrisTerrainPassSchedulerTest {
                 #ifdef OPTIONAL_SECOND_OUTPUT
                 layout(location = 1) out vec4 auxiliary;
                 #endif
-                void main() { scene = vec4(1.0); }
+                void main() {
+                    scene = vec4(1.0);
+                    #ifdef OPTIONAL_SECOND_OUTPUT
+                    auxiliary = vec4(0.5);
+                    #endif
+                }
                 """);
         try (ShaderPackSources sources = ShaderPackSources.open(descriptor("ConditionalOutputs", 3))) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);

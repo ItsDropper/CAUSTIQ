@@ -111,8 +111,10 @@ class IrisImageResourcesTest {
             assertTrue(shadowVertex.contains("update_voxel_map"), "Photon shadow vertex pass must update its voxel map");
             assertTrue(shadowVertex.contains("imageStore"), "Photon shadow vertex pass must write its voxel image");
 
-            compilePhotonCompute("setup", setup, defines);
-            compilePhotonCompute("shadowcomp", shadowcomp, defines);
+            Map<String, String> computeDefines = Map.of(
+                    "COLORED_LIGHTS", "1", "VOXEL_VOLUME_SIZE", "128");
+            compilePhotonCompute("setup", setup, computeDefines);
+            compilePhotonCompute("shadowcomp", shadowcomp, computeDefines);
         }
     }
 
