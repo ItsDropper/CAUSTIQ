@@ -309,6 +309,10 @@ public final class IrisGlProgramCompiler {
         boolean handDepthProvided = result.stream().anyMatch(value ->
                 value != null && value.split("=", 2)[0].trim().equals("MC_HAND_DEPTH"));
         if (!handDepthProvided) result.add("MC_HAND_DEPTH=1.0");
+        // Iris StandardMacros supplies these quality macros to every shader stage.
+        // CAUSTIQ compiles outside Iris, so mirror Iris standard defaults.
+        result.add("MC_RENDER_QUALITY=1.0");
+        result.add("MC_SHADOW_QUALITY=1.0");
         return Set.copyOf(result);
     }
 
