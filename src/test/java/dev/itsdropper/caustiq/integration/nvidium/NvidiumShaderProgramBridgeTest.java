@@ -10,15 +10,15 @@ import static org.junit.jupiter.api.Assertions.*;
 class NvidiumShaderProgramBridgeTest {
     @BeforeEach void resetBefore() {
         NvidiumShaderProgramBridge.resetForTests();
-        NvidiumCompatibility.setExtendedVertexFormatCommittedForTests(true);
+        NvidiumVertexAbiState.setCommittedForTests(true);
     }
     @AfterEach void reset() {
         NvidiumShaderProgramBridge.resetForTests();
-        NvidiumCompatibility.setExtendedVertexFormatCommittedForTests(false);
+        NvidiumVertexAbiState.setCommittedForTests(false);
     }
 
     @Test void nativeAdapterIsNotActiveUntilTheExtendedVertexFormatIsRequested() {
-        NvidiumCompatibility.setExtendedVertexFormatCommittedForTests(false);
+        NvidiumVertexAbiState.setCommittedForTests(false);
         assertFalse(NvidiumShaderProgramBridge.hasNativeSourceAdapter());
         Map<Object, String> sources = terrainSources();
         NvidiumShaderProgramBridge.transformBeforeCompile(sources);
