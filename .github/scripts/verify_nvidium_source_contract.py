@@ -228,6 +228,10 @@ assert "formatField.setBoolean(config, true)" in compatibility
 assert "NvidiumIrisChunkVertex.commit()" in compatibility
 assert "use_sodium_vertex_format=true" in compatibility
 assert "isCommitted()" in (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
+abi_state = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumVertexAbiState.java").read_text(encoding="utf-8")
+assert "static boolean isCommitted()" in abi_state
+assert "NvidiumVertexAbiState.commit()" in vertex_encoder
+assert "NvidiumVertexAbiState.isCommitted()" in bridge
 assert "SODIUM_VERTEX_FORMAT_DEFINE" in adapter
 preprocessor = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/IrisGlslConditionalPreprocessor.java").read_text(encoding="utf-8")
 assert "maskComments(normalized)" in preprocessor
