@@ -112,6 +112,10 @@ public final class IrisShaderResources implements AutoCloseable {
     public void bindProgramImages(int program, java.util.Set<String> names) { imageResources.bindImages(program, names); }
     public void restoreProgramImages() { imageResources.restoreImages(); }
     public void clearImage(String name) { imageResources.clear(name); }
+    public int[] computeDispatchGroups(IrisGlProgram program) {
+        return imageResources.dispatchGroups(program.images(), program.localSizeX(), program.localSizeY(),
+                program.localSizeZ(), program.usesGlobalY(), program.usesGlobalZ());
+    }
     public java.util.Set<String> uniformNames() { return uniforms.keySet(); }
     public java.util.Set<String> variableNames() { return variables.keySet(); }
 

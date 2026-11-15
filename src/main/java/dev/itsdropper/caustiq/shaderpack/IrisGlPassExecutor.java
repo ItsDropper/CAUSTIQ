@@ -11,6 +11,8 @@ import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL30C;
+import org.lwjgl.opengl.GL42C;
+import org.lwjgl.opengl.GL43C;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.FloatBuffer;
@@ -89,7 +91,8 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 IrisTerrainPassScheduler.Pass pass = scheduled.pass();
                 if (pass.group() == ShaderPackProgramCatalog.Group.GBUFFERS
                         || pass.group() == ShaderPackProgramCatalog.Group.SHADOW) continue;
-                if (pass.group() != ShaderPackProgramCatalog.Group.DEFERRED
+                if (pass.group() != ShaderPackProgramCatalog.Group.SETUP
+                        && pass.group() != ShaderPackProgramCatalog.Group.DEFERRED
                         && pass.group() != ShaderPackProgramCatalog.Group.COMPOSITE
                         && pass.group() != ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE
                         && pass.group() != ShaderPackProgramCatalog.Group.FINAL) {
@@ -99,15 +102,22 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 if (pass.group() == ShaderPackProgramCatalog.Group.SHADOW) {
                     throw new IllegalStateException("Iris shadow rendering requires a light-space Nvidium terrain pass.");
                 }
-                if (pass.compute() || pass.geometryOrTessellation()) {
-                    throw new IllegalStateException("Iris pass '" + pass.name()
-                            + "' requires compute/geometry execution, which is not a full-screen pass.");
-                }
                 IrisGlProgram program = programs.get(pass.name());
                 if (program == null) {
                     throw new IllegalStateException("Scheduled Iris pass has no linked program: " + pass.name());
                 }
-                renderPass(pass, plan.targets(), program, mainTarget, targetWidth, targetHeight, alternateCurrent, hasWritten, clearedTargets, resources);
+                if (pass.geometryOrTessellation()) {
+                    throw new IllegalStateException("Iris pass '" + pass.name() + "' requires unsupported geometry/tessellation execution.");
+                }
+                if (pass.compute()) {
+                    if (!program.compute()) throw new IllegalStateException("Iris compute pass '" + pass.name() + "' was linked as a graphics program.");
+                    dispatchCompute(program, mainTarget, targetWidth, targetHeight, alternateCurrent,
+                            hasWritten, resources);
+                } else {
+                    if (program.compute()) throw new IllegalStateException("Iris graphics pass '" + pass.name() + "' was linked as a compute program.");
+                    renderPass(pass, plan.targets(), program, mainTarget, targetWidth, targetHeight,
+                            alternateCurrent, hasWritten, clearedTargets, resources);
+                }
             }
             for (int index = 1; index <= MAX_COLOR_TARGET; index++) {
                 IrisTerrainPassScheduler.RenderTarget target = plan.targets().get(index);
@@ -128,6 +138,55 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             }
         } finally {
             restoreState(previous);
+        }
+    }
+
+    private static void dispatchCompute(IrisGlProgram program, RenderTarget mainTarget,
+                                         int width, int height, boolean[] alternateCurrent,
+                                         boolean[] hasWritten, IrisShaderResources resources) {
+        GL20C.glUseProgram(program.programId());
+        bindComputeSamplers(program, mainTarget, alternateCurrent, hasWritten, resources);
+        NvidiumIrisUniformBridge.uploadProgram(program.programId());
+        resources.uploadUniforms(program.programId(),
+                NvidiumIrisUniformBridge.expressionVariables(width, height));
+        resources.bindProgramImages(program.programId(), program.images());
+        try {
+            int[] groups = resources.computeDispatchGroups(program);
+            for (int axis = 0; axis < 3; axis++) {
+                int maximum = GL11C.glGetIntegeri(GL43C.GL_MAX_COMPUTE_WORK_GROUP_COUNT, axis);
+                if (groups[axis] < 1 || groups[axis] > maximum) {
+                    throw new IllegalStateException("Iris compute program '" + program.name()
+                            + "' requests an invalid work-group count " + groups[axis]
+                            + " on axis " + axis + " (device limit " + maximum + ").");
+                }
+            }
+            GL43C.glDispatchCompute(groups[0], groups[1], groups[2]);
+            GL42C.glMemoryBarrier(GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT
+                    | GL42C.GL_TEXTURE_FETCH_BARRIER_BIT
+                    | GL42C.GL_TEXTURE_UPDATE_BARRIER_BIT);
+        } finally {
+            resources.restoreProgramImages();
+        }
+    }
+
+    private static void bindComputeSamplers(IrisGlProgram program, RenderTarget mainTarget,
+                                            boolean[] alternateCurrent, boolean[] hasWritten,
+                                            IrisShaderResources resources) {
+        int unit = 0;
+        int maximum = GL11C.glGetInteger(GL43C.GL_MAX_COMPUTE_TEXTURE_IMAGE_UNITS);
+        for (String sampler : program.samplers()) {
+            int location = GL20C.glGetUniformLocation(program.programId(), sampler);
+            if (location < 0) continue;
+            if (unit >= maximum) {
+                throw new IllegalStateException("Iris compute program '" + program.name()
+                        + "' exceeds GL_MAX_COMPUTE_TEXTURE_IMAGE_UNITS.");
+            }
+            if (resources.bindTexture(sampler, unit, location)) {
+                unit++;
+                continue;
+            }
+            throw new IllegalStateException("Iris compute sampler '" + sampler
+                    + "' has no declared image/custom texture binding.");
         }
     }
 
