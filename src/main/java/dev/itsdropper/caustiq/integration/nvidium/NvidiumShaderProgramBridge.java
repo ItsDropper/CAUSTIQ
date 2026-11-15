@@ -12,7 +12,12 @@ public final class NvidiumShaderProgramBridge {
     private static final Set<String> TERRAIN_STAGES = Set.of("TASK", "MESH", "FRAGMENT");
     private static final AtomicReference<Snapshot> LAST_TERRAIN_PROGRAM = new AtomicReference<>();
     private static volatile UnaryOperator<Map<String, String>> nativeSourceAdapter = NvidiumTerrainVaryingAdapter::adapt;
-    private static volatile UnaryOperator<Map<String, String>> irisTerrainAdapter;
+    private static volatile UnaryOperator<Map<String, String>> primaryTerrainAdapter;
+    private static volatile UnaryOperator<Map<String, String>> translucentTerrainAdapter;
+    private static volatile List<Integer> primaryOutputRouting = List.of(0, 1, 2, 3, 4, 5, 6, 7);
+    private static volatile List<Integer> translucentOutputRouting = List.of(0, 1, 2, 3, 4, 5, 6, 7);
+    private static final ThreadLocal<PipelineKind> ACTIVE_PIPELINE =
+            ThreadLocal.withInitial(() -> PipelineKind.PRIMARY);
 
     private NvidiumShaderProgramBridge() { }
 
@@ -21,22 +26,58 @@ public final class NvidiumShaderProgramBridge {
         nativeSourceAdapter = Objects.requireNonNull(adapter, "adapter");
     }
 
-    /** Installs an actual Iris terrain-pack translator; only this enables the Iris opt-out override. */
+    /** Installs the primary opaque/cutout terrain translator. */
     public static void registerTerrainAdapter(UnaryOperator<Map<String, String>> adapter) {
-        irisTerrainAdapter = Objects.requireNonNull(adapter, "adapter");
+        registerTerrainAdapter(adapter, List.of(0, 1, 2, 3, 4, 5, 6, 7));
+    }
+
+    public static void registerTerrainAdapter(
+            UnaryOperator<Map<String, String>> adapter, List<Integer> outputRouting) {
+        primaryTerrainAdapter = Objects.requireNonNull(adapter, "adapter");
+        primaryOutputRouting = List.copyOf(outputRouting);
+    }
+
+    /** Installs the separate translucent terrain translator. */
+    public static void registerTranslucentTerrainAdapter(
+            UnaryOperator<Map<String, String>> adapter, List<Integer> outputRouting) {
+        translucentTerrainAdapter = Objects.requireNonNull(adapter, "adapter");
+        translucentOutputRouting = List.copyOf(outputRouting);
     }
 
     public static void unregisterTerrainAdapter() {
-        irisTerrainAdapter = null;
+        primaryTerrainAdapter = null;
+        translucentTerrainAdapter = null;
+        primaryOutputRouting = List.of(0, 1, 2, 3, 4, 5, 6, 7);
+        translucentOutputRouting = List.of(0, 1, 2, 3, 4, 5, 6, 7);
+        ACTIVE_PIPELINE.remove();
     }
 
     public static void unregisterTerrainAdapters() {
         nativeSourceAdapter = null;
-        irisTerrainAdapter = null;
+        unregisterTerrainAdapter();
     }
 
-    /** True only when Iris terrain shader code itself has a registered translator. */
-    public static boolean hasTerrainAdapter() { return irisTerrainAdapter != null; }
+    /** True only when an Iris terrain program translator is installed. */
+    public static boolean hasTerrainAdapter() {
+        return primaryTerrainAdapter != null || translucentTerrainAdapter != null;
+    }
+
+    public static List<Integer> outputRoutingFor(PipelineKind pipeline) {
+        return pipeline == PipelineKind.TRANSLUCENT ? translucentOutputRouting : primaryOutputRouting;
+    }
+
+    public static void beginPipelineCompile(PipelineKind pipeline) {
+        ACTIVE_PIPELINE.set(Objects.requireNonNull(pipeline, "pipeline"));
+    }
+
+    public static void endPipelineCompile() {
+        ACTIVE_PIPELINE.remove();
+    }
+
+    public enum PipelineKind {
+        PRIMARY,
+        TRANSLUCENT
+    }
 
     /** Called immediately before Nvidium links a shader program through OpenGL. */
     @SuppressWarnings("unchecked")
@@ -54,8 +95,13 @@ public final class NvidiumShaderProgramBridge {
         Map<String, String> transformed = original;
         UnaryOperator<Map<String, String>> nativeAdapter = nativeSourceAdapter;
         if (nativeAdapter != null) transformed = applyAdapter(nativeAdapter, transformed, "native Nvidium", false);
-        UnaryOperator<Map<String, String>> irisAdapter = irisTerrainAdapter;
-        if (irisAdapter != null) transformed = applyAdapter(irisAdapter, transformed, "Iris terrain", true);
+        PipelineKind pipeline = ACTIVE_PIPELINE.get();
+        UnaryOperator<Map<String, String>> irisAdapter = pipeline == PipelineKind.TRANSLUCENT
+                ? translucentTerrainAdapter : primaryTerrainAdapter;
+        if (irisAdapter != null) {
+            transformed = applyAdapter(irisAdapter, transformed,
+                    pipeline == PipelineKind.TRANSLUCENT ? "Iris translucent terrain" : "Iris terrain", true);
+        }
 
         if (transformed.equals(original)) return;
         for (Map.Entry<?, String> entry : shaderSources.entrySet()) {
@@ -90,7 +136,7 @@ public final class NvidiumShaderProgramBridge {
 
     static void resetForTests() {
         nativeSourceAdapter = null;
-        irisTerrainAdapter = null;
+        unregisterTerrainAdapter();
         LAST_TERRAIN_PROGRAM.set(null);
     }
 
