@@ -8,10 +8,17 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NvidiumShaderProgramBridgeTest {
-    @BeforeEach void resetBefore() { NvidiumShaderProgramBridge.resetForTests(); }
-    @AfterEach void reset() { NvidiumShaderProgramBridge.resetForTests(); }
+    @BeforeEach void resetBefore() {
+        NvidiumShaderProgramBridge.resetForTests();
+        NvidiumCompatibility.setExtendedVertexFormatCommittedForTests(true);
+    }
+    @AfterEach void reset() {
+        NvidiumShaderProgramBridge.resetForTests();
+        NvidiumCompatibility.setExtendedVertexFormatCommittedForTests(false);
+    }
 
     @Test void nativeAdapterIsNotActiveUntilTheExtendedVertexFormatIsRequested() {
+        NvidiumCompatibility.setExtendedVertexFormatCommittedForTests(false);
         assertFalse(NvidiumShaderProgramBridge.hasNativeSourceAdapter());
         Map<Object, String> sources = terrainSources();
         NvidiumShaderProgramBridge.transformBeforeCompile(sources);
