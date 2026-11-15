@@ -600,7 +600,7 @@ public final class IrisNvidiumTerrainTranslator {
         uniforms.appendTail(uniformOutput);
         working = uniformOutput.toString();
         for (String unavailable : UNSUPPORTED_RUNTIME_UNIFORMS) {
-            if (Pattern.compile("\\\\b" + Pattern.quote(unavailable) + "\\\\b").matcher(working).find()) {
+            if (Pattern.compile("\\b" + Pattern.quote(unavailable) + "\\b").matcher(working).find()) {
                 throw new IllegalArgumentException("Iris terrain shader uses '" + unavailable
                         + "', which CAUSTIQ does not yet bind to a real Nvidium resource.");
             }
