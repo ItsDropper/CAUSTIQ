@@ -168,7 +168,7 @@ assert "insertAfterExtensions(mesh, MESH_UNIFORM_ALIASES" in adapter
 assert "insertAfterExtensions(fragment, FRAGMENT_UNIFORM_ALIASES" in adapter
 assert "uniform int caustiqHeldBlockLightValue;" in translator
 assert 'Map.entry("heldBlockLightValue", "caustiqHeldBlockLightValue")' in translator
-assert 'integer(program, "caustiqHeldBlockLightValue", heldBlockLightValue())' in uniform_bridge
+assert 'integer(program, "caustiqHeldBlockLightValue", heldBlockLightValue(InteractionHand.MAIN_HAND))' in uniform_bridge
 assert '"getLightEmission"' in uniform_bridge and "getItemInHand" in uniform_bridge and "InteractionHand.class" in uniform_bridge
 assert "heldBlockLightValue(InteractionHand.MAIN_HAND)" in uniform_bridge
 assert "heldBlockLightValue(InteractionHand.OFF_HAND)" in uniform_bridge
