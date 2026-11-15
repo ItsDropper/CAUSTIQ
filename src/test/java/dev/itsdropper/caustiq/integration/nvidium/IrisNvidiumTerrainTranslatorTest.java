@@ -112,6 +112,7 @@ class IrisNvidiumTerrainTranslatorTest {
                 void main() { gl_Position = ftransform(); }
                 """, """
                 #version 150
+                /* RENDERTARGETS: 1,2,3,4 */
                 void main() {
                     gl_FragData[0] = vec4(1.0);
                     gl_FragData[1] = vec4(0.5);
@@ -120,8 +121,10 @@ class IrisNvidiumTerrainTranslatorTest {
                 """);
 
         String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
-        assertTrue(fragment.contains("layout(location = 1) out vec4 caustiqIrisOutput1;"));
-        assertTrue(fragment.contains("layout(location = 3) out vec4 caustiqIrisOutput3;"));
+        assertTrue(fragment.contains("layout(location = 1) out vec4 caustiqIrisOutput0;"));
+        assertTrue(fragment.contains("layout(location = 2) out vec4 caustiqIrisOutput1;"));
+        assertTrue(fragment.contains("layout(location = 4) out vec4 caustiqIrisOutput3;"));
+        assertTrue(fragment.contains("caustiqIrisOutput0 = caustiqIrisFragData[0];"));
         assertTrue(fragment.contains("caustiqIrisOutput1 = caustiqIrisFragData[1];"));
         assertTrue(fragment.contains("caustiqIrisOutput3 = caustiqIrisFragData[3];"));
     }
@@ -202,8 +205,10 @@ class IrisNvidiumTerrainTranslatorTest {
             assertTrue(combined.get("MESH").contains("caustiqIrisVertexMain"));
             assertTrue(combined.get("FRAGMENT").contains("caustiqIrisFragmentMain"));
             assertTrue(combined.get("MESH").contains("gl_MeshVerticesNV[id].gl_Position = caustiqIrisClipPosition;"));
-            assertFalse(combined.get("FRAGMENT").contains("layout(location = 1) out vec4 caustiqIrisOutput1;"),
-                    "Photon's default RENDERTARGETS: 1 must not expose its disabled second MRT output");
+            assertTrue(combined.get("FRAGMENT").contains("layout(location = 0) out vec4 colour;"),
+                    "Nvidium's native forward color output must remain at location zero");
+            assertTrue(combined.get("FRAGMENT").contains("layout(location = 1) out vec4 caustiqIrisOutput0;"),
+                    "Iris colortex1 must be routed through a separate output location");
             String outputDirectory = System.getenv("CAUSTIQ_COMPAT_OUTPUT_DIR");
             String validator = System.getenv("GLSLANG_VALIDATOR");
             Assumptions.assumeTrue(outputDirectory != null && validator != null,
