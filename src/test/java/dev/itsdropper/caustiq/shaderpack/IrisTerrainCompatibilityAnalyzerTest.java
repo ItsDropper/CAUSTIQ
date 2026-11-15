@@ -109,7 +109,8 @@ class IrisTerrainCompatibilityAnalyzerTest {
         try (var sources = ShaderPackSources.open(descriptor)) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
             IrisNvidiumTerrainTranslator translator = assertDoesNotThrow(
-                    () -> IrisNvidiumTerrainTranslator.from(model),
+                    () -> IrisNvidiumTerrainTranslator.from(model, null, "gbuffers_terrain",
+                            java.util.Map.of("TAA", "false", "NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false")),
                     "The pinned Photon gbuffers_terrain pair must translate into the Nvidium mesh/fragment ABI");
             assertNotNull(translator);
             assertEquals(java.util.List.of(1), translator.renderTargetIndices());
