@@ -110,6 +110,44 @@ class NvidiumIrisUniformBridgeTest {
     }
 
     @Test
+    void evaluatesComplementaryCustomUniformExpressionsWithFourArgumentSmooth() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("Complementary/shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), """
+                uniform.float.isEyeInCave = if(isEyeInWater == 0, 1.0 - smooth(202, if(eyeAltitude < 5.0, eyeBrightness.y / 240.0, 1.0), 6, 12), 0.0)
+                uniform.float.inDry = smooth(101, if(in(biome_precipitation, 0), 1, 0), 20, 10)
+                variable.float.difX = cameraPosition.x - previousCameraPosition.x
+                variable.float.difY = cameraPosition.y - previousCameraPosition.y
+                variable.float.difZ = cameraPosition.z - previousCameraPosition.z
+                variable.float.difSum = abs(difX) + abs(difY) + abs(difZ)
+                variable.float.moving = if(difSum > 0.0 && difSum < 1.0, 1, 0)
+                variable.float.moved = smooth(2, moving, 0, 31536000)
+                uniform.float.starter = smooth(3, moved, 20, 20)
+                uniform.float.inNetherWastes = smooth(50, if(in(biome, BIOME_NETHER_WASTES), 1, 0), 15, 15)
+                uniform.float.maxBlindnessDarkness = max(blindness, darknessFactor)
+                """);
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("complementary-expressions", "Complementary Expressions",
+                temporaryDirectory.resolve("Complementary"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            try (IrisShaderResources resources = IrisShaderResources.load(model.properties(), sources)) {
+                Map<String, Double> base = new HashMap<>();
+                NvidiumIrisUniformBridge.putIrisBuiltInDefaults(base);
+                base.put("eyeAltitude", 10.0);
+                base.put("eyeBrightness.y", 120.0);
+                base.put("cameraPosition.x", 100.0);
+                base.put("previousCameraPosition.x", 99.5);
+                Map<String, double[]> evaluated = resources.evaluateUniformValues(base);
+                assertEquals(0.0, evaluated.get("isEyeInCave")[0], 1.0e-9);
+                assertEquals(1.0, evaluated.get("inDry")[0], 1.0e-9);
+                assertEquals(1.0, evaluated.get("moving")[0], 1.0e-9);
+                assertEquals(1.0, evaluated.get("inNetherWastes")[0], 1.0e-9);
+                assertEquals(0.0, evaluated.get("maxBlindnessDarkness")[0], 1.0e-9);
+            }
+        }
+    }
+
+    @Test
     void exposesSunPositionInViewSpaceUsingMinecraftCelestialTransform() {
         Map<String, Double> values = new HashMap<>();
         float[] identity = new org.joml.Matrix4f().get(new float[16]);
