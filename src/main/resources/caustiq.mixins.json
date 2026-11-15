@@ -17,7 +17,8 @@
     "NvidiumBlockRendererVertexContextMixin",
     "NvidiumFluidRendererVertexContextMixin",
     "NvidiumPrimaryTerrainRasterizerMixin",
-    "NvidiumTranslucentTerrainRasterizerMixin"
+    "NvidiumTranslucentTerrainRasterizerMixin",
+    "MinecraftMixin"
   ],
   "injectors": {
     "defaultRequire": 1
