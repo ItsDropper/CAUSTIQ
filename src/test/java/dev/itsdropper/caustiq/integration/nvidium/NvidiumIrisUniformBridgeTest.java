@@ -66,8 +66,13 @@ class NvidiumIrisUniformBridgeTest {
                 "gl_ModelViewMatrixInverse.0.0", "gl_ProjectionMatrix.0.0",
                 "gl_ProjectionMatrixInverse.0.0", "gl_ModelViewProjectionMatrix.0.0",
                 "gl_NormalMatrix.0.0", "CAT_DESERT", "CAT_MESA", "CAT_SAVANNA",
-                "CAT_ICY", "CAT_TAIGA", "CAT_JUNGLE", "CAT_SWAMP", "PPT_NONE",
-                "PPT_RAIN", "PPT_SNOW", "BIOME_PALE_GARDEN", "chunkFadeTimeInv",
+                "CAT_ICY", "CAT_TAIGA", "CAT_JUNGLE", "CAT_SWAMP", "CAT_EXTREME_HILLS",
+                "CAT_PLAINS", "CAT_THE_END", "CAT_BEACH", "CAT_FOREST", "CAT_OCEAN",
+                "CAT_RIVER", "CAT_MUSHROOM", "CAT_NETHER", "CAT_MOUNTAIN", "CAT_UNDERGROUND",
+                "PPT_NONE", "PPT_RAIN", "PPT_SNOW", "BIOME_PALE_GARDEN",
+                "BIOME_NETHER_WASTES", "BIOME_CRIMSON_FOREST", "BIOME_WARPED_FOREST",
+                "BIOME_BASALT_DELTAS", "BIOME_SOUL_SAND_VALLEY", "BIOME_SULFUR_CAVES",
+                "chunkFadeTimeInv",
                 "seaLevel", "cloudTime", "heavyFog", "inSwimmingAnimation",
                 "heldBlockLightColor.x", "heldBlockLightColor2.z", "dhProjection.0.0",
                 "dhProjectionInverse.0.0", "dhPreviousProjection.0.0",
@@ -198,7 +203,7 @@ class NvidiumIrisUniformBridgeTest {
                 base.put("sunPosition.y", 100.0);
                 base.put("sunPosition.z", 0.0);
                 base.put("moonPosition.x", 0.0);
-                base.put("moonPosition.y", -100.0);
+                base.put("moonPosition.y", 100.0);
                 base.put("moonPosition.z", 0.0);
                 base.put("skyColor.r", 0.5);
                 base.put("skyColor.g", 0.5);
