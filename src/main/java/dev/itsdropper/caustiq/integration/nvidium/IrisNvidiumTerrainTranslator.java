@@ -1128,7 +1128,7 @@ public final class IrisNvidiumTerrainTranslator {
         return directives + nativeSource;
     }
 
-    private static String stripExtensions(String source) {
+    static String stripExtensions(String source) {
         return Pattern.compile("(?m)^[\\t ]*#\\s*extension\\b[^\\r\\n]*(?:\\r?\\n|$)")
                 .matcher(source).replaceAll("");
     }
