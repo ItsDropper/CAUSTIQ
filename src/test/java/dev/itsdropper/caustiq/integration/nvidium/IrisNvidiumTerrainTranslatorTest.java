@@ -214,6 +214,18 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void exposesEveryPhotonBiomeAndWeatherCustomUniformThroughRuntimeAliases() {
+        Map<String, String> aliases = IrisNvidiumTerrainTranslator.uniformAliases();
+        for (String name : List.of(
+                "biome_pale_garden", "biome_cave", "biome_arid", "biome_snowy",
+                "biome_taiga", "biome_jungle", "biome_swamp", "biome_temperate",
+                "biome_may_rain", "biome_may_snow", "biome_temperature",
+                "biome_humidity", "desert_sandstorm", "biome_may_sandstorm")) {
+            assertTrue(aliases.containsKey(name), "Missing Photon custom uniform alias: " + name);
+        }
+    }
+
+    @Test
     void translatesPhotonTemperateBiomeUniformToItsExpressionBackedRuntimeBinding() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150

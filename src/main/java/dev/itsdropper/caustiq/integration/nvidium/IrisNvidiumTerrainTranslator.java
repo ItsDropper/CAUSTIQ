@@ -138,9 +138,20 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("time_noon", "caustiqTimeNoon"),
             Map.entry("time_sunset", "caustiqTimeSunset"),
             Map.entry("time_midnight", "caustiqTimeMidnight"),
+            Map.entry("biome_pale_garden", "caustiqBiomePaleGarden"),
+            Map.entry("biome_cave", "caustiqBiomeCave"),
+            Map.entry("biome_arid", "caustiqBiomeArid"),
+            Map.entry("biome_snowy", "caustiqBiomeSnowy"),
+            Map.entry("biome_taiga", "caustiqBiomeTaiga"),
+            Map.entry("biome_jungle", "caustiqBiomeJungle"),
+            Map.entry("biome_swamp", "caustiqBiomeSwamp"),
             Map.entry("biome_temperate", "caustiqBiomeTemperate"),
+            Map.entry("biome_may_rain", "caustiqBiomeMayRain"),
+            Map.entry("biome_may_snow", "caustiqBiomeMaySnow"),
             Map.entry("biome_temperature", "caustiqBiomeTemperature"),
             Map.entry("biome_humidity", "caustiqBiomeHumidity"),
+            Map.entry("desert_sandstorm", "caustiqDesertSandstorm"),
+            Map.entry("biome_may_sandstorm", "caustiqBiomeMaySandstorm"),
             Map.entry("alphaTestRef", "caustiqAlphaTestRef"),
             Map.entry("blockEntityId", "caustiqBlockEntityId"),
             Map.entry("entityId", "caustiqEntityId"),
@@ -979,9 +990,20 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform float caustiqTimeNoon;
                 uniform float caustiqTimeSunset;
                 uniform float caustiqTimeMidnight;
+                uniform float caustiqBiomePaleGarden;
+                uniform float caustiqBiomeCave;
+                uniform float caustiqBiomeArid;
+                uniform float caustiqBiomeSnowy;
+                uniform float caustiqBiomeTaiga;
+                uniform float caustiqBiomeJungle;
+                uniform float caustiqBiomeSwamp;
                 uniform float caustiqBiomeTemperate;
+                uniform float caustiqBiomeMayRain;
+                uniform float caustiqBiomeMaySnow;
                 uniform float caustiqBiomeTemperature;
                 uniform float caustiqBiomeHumidity;
+                uniform float caustiqDesertSandstorm;
+                uniform float caustiqBiomeMaySandstorm;
                 uniform float caustiqAlphaTestRef;
                 uniform int caustiqBlockEntityId;
                 uniform int caustiqEntityId;
@@ -1013,7 +1035,11 @@ public final class IrisNvidiumTerrainTranslator {
             case "isEyeInWater", "moonPhase", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2" -> "int";
             case "frameTimeCounter", "viewWidth", "viewHeight", "near", "far", "rainStrength",
                     "wetness", "world_age", "day_factor", "aspectRatio", "time_sunrise", "time_noon", "time_sunset",
-                    "time_midnight", "biome_temperate", "biome_temperature", "biome_humidity", "alphaTestRef",
+                    "time_midnight", "biome_pale_garden", "biome_cave", "biome_arid",
+                    "biome_snowy", "biome_taiga", "biome_jungle", "biome_swamp",
+                    "biome_temperate", "biome_may_rain", "biome_may_snow",
+                    "biome_temperature", "biome_humidity", "desert_sandstorm",
+                    "biome_may_sandstorm", "alphaTestRef",
                     "dhNearPlane", "dhFarPlane", "combined_near", "combined_far" -> "float";
             case "frameCounter", "blockEntityId", "entityId", "currentRenderedItemId",
                     "dhRenderDistance", "vxRenderDistance" -> "int";
