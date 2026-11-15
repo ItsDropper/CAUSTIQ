@@ -69,6 +69,7 @@ public final class NvidiumTerrainVaryingAdapter {
             "    uint midBlock;",
             "    uint nvidiumMaterial;");
     private static final String NORMAL_HELPER = String.join("\n",
+            "// CAUSTIQ_NVIDIUM_ADAPTER_HELPERS_BEGIN",
             "vec3 caustiqDecodeNormal(Vertex vertex) {",
             "    int packedNormal = int(vertex.normal);",
             "    vec2 e = vec2((packedNormal << 8) >> 20, (packedNormal << 20) >> 20) * (1.0 / 2047.0);",
@@ -127,7 +128,8 @@ public final class NvidiumTerrainVaryingAdapter {
             "    vec4 color = decodeVertexColour(vertex);",
             "    color.a = float((vertex.nvidiumMaterial >> 8u) & 0xFFu) * COLOR_SCALE;",
             "    return color;",
-            "}");
+            "}",
+            "// CAUSTIQ_NVIDIUM_ADAPTER_HELPERS_END");
 
     private NvidiumTerrainVaryingAdapter() { }
 
