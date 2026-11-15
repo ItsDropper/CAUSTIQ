@@ -115,10 +115,10 @@ public final class IrisGlslConditionalPreprocessor {
 
         for (int index = 0; index < masked.length; index++) {
             char current = source.charAt(index);
-            char next = index + 1 < source.length() ? source.charAt(index + 1) : '\\0';
+            char next = index + 1 < source.length() ? source.charAt(index + 1) : '\0';
 
             if (lineComment) {
-                if (current == '\\n' || current == '\\r') {
+                if (current == '\n' || current == '\r') {
                     lineComment = false;
                 } else {
                     masked[index] = ' ';
@@ -131,18 +131,18 @@ public final class IrisGlslConditionalPreprocessor {
                     masked[index + 1] = ' ';
                     index++;
                     blockComment = false;
-                } else if (current != '\\n' && current != '\\r') {
+                } else if (current != '\n' && current != '\r') {
                     masked[index] = ' ';
                 }
                 continue;
             }
             if (quoted) {
                 if (escaped) escaped = false;
-                else if (current == '\\\\') escaped = true;
+                else if (current == '\\') escaped = true;
                 else if (current == quote) quoted = false;
                 continue;
             }
-            if (current == '"' || current == '\\'') {
+            if (current == '"' || current == '\'') {
                 quoted = true;
                 quote = current;
                 continue;
