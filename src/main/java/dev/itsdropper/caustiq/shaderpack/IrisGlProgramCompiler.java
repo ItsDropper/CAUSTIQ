@@ -294,9 +294,11 @@ public final class IrisGlProgramCompiler {
         for (String define : defines) {
             if (define == null || define.isBlank()) continue;
             String[] parts = define.split("=", 2);
-            block.append("#define ").append(parts[0].trim());
-            if (parts.length == 2) block.append(' ').append(parts[1].trim());
-            block.append('\n');
+            String name = parts[0].trim();
+            String value = parts.length == 2 ? parts[1].trim() : "1";
+            if (value.equalsIgnoreCase("false") || value.equals("0")) continue;
+            if (value.equalsIgnoreCase("true")) value = "1";
+            block.append("#define ").append(name).append(' ').append(value).append('\n');
         }
         return newline < 0 ? source + "\n" + block : source.substring(0, newline + 1) + block + source.substring(newline + 1);
     }

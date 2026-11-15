@@ -34,6 +34,10 @@ public final class IrisTerrainPassScheduler {
             Pattern.CASE_INSENSITIVE);
 
     public Plan schedule(IrisShaderPackModel model, String dimensionKey) {
+        return schedule(model, dimensionKey, Map.of());
+    }
+
+    public Plan schedule(IrisShaderPackModel model, String dimensionKey, Map<String, String> defines) {
         Objects.requireNonNull(model, "model");
         IrisShaderPackModel.ProgramSet programSet = selectProgramSet(model, dimensionKey);
         Map<Integer, RenderTarget> targets = parseTargets(model.renderTargetDirectives());
@@ -44,8 +48,10 @@ public final class IrisTerrainPassScheduler {
             if (group == ShaderPackProgramCatalog.Group.UNKNOWN) {
                 throw new IllegalArgumentException("Unknown Iris program group: " + program.name());
             }
-            String enabled = model.conditionalPrograms().get(program.name());
-            if (enabled != null && isLiteralFalse(enabled)) continue;
+            String enabled = model.conditionalPrograms().get(
+                    programSet.directory().isBlank() ? program.name() : programSet.directory() + "/" + program.name());
+            if (enabled == null) enabled = model.conditionalPrograms().get(program.name());
+            if (enabled != null && !evaluateEnabled(enabled, defines)) continue;
 
             String vertex = source(model, program, ShaderPackProgramCatalog.Stage.VERTEX);
             String fragment = source(model, program, ShaderPackProgramCatalog.Stage.FRAGMENT);
@@ -57,7 +63,6 @@ public final class IrisTerrainPassScheduler {
             collectTargets(compute, reads);
             Map<Integer, Integer> outputTargets = collectOutputs(fragment);
             writes.addAll(outputTargets.values());
-            if (program.hasCompute()) writes.addAll(parseImageBindings(compute));
 
             for (int target : reads) {
                 if (target < 0 || target > 31) {
@@ -183,6 +188,33 @@ public final class IrisTerrainPassScheduler {
             return List.copyOf(result);
         }
         return null;
+    }
+
+    private static boolean evaluateEnabled(String expression, Map<String, String> defines) {
+        String value = expression.trim();
+        while (value.startsWith("(") && value.endsWith(")")) value = value.substring(1, value.length() - 1).trim();
+        int split = topLevelOperator(value, "||");
+        if (split >= 0) return evaluateEnabled(value.substring(0, split), defines)
+                || evaluateEnabled(value.substring(split + 2), defines);
+        split = topLevelOperator(value, "&&");
+        if (split >= 0) return evaluateEnabled(value.substring(0, split), defines)
+                && evaluateEnabled(value.substring(split + 2), defines);
+        if (value.startsWith("!")) return !evaluateEnabled(value.substring(1), defines);
+        if (value.equalsIgnoreCase("true") || value.equals("1")) return true;
+        if (value.equalsIgnoreCase("false") || value.equals("0") || value.isBlank()) return false;
+        String option = defines.get(value);
+        return option != null && !option.equalsIgnoreCase("false") && !option.equals("0");
+    }
+
+    private static int topLevelOperator(String expression, String operator) {
+        int depth = 0;
+        for (int i = 0; i <= expression.length() - operator.length(); i++) {
+            char current = expression.charAt(i);
+            if (current == '(') depth++;
+            else if (current == ')') depth--;
+            if (depth == 0 && expression.startsWith(operator, i)) return i;
+        }
+        return -1;
     }
 
     private static Set<Integer> parseImageBindings(String source) {

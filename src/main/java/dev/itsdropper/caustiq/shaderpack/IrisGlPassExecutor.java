@@ -153,7 +153,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         try {
             int[] groups = resources.computeDispatchGroups(program);
             for (int axis = 0; axis < 3; axis++) {
-                int maximum = GL11C.glGetIntegeri(GL43C.GL_MAX_COMPUTE_WORK_GROUP_COUNT, axis);
+                int maximum = GL30C.glGetIntegeri(GL43C.GL_MAX_COMPUTE_WORK_GROUP_COUNT, axis);
                 if (groups[axis] < 1 || groups[axis] > maximum) {
                     throw new IllegalStateException("Iris compute program '" + program.name()
                             + "' requests an invalid work-group count " + groups[axis]
