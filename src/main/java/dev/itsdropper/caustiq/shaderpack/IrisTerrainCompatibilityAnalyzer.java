@@ -175,7 +175,7 @@ public final class IrisTerrainCompatibilityAnalyzer {
         Matcher samplers = SAMPLER.matcher(source);
         while (samplers.find()) {
             String sampler = samplers.group(2);
-            if (!hasReachableReference(usageSource, sampler)) continue;
+            if (!isReferenced(usageSource, sampler)) continue;
             if (!AVAILABLE_SAMPLERS.contains(sampler)) {
                 issues.add(new Issue("UNBOUND_SAMPLER", sampler,
                         "The sampler has no binding in Nvidium's current terrain stage ABI."));
@@ -189,7 +189,7 @@ public final class IrisTerrainCompatibilityAnalyzer {
         while (uniforms.find()) {
             String type = uniforms.group(1);
             String name = uniforms.group(2);
-            if (!hasReachableReference(usageSource, name)) continue;
+            if (!isReferenced(usageSource, name)) continue;
             if (type.startsWith("sampler") || type.startsWith("isampler")
                     || type.startsWith("usampler") || type.startsWith("image")) {
                 continue;
@@ -233,6 +233,10 @@ public final class IrisTerrainCompatibilityAnalyzer {
             issues.add(new Issue("MULTIPLE_RENDER_TARGETS", Integer.toString(outputCount),
                     "Nvidium's current terrain fragment pipeline does not provide Iris MRT attachment routing."));
         }
+    }
+
+    private static boolean isReferenced(String source, String symbol) {
+        return Pattern.compile("\\\\b" + Pattern.quote(symbol) + "\\\\b").matcher(source).find();
     }
 
     private static Map<String, Declaration> declarations(String source, Set<String> storage) {
