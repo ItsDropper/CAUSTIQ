@@ -54,8 +54,8 @@ public final class NvidiumIrisChunkVertex implements ChunkVertexType {
                     basis.tx, basis.ty, basis.tz);
             int blockEntity = ((context.blockId() + 1) << 1) | (context.renderType() & 1);
             for (ChunkVertexEncoder.Vertex vertex : vertices) {
-                int nvidiumMaterial = (material & 0xFF)
-                        | (ColorU8.normalizedFloatToByte(Mth.clamp(vertex.ao, 0.0f, 1.0f)) << 8);
+                int originalAlpha = (vertex.color >>> 24) & 0xFF;
+                int nvidiumMaterial = (material & 0xFF) | (originalAlpha << 8);
                 int x = quantizePosition(vertex.x);
                 int y = quantizePosition(vertex.y);
                 int z = quantizePosition(vertex.z);
