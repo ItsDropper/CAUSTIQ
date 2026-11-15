@@ -93,6 +93,8 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 if (pass.group() == ShaderPackProgramCatalog.Group.GBUFFERS
                         || pass.group() == ShaderPackProgramCatalog.Group.SHADOW) continue;
                 if (pass.group() != ShaderPackProgramCatalog.Group.SETUP
+                        && pass.group() != ShaderPackProgramCatalog.Group.BEGIN
+                        && pass.group() != ShaderPackProgramCatalog.Group.PREPARE
                         && pass.group() != ShaderPackProgramCatalog.Group.DEFERRED
                         && pass.group() != ShaderPackProgramCatalog.Group.COMPOSITE
                         && pass.group() != ShaderPackProgramCatalog.Group.SHADOW_COMPOSITE
