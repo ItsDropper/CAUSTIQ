@@ -51,6 +51,27 @@ class IrisShaderResourcesTest {
     }
 
     @Test
+    void loadsProgramScopedRawThreeDimensionalTextures() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("Scoped/shaders"));
+        Path imageDirectory = Files.createDirectories(shaders.resolve("image"));
+        Files.write(imageDirectory.resolve("volume.dat"), new byte[]{0, 1, 2, 3, 4, 5, 6, 7});
+        Files.writeString(shaders.resolve("shaders.properties"), """
+                texture.deferred.colortex6.1=image/volume.dat TEXTURE_3D R8 2 2 2 RED UNSIGNED_BYTE
+                """);
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("scoped", "Scoped",
+                temporaryDirectory.resolve("Scoped"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            try (IrisShaderResources resources = IrisShaderResources.load(model.properties(), sources)) {
+                assertTrue(resources.textureNames().contains("deferred::colortex6"));
+                assertFalse(resources.hasTexture("colortex6"),
+                        "Program-scoped textures must not leak into unrelated passes.");
+            }
+        }
+    }
+
+    @Test
     void rejectsCustomTexturePathTraversal() throws IOException {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("Unsafe/shaders"));
         Files.writeString(shaders.resolve("shaders.properties"), "texture.bad=../outside.png\n");
