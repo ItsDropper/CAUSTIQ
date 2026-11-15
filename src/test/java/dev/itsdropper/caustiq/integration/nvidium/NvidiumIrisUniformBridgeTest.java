@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class NvidiumIrisUniformBridgeTest {
     @TempDir Path temporaryDirectory;
@@ -204,6 +205,31 @@ class NvidiumIrisUniformBridgeTest {
                 base.put("skyColor.b", 0.7);
                 Map<String, double[]> evaluated = resources.evaluateUniformValues(base);
                 assertFalse(evaluated.isEmpty(), "Pinned Photon must expose custom uniforms for expression evaluation.");
+            }
+        }
+    }
+
+    @Test
+    void reportsAllMissingExpressionSymbolsTogether() throws IOException {
+        Path shaders = Files.createDirectories(temporaryDirectory.resolve("Unknowns/shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), """
+                uniform.float.first = temperature + missing_temperature_alias
+                uniform.float.second = rainfall + missing_weather_alias
+                uniform.float.third = eyeBrightness.x + missing_light_alias
+                """);
+        ShaderPackDescriptor descriptor = new ShaderPackDescriptor("unknown-symbols", "Unknown Symbols",
+                temporaryDirectory.resolve("Unknowns"), "", ShaderPackSourceType.DIRECTORY,
+                ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        try (ShaderPackSources sources = ShaderPackSources.open(descriptor)) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            try (IrisShaderResources resources = IrisShaderResources.load(model.properties(), sources)) {
+                Map<String, Double> base = new HashMap<>();
+                NvidiumIrisUniformBridge.putIrisBuiltInDefaults(base);
+                IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                        () -> resources.evaluateUniformValues(base));
+                assertTrue(error.getMessage().contains("missing_temperature_alias"));
+                assertTrue(error.getMessage().contains("missing_weather_alias"));
+                assertTrue(error.getMessage().contains("missing_light_alias"));
             }
         }
     }
