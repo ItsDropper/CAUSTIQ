@@ -130,6 +130,19 @@ class NvidiumTerrainVaryingAdapterTest {
     }
 
     @Test
+    void rejectsNativeUvec4ShaderWhenExtendedEncoderWasRequested() {
+        Map<String, String> base = sourceStages();
+        Map<String, String> mismatched = Map.of(
+                "TASK", base.get("TASK"),
+                "MESH", base.get("MESH").replace("#define USE_SODIUM_VERTEX_FORMAT\\n", ""),
+                "FRAGMENT", base.get("FRAGMENT").replace("#define USE_SODIUM_VERTEX_FORMAT\\n", ""));
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class, () -> NvidiumTerrainVaryingAdapter.adapt(mismatched));
+        assertTrue(exception.getMessage().contains("USE_SODIUM_VERTEX_FORMAT"));
+        assertTrue(exception.getMessage().contains("uvec4"));
+    }
+
+    @Test
     void rejectsUnexpectedNvidiumShaderLayoutInsteadOfPartiallyPatchingIt() {
         Map<String, String> sources = sourceStages();
         sources = Map.of(
