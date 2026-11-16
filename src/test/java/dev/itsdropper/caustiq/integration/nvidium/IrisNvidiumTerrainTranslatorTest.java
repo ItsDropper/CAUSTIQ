@@ -658,8 +658,8 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
-    void rejectsUnavailableSamplersOnlyWhenTheirFunctionsAreReachableFromMain() {
-        assertDoesNotThrow(() -> translator("""
+    void translatesDepthTextureOnlyWhenItsSamplingFunctionIsReachableFromMain() {
+        IrisNvidiumTerrainTranslator unused = translator("""
                 #version 150
                 void main() { gl_Position = ftransform(); }
                 """, """
@@ -667,15 +667,22 @@ class IrisNvidiumTerrainTranslatorTest {
                 uniform sampler2D depthtex1;
                 vec4 unusedDepthHelper() { return texture(depthtex1, vec2(0.0)); }
                 void main() { gl_FragColor = vec4(1.0); }
-                """));
-        assertThrows(IllegalArgumentException.class, () -> translator("""
+                """);
+        String unusedFragment = unused.adapt(nativeStages()).get("FRAGMENT");
+        assertFalse(unusedFragment.contains("uniform sampler2D depthtex1;"));
+
+        IrisNvidiumTerrainTranslator used = translator("""
                 #version 150
                 void main() { gl_Position = ftransform(); }
                 """, """
                 #version 150
                 uniform sampler2D depthtex1;
                 void main() { gl_FragColor = texture(depthtex1, vec2(0.0)); }
-                """));
+                """);
+        String fragment = used.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("layout(binding = 3) uniform sampler2D caustiqDepthTexture1;"));
+        assertTrue(fragment.contains("texture(caustiqDepthTexture1, vec2(0.0))"));
+        assertFalse(fragment.contains("uniform sampler2D depthtex1;"));
     }
 
     @Test

@@ -42,7 +42,7 @@ public final class IrisNvidiumTerrainTranslator {
     private static final Pattern RENDERTARGETS = Pattern.compile(
             "(?s)/\\*\\s*RENDERTARGETS\\s*:\\s*([0-9,\\s]+)\\s*\\*/");
     private static final Set<String> UNSUPPORTED_RUNTIME_UNIFORMS = Set.of(
-            "normals", "specular", "depthtex1", "colortex15",
+            "normals", "specular", "colortex15",
             "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans");
     private static final Set<String> SUPPORTED_ATTRIBUTES = Set.of(
             "mc_Entity", "at_midBlock", "mc_midTexCoord", "at_midTexCoord",
@@ -987,6 +987,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform int caustiqFrameCounter;
                 #endif
                 layout(binding = 2) uniform sampler2D caustiqNoiseTexture;
+                layout(binding = 3) uniform sampler2D caustiqDepthTexture1;
                 layout(binding = 12) uniform sampler2D caustiqShadowtex0;
                 layout(binding = 13) uniform sampler2DShadow caustiqShadowtex1;
                 layout(binding = 14) uniform sampler2D caustiqShadowcolor0;

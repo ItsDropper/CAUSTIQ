@@ -16,6 +16,9 @@ public final class NvidiumIrisTextureBridge {
     private static final int NOISE_SIZE = 512;
     private static int noiseTexture;
     private static int fallbackDepthTexture;
+    private static int depthSnapshotTexture;
+    private static int depthSnapshotWidth;
+    private static int depthSnapshotHeight;
     private static int fallbackColorTexture;
     private static int shadowComparisonSampler;
     private static BindingState bindingState;
@@ -32,16 +35,30 @@ public final class NvidiumIrisTextureBridge {
         if (bindingState != null || customResources != null) restoreBindings();
         ensureTextures();
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
-        int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE12, GL13C.GL_TEXTURE13,
-                GL13C.GL_TEXTURE14, GL13C.GL_TEXTURE15};
-        int[] textures = {noiseTexture,
-                shadowOrFallback(NvidiumShadowRenderer.shadowTexture()),
-                shadowOrFallback(NvidiumShadowRenderer.shadowTexture1()),
-                colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0)),
-                colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))};
-        int[] samplers = {0, 0, shadowComparisonSampler, 0, 0};
+        boolean needsDepthSnapshot = program != 0
+                && GL20C.glGetUniformLocation(program, "caustiqDepthTexture1") >= 0;
+        int[] units = needsDepthSnapshot
+                ? new int[]{GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE3, GL13C.GL_TEXTURE12,
+                        GL13C.GL_TEXTURE13, GL13C.GL_TEXTURE14, GL13C.GL_TEXTURE15}
+                : new int[]{GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE12, GL13C.GL_TEXTURE13,
+                        GL13C.GL_TEXTURE14, GL13C.GL_TEXTURE15};
+        int[] textures = needsDepthSnapshot
+                ? new int[]{noiseTexture, captureDepthSnapshot(),
+                        shadowOrFallback(NvidiumShadowRenderer.shadowTexture()),
+                        shadowOrFallback(NvidiumShadowRenderer.shadowTexture1()),
+                        colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0)),
+                        colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))}
+                : new int[]{noiseTexture,
+                        shadowOrFallback(NvidiumShadowRenderer.shadowTexture()),
+                        shadowOrFallback(NvidiumShadowRenderer.shadowTexture1()),
+                        colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0)),
+                        colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))};
+        int[] samplers = needsDepthSnapshot
+                ? new int[]{0, 0, 0, shadowComparisonSampler, 0, 0}
+                : new int[]{0, 0, shadowComparisonSampler, 0, 0};
         bindingState = bindTextures(previousActive, units, textures, samplers);
         setSampler(program, "noisetex", 2);
+        if (needsDepthSnapshot) setSampler(program, "caustiqDepthTexture1", 3);
         setSampler(program, "shadowtex0", 12);
         setSampler(program, "shadowtex1", 13);
         setSampler(program, "shadowcolor0", 14);
@@ -189,10 +206,14 @@ public final class NvidiumIrisTextureBridge {
         restoreBindings();
         if (noiseTexture != 0) GL11C.glDeleteTextures(noiseTexture);
         if (fallbackDepthTexture != 0) GL11C.glDeleteTextures(fallbackDepthTexture);
+        if (depthSnapshotTexture != 0) GL11C.glDeleteTextures(depthSnapshotTexture);
         if (fallbackColorTexture != 0) GL11C.glDeleteTextures(fallbackColorTexture);
         if (shadowComparisonSampler != 0) GL33C.glDeleteSamplers(shadowComparisonSampler);
         noiseTexture = 0;
         fallbackDepthTexture = 0;
+        depthSnapshotTexture = 0;
+        depthSnapshotWidth = 0;
+        depthSnapshotHeight = 0;
         fallbackColorTexture = 0;
         shadowComparisonSampler = 0;
     }
@@ -214,6 +235,55 @@ public final class NvidiumIrisTextureBridge {
 
     private static int colorOrFallback(int texture) {
         return texture == 0 ? fallbackColorTexture : texture;
+    }
+
+    /**
+     * Copies the currently bound scene depth buffer before Nvidium's translucent
+     * terrain pass. Iris depthtex1 represents opaque depth, so sampling the live
+     * framebuffer attachment while translucency is being drawn would be a
+     * framebuffer feedback loop.
+     */
+    private static int captureDepthSnapshot() {
+        int[] viewport = new int[4];
+        try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+            java.nio.IntBuffer values = stack.mallocInt(4);
+            GL11C.glGetIntegerv(GL11C.GL_VIEWPORT, values);
+            for (int i = 0; i < 4; i++) viewport[i] = values.get(i);
+        }
+        int width = viewport[2];
+        int height = viewport[3];
+        if (width <= 0 || height <= 0) {
+            throw new IllegalStateException("Cannot bind Iris depthtex1 without a non-empty Nvidium viewport.");
+        }
+
+        int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
+        int sourceFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
+        int previousReadFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
+        GL13C.glActiveTexture(GL13C.GL_TEXTURE3);
+        int previousTexture = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
+        try {
+            if (depthSnapshotTexture == 0) depthSnapshotTexture = GL11C.glGenTextures();
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, depthSnapshotTexture);
+            GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_NEAREST);
+            GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_NEAREST);
+            GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, 0x812F);
+            GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, 0x812F);
+            if (depthSnapshotWidth != width || depthSnapshotHeight != height) {
+                GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_DEPTH_COMPONENT32F,
+                        width, height, 0, GL11C.GL_DEPTH_COMPONENT, GL11C.GL_FLOAT,
+                        (ByteBuffer) null);
+                depthSnapshotWidth = width;
+                depthSnapshotHeight = height;
+            }
+            GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, sourceFramebuffer);
+            GL11C.glCopyTexSubImage2D(GL11C.GL_TEXTURE_2D, 0, 0, 0,
+                    viewport[0], viewport[1], width, height);
+        } finally {
+            GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
+            GL13C.glActiveTexture(previousActive);
+        }
+        return depthSnapshotTexture;
     }
 
     private static int createShadowComparisonSampler() {
