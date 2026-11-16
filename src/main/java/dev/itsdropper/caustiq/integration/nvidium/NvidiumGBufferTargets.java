@@ -5,6 +5,7 @@ import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import dev.itsdropper.caustiq.CaustiqClient;
 import dev.itsdropper.caustiq.shaderpack.IrisTerrainPassScheduler;
+import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL20C;
@@ -14,7 +15,9 @@ import org.lwjgl.system.MemoryStack;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Temporarily adds CAUSTIQ's auxiliary terrain G-buffer attachments to the
@@ -39,13 +42,14 @@ public final class NvidiumGBufferTargets {
     private static final int[] ALTERNATE_TEXTURES = new int[ATTACHMENT_COUNT];
     private static final TextureTarget[] TARGETS = new TextureTarget[ATTACHMENT_COUNT];
     private static final TextureTarget[] ALTERNATE_TARGETS = new TextureTarget[ATTACHMENT_COUNT];
-    private static final boolean[] PERSISTENT_INITIALIZED = new boolean[ATTACHMENT_COUNT];
+    private static final Set<Integer> PERSISTENT_INITIALIZED = new HashSet<>();
     private static int width;
     private static int height;
     private static FramebufferState activeState;
     private static boolean warnedUnavailable;
     private static Map<Integer, IrisTerrainPassScheduler.RenderTarget> targetSpecs = Map.of();
     private static boolean formatsDirty = true;
+    private static List<Integer> outputTargets = List.of(1, 2, 3, 4, 5, 6, 7);
     private static int[] outputRouting = {0, 1, 2, 3, 4, 5, 6, 7};
 
     private NvidiumGBufferTargets() { }
@@ -53,12 +57,13 @@ public final class NvidiumGBufferTargets {
     /** Applies Iris colortex format/filter/clear directives before the next terrain draw. */
     public static void configureTargets(Map<Integer, IrisTerrainPassScheduler.RenderTarget> specs) {
         targetSpecs = Map.copyOf(specs);
-        Arrays.fill(PERSISTENT_INITIALIZED, false);
+        PERSISTENT_INITIALIZED.clear();
         formatsDirty = true;
     }
 
     /** Maps fragment output locations to Iris colortex indices for the active terrain program. */
     public static void configureOutputRouting(java.util.List<Integer> targetIndices) {
+        outputTargets = targetIndices.stream().filter(target -> target > 0).toList();
         outputRouting = createOutputRouting(targetIndices);
     }
 
@@ -75,18 +80,23 @@ public final class NvidiumGBufferTargets {
         int[] routing = new int[REQUIRED_DRAW_BUFFERS];
         Arrays.fill(routing, -1);
         routing[0] = 0;
+        Set<Integer> uniqueTargets = new HashSet<>();
         for (int irisIndex = 0; irisIndex < targetIndices.size(); irisIndex++) {
             int target = targetIndices.get(irisIndex);
-            if (target < 1 || target > MAX_ATTACHMENT) {
-                throw new IllegalArgumentException("Nvidium reserves colortex0 and supports Iris colortex1 through colortex7.");
+            if (target < 1 || target > 15) {
+                throw new IllegalArgumentException("Nvidium reserves colortex0 and supports Iris colortex1 through colortex15.");
             }
-            routing[irisIndex + 1] = target;
+            if (!uniqueTargets.add(target)) {
+                throw new IllegalArgumentException("Iris terrain MRT outputs contain duplicate colortex" + target + ".");
+            }
+            routing[irisIndex + 1] = irisIndex + 1;
         }
         return routing;
     }
 
     /** Restores Nvidium's native location-to-attachment mapping. */
     public static void resetOutputRouting() {
+        outputTargets = List.of(1, 2, 3, 4, 5, 6, 7);
         outputRouting = new int[]{0, 1, 2, 3, 4, 5, 6, 7};
     }
 
@@ -139,8 +149,16 @@ public final class NvidiumGBufferTargets {
 
         FramebufferState state = new FramebufferState(framebuffer, previousDrawBuffers, previousAttachments);
         for (int i = 0; i < ATTACHMENT_COUNT; i++) {
+            int texture = i < outputTargets.size()
+                    ? outputTexture(outputTargets.get(i)) : TEXTURES[i];
+            if (texture == 0) {
+                restore(state);
+                warnUnavailable("Iris colortex" + outputTargets.get(i)
+                        + " has no allocated texture for Nvidium MRT output.");
+                return false;
+            }
             GL30C.glFramebufferTexture2D(GL30C.GL_DRAW_FRAMEBUFFER, FIRST_ATTACHMENT + i,
-                    GL11C.GL_TEXTURE_2D, TEXTURES[i], 0);
+                    GL11C.GL_TEXTURE_2D, texture, 0);
         }
         int[] drawBuffers = new int[REQUIRED_DRAW_BUFFERS];
         Arrays.fill(drawBuffers, GL11C.GL_NONE);
@@ -189,6 +207,12 @@ public final class NvidiumGBufferTargets {
         restore(state);
     }
 
+    private static int outputTexture(int colortex) {
+        return colortex <= MAX_ATTACHMENT
+                ? TEXTURES[colortex - 1]
+                : ShaderRuntime.irisColorTexture(colortex);
+    }
+
     /** Returns the terrain-produced GL texture for an auxiliary color attachment (1 through 7). */
     public static int texture(int attachment) {
         if (attachment < NORMAL || attachment > MAX_ATTACHMENT) {
@@ -233,7 +257,7 @@ public final class NvidiumGBufferTargets {
         height = 0;
         targetSpecs = Map.of();
         resetOutputRouting();
-        Arrays.fill(PERSISTENT_INITIALIZED, false);
+        PERSISTENT_INITIALIZED.clear();
         formatsDirty = true;
     }
 
@@ -241,7 +265,7 @@ public final class NvidiumGBufferTargets {
         int previousDrawFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
         int previousReadFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
         boolean resized = TARGETS[0] == null || width != newWidth || height != newHeight;
-        if (resized || formatsDirty) Arrays.fill(PERSISTENT_INITIALIZED, false);
+        if (resized || formatsDirty) PERSISTENT_INITIALIZED.clear();
         if (TARGETS[0] == null) {
             for (int i = 0; i < TARGETS.length; i++) {
                 TARGETS[i] = new TextureTarget("Caustiq Nvidium G-buffer " + (i + 1),
@@ -300,17 +324,20 @@ public final class NvidiumGBufferTargets {
     }
 
     private static void clearAuxiliaryAttachments() {
+        Set<Integer> clearedTargets = new HashSet<>();
         try (MemoryStack stack = MemoryStack.stackPush()) {
             for (int i = 0; i < ATTACHMENT_COUNT; i++) {
-                int index = i + 1;
-                IrisTerrainPassScheduler.RenderTarget spec = targetSpecs.get(index);
+                int physicalAttachment = i + 1;
+                int logicalTarget = i < outputTargets.size() ? outputTargets.get(i) : physicalAttachment;
+                if (!clearedTargets.add(logicalTarget)) continue;
+                IrisTerrainPassScheduler.RenderTarget spec = targetSpecs.get(logicalTarget);
                 if (spec != null && (!spec.clear()
-                        || (spec.persistent() && PERSISTENT_INITIALIZED[i]))) continue;
+                        || (spec.persistent() && PERSISTENT_INITIALIZED.contains(logicalTarget)))) continue;
                 float[] color = parseClearColor(spec == null ? "0.0 0.0 0.0 0.0" : spec.clearColor());
                 FloatBuffer clearValue = stack.mallocFloat(4);
                 clearValue.put(color).flip();
-                GL30C.glClearBufferfv(GL11C.GL_COLOR, index, clearValue);
-                PERSISTENT_INITIALIZED[i] = true;
+                GL30C.glClearBufferfv(GL11C.GL_COLOR, physicalAttachment, clearValue);
+                PERSISTENT_INITIALIZED.add(logicalTarget);
             }
         }
     }

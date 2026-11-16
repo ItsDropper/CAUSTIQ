@@ -510,9 +510,9 @@ public final class IrisNvidiumTerrainTranslator {
             int target = Integer.parseInt(token);
             boolean shadowProgram = programName.equalsIgnoreCase("shadow")
                     || programName.toLowerCase(java.util.Locale.ROOT).startsWith("shadow_");
-            if (target < (shadowProgram ? 0 : 1) || target > (shadowProgram ? 6 : 7)) {
-                throw new IllegalArgumentException("Nvidium reserves colortex0 for its native forward color and supports terrain MRT outputs to colortex1 through colortex7; got colortex"
-                        + target + ".");
+            if (target < (shadowProgram ? 0 : 1) || target > (shadowProgram ? 6 : 15)) {
+                throw new IllegalArgumentException("Nvidium reserves colortex0 for native forward color and supports up to seven terrain MRT outputs; Iris colortex indices must be "
+                        + (shadowProgram ? "0 through 6" : "1 through 15") + "; got colortex" + target + ".");
             }
             if (targets.contains(target)) {
                 throw new IllegalArgumentException("Iris RENDERTARGETS contains duplicate colortex" + target + ".");

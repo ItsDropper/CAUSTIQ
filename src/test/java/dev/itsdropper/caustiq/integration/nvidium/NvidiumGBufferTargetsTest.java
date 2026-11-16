@@ -10,8 +10,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class NvidiumGBufferTargetsTest {
     @Test
     void preservesNativeColorAndRoutesIrisOutputsToRequestedColortexAttachments() {
-        assertArrayEquals(new int[]{0, 1, 3, 4, -1, -1, -1, -1},
+        assertArrayEquals(new int[]{0, 1, 2, 3, -1, -1, -1, -1},
                 NvidiumGBufferTargets.createOutputRouting(List.of(1, 3, 4)));
+    }
+
+    @Test
+    void mapsHighLogicalColortexIndicesIntoAvailablePhysicalAttachments() {
+        assertArrayEquals(new int[]{0, 1, 2, -1, -1, -1, -1, -1},
+                NvidiumGBufferTargets.createOutputRouting(List.of(3, 13)));
     }
 
     @Test
