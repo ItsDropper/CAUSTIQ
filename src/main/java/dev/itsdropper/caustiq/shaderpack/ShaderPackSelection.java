@@ -25,6 +25,6 @@ public final class ShaderPackSelection {
         }
 
         if (current < 0) return direction > 0 ? 0 : packs.size() - 1;
-        return Math.floorMod(current + Integer.signum(direction), packs.size());
+        return (int) Math.floorMod((long) current + direction, packs.size());
     }
 }
