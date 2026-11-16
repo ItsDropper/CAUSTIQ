@@ -2,6 +2,7 @@ package dev.itsdropper.caustiq.gui;
 
 import dev.itsdropper.caustiq.CaustiqClient;
 import dev.itsdropper.caustiq.CaustiqConfig;
+import dev.itsdropper.caustiq.diagnostics.CaustiqDiagnostics;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackDescriptor;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackMetadata;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
@@ -59,7 +60,12 @@ public final class CaustiqSettingsScreen extends Screen {
 
         addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.refresh"),
                 button -> CaustiqClient.refreshShaderPacks())
-                .bounds(width / 2 - 155, 68, 310, 20).build());
+                .bounds(width / 2 - 155, 68, 150, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.copy_diagnostics"),
+                button -> {
+                    Minecraft.getInstance().keyboardHandler.setClipboard(CaustiqDiagnostics.createReport());
+                    button.setMessage(Component.translatable("caustiq.settings.diagnostics_copied"));
+                }).bounds(width / 2 + 5, 68, 150, 20).build());
 
         if (selected != null) addOptionButtons(selected, config);
         else addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.no_selection"),

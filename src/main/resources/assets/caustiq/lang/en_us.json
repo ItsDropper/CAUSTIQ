@@ -12,6 +12,8 @@
   "caustiq.settings.pack_settings": "Shader pack selection and options",
   "caustiq.settings.pack_settings_tooltip": "Choose an installed shader pack, rescan the shaderpacks folder, and edit pack-defined options.",
   "caustiq.settings.refresh": "Rescan Shader Packs",
+  "caustiq.settings.copy_diagnostics": "Copy Diagnostics",
+  "caustiq.settings.diagnostics_copied": "Diagnostics Copied",
   "caustiq.settings.no_selection": "Select a shader pack above to view its options.",
   "caustiq.settings.no_options": "No shader options",
   "caustiq.settings.selected_pack": "Selected shader pack",
