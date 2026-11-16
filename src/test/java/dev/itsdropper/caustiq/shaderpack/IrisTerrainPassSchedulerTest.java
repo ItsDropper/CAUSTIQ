@@ -308,6 +308,6 @@ class IrisTerrainPassSchedulerTest {
                 IrisTerrainPassScheduler.parseOutputTargetMapping("/* DRAWBUFFERS: 35 */"));
         assertEquals(java.util.List.of(1, 4),
                 IrisTerrainPassScheduler.parseOutputTargetMapping(
-                        "/* DRAWBUFFERS: 35 */\\n/* RENDERTARGETS: 1,4 */"));
+                        "/* DRAWBUFFERS: 35 */\n/* RENDERTARGETS: 1,4 */"));
     }
 }
