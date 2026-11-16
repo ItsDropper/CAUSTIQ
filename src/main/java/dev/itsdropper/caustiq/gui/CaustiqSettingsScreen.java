@@ -73,7 +73,7 @@ public final class CaustiqSettingsScreen extends Screen {
 
         if (selected != null) addOptionButtons(selected, config);
         else addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.no_selection"),
-                button -> { }).bounds(width / 2 - 155, 152, 310, 20).build());
+                button -> { }).bounds(width / 2 - 155, 164, 310, 20).build());
 
         addRenderableWidget(Button.builder(Component.translatable("gui.done"),
                 button -> Minecraft.getInstance().setScreen(parent))
@@ -104,6 +104,12 @@ public final class CaustiqSettingsScreen extends Screen {
                     width / 2 + 80, 120, 0xFFAAAAAA);
             graphics.drawCenteredString(font, Component.translatable("caustiq.settings.structural_only"),
                     width / 2 + 80, 132, 0xFF888888);
+            Component metadataSummary = metadataLoaded && selected.id().equals(metadataCachePackId)
+                    ? Component.translatable("caustiq.settings.pack_options_count", metadataCache == null
+                            ? Component.translatable("caustiq.settings.pack_options_unavailable")
+                            : Integer.toString(metadataCache.options().size()))
+                    : Component.translatable("caustiq.settings.pack_options_loading");
+            graphics.drawCenteredString(font, metadataSummary, width / 2 + 80, 144, 0xFFAAAAAA);
         }
 
         ShaderPackRefreshStatus status = CaustiqClient.refreshStatus();
@@ -171,7 +177,7 @@ public final class CaustiqSettingsScreen extends Screen {
             start = 0;
         }
         int end = Math.min(start + PAGE_SIZE, metadata.options().size());
-        int y = 152;
+        int y = 164;
         for (ShaderPackMetadata.Option option : metadata.options().subList(start, end)) {
             String value = config.option(pack.id(), option.name(), option.defaultValue());
             int selectedIndex = option.values().indexOf(value);
