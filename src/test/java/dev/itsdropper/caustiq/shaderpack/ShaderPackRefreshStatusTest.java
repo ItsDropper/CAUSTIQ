@@ -2,6 +2,7 @@ package dev.itsdropper.caustiq.shaderpack;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,14 +23,18 @@ class ShaderPackRefreshStatusTest {
 
     @Test
     void publishesCountsOnlyAfterTheScanCompletes() {
-        ShaderPackScanResult result = new ShaderPackScanResult(List.of(), List.of(), 3);
+        ShaderPackDescriptor pack = new ShaderPackDescriptor(
+                "example", "Example", Path.of("Example"), "",
+                ShaderPackSourceType.DIRECTORY, ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 128);
+        ShaderPackScanResult result = new ShaderPackScanResult(
+                List.of(pack), List.of(new ShaderPackIssue(Path.of("Broken.zip"), "Invalid ZIP")), 3);
 
         ShaderPackRefreshStatus status = ShaderPackRefreshStatus.complete(result);
 
         assertFalse(status.isScanning());
         assertEquals(ShaderPackRefreshStatus.State.COMPLETE, status.state());
-        assertEquals(0, status.packCount());
-        assertEquals(0, status.rejectedCandidateCount());
+        assertEquals(1, status.packCount());
+        assertEquals(1, status.rejectedCandidateCount());
     }
 
     @Test
