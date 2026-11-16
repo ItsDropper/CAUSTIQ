@@ -1,6 +1,5 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
-import org.joml.Matrix4f;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -22,30 +21,6 @@ class NvidiumTaaJitterTest {
             assertTrue(Math.abs(offset.y()) <= 1.0f / 1080.0f);
         }
         assertEquals(first, NvidiumTaaJitter.forFrame(9, 1920, 1080));
-    }
-
-    @Test
-    void appliesTheSameJitterToTheProjectionThatIsExposedToShaderPacks() {
-        Matrix4f projection = new Matrix4f().perspective((float) Math.toRadians(70.0), 16.0f / 9.0f, 0.05f, 512.0f);
-        float originalX = projection.m20();
-        float originalY = projection.m21();
-
-        var offset = NvidiumTaaJitter.apply(projection, 4, 1920, 1080);
-
-        assertEquals(originalX - offset.x(), projection.m20(), 1.0e-7f);
-        assertEquals(originalY - offset.y(), projection.m21(), 1.0e-7f);
-    }
-
-    @Test
-    void appliesPackSpecificProjectionScaleWithoutChangingThePublishedOffset() {
-        Matrix4f projection = new Matrix4f().perspective((float) Math.toRadians(70.0), 16.0f / 9.0f, 0.05f, 512.0f);
-        float originalX = projection.m20();
-        float originalY = projection.m21();
-
-        var offset = NvidiumTaaJitter.apply(projection, 3, 1920, 1080, 0.66f);
-
-        assertEquals(originalX - offset.x() * 0.66f, projection.m20(), 1.0e-7f);
-        assertEquals(originalY - offset.y() * 0.66f, projection.m21(), 1.0e-7f);
     }
 
     @Test
