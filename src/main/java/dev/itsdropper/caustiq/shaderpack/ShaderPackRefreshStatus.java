@@ -23,6 +23,9 @@ public record ShaderPackRefreshStatus(State state, int packCount, int rejectedCa
     }
 
     public static ShaderPackRefreshStatus complete(ShaderPackScanResult result) {
+        if (result == null) {
+            throw new IllegalArgumentException("Completed scan result must not be null");
+        }
         return new ShaderPackRefreshStatus(State.COMPLETE, result.packs().size(), result.issues().size());
     }
 
