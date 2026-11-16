@@ -38,7 +38,6 @@ public final class NvidiumIrisUniformBridge {
     private static volatile long worldStartNanos;
     private static volatile long lastCaptureNanos;
     private static volatile boolean warnedUploadFailure;
-    private static volatile boolean warnedImmutableProjection;
     private static volatile float taaOffsetX;
     private static volatile float taaOffsetY;
     private static volatile float centerDepthSmooth = 1.0f;
@@ -63,20 +62,10 @@ public final class NvidiumIrisUniformBridge {
             int frameCounter = FRAME_COUNTER.incrementAndGet();
             if (isTaaEnabled()) {
                 var target = Minecraft.getInstance().getMainRenderTarget();
-                if (projection instanceof Matrix4f mutableProjection && target.width > 0 && target.height > 0) {
-                    float projectionScale = isTaaUEnabled() ? 1.0f : 0.66f;
-                    NvidiumTaaJitter.Offset offset = NvidiumTaaJitter.apply(
-                            mutableProjection, frameCounter, target.width, target.height, projectionScale);
-                    taaOffsetX = offset.x();
-                    taaOffsetY = offset.y();
-                } else {
-                    taaOffsetX = 0.0f;
-                    taaOffsetY = 0.0f;
-                    if (!warnedImmutableProjection) {
-                        warnedImmutableProjection = true;
-                        CaustiqClient.LOGGER.warn("TAA is enabled, but Nvidium supplied a non-mutable projection matrix; temporal jitter is disabled.");
-                    }
-                }
+                NvidiumTaaJitter.Offset offset = NvidiumTaaJitter.forFrame(
+                        frameCounter, target.width, target.height);
+                taaOffsetX = offset.x();
+                taaOffsetY = offset.y();
             } else {
                 taaOffsetX = 0.0f;
                 taaOffsetY = 0.0f;
@@ -1308,10 +1297,6 @@ public final class NvidiumIrisUniformBridge {
 
     private static boolean isTaaEnabled() {
         return isEnabledDefine("TAA");
-    }
-
-    private static boolean isTaaUEnabled() {
-        return isEnabledDefine("TAAU");
     }
 
     private static boolean isEnabledDefine(String name) {
