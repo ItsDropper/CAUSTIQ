@@ -167,7 +167,7 @@ public final class CaustiqSettingsScreen extends Screen {
         ShaderPackMetadata metadata = readMetadata(pack);
         if (metadata == null || metadata.options().isEmpty()) {
             addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.no_options"),
-                    button -> { }).bounds(width / 2 - 155, 152, 310, 20).build());
+                    button -> { }).bounds(width / 2 - 155, 176, 310, 20).build());
             return;
         }
         int pages = (metadata.options().size() + PAGE_SIZE - 1) / PAGE_SIZE;
