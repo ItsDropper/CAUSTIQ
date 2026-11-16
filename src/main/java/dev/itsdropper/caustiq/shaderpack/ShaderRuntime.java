@@ -180,6 +180,7 @@ public final class ShaderRuntime {
                 optionDefines.put(option.name(), CaustiqConfig.get().option(
                         selected.id(), option.name(), option.defaultValue()));
             }
+            selectedDefines = Map.copyOf(optionDefines);
             IrisShaderResources loadedResources = IrisShaderResources.load(
                     model.properties(), selectedSources, optionDefines);
             irisShaderResources.close();
