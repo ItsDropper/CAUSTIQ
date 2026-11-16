@@ -431,4 +431,18 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 "#version 400\nvoid main() { gl_Position = vec4(0.0); }", fragment.toString());
         assertTrue(result.compatible(), result.issues().toString());
     }
+
+    @Test
+    void rejectsColortexEightBecauseItHasNoAvailableTerrainTextureUnit() {
+        String vertex = "#version 400\\nvoid main() { gl_Position = vec4(0.0); }";
+        String fragment = """
+                #version 400
+                uniform sampler2D colortex8;
+                layout(location = 0) out vec4 color;
+                void main() { color = texture(colortex8, vec2(0.5)); }
+                """;
+        var result = analyzer.analyze(vertex, fragment);
+        assertTrue(result.issues().stream().anyMatch(issue ->
+                issue.code().equals("UNBOUND_SAMPLER") && issue.symbol().equals("colortex8")));
+    }
 }

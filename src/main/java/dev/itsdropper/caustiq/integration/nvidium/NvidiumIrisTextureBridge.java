@@ -13,7 +13,7 @@ import java.util.Random;
 
 /** Owns the fallback Iris textures used by the translated Photon terrain shader. */
 public final class NvidiumIrisTextureBridge {
-    public static final int MAX_COLORTEX_SAMPLER = 8;
+    public static final int MAX_COLORTEX_SAMPLER = 7;
     private static final int NOISE_SIZE = 512;
     private static int noiseTexture;
     private static int fallbackDepthTexture;
