@@ -37,5 +37,8 @@
   "caustiq.settings.pack_source_archive": "ZIP archive",
   "caustiq.settings.pack_summary": "%s · %s shader source files",
   "caustiq.settings.pack_detail": "%s pipeline entry points · %s declared size",
-  "caustiq.settings.structural_only": "Detected layout only; shader-feature compatibility is not implied."
+  "caustiq.settings.structural_only": "Structural detection only; compatibility is not guaranteed.",
+  "caustiq.settings.pack_options_count": "Discovered settings: %s",
+  "caustiq.settings.pack_options_unavailable": "unavailable",
+  "caustiq.settings.pack_options_loading": "Reading shader-pack settings..."
 }
