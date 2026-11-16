@@ -63,8 +63,9 @@ public final class NvidiumGBufferTargets {
 
     /** Maps fragment output locations to Iris colortex indices for the active terrain program. */
     public static void configureOutputRouting(java.util.List<Integer> targetIndices) {
+        int[] routing = createOutputRouting(targetIndices);
         outputTargets = targetIndices.stream().filter(target -> target > 0).toList();
-        outputRouting = createOutputRouting(targetIndices);
+        outputRouting = routing;
     }
 
     static int[] createOutputRouting(java.util.List<Integer> targetIndices) {
@@ -148,12 +149,13 @@ public final class NvidiumGBufferTargets {
         }
 
         FramebufferState state = new FramebufferState(framebuffer, previousDrawBuffers, previousAttachments);
+        List<Integer> physicalTargets = physicalOutputTargets();
         for (int i = 0; i < ATTACHMENT_COUNT; i++) {
-            int texture = i < outputTargets.size()
-                    ? outputTexture(outputTargets.get(i)) : TEXTURES[i];
+            int logicalTarget = physicalTargets.get(i);
+            int texture = outputTexture(logicalTarget);
             if (texture == 0) {
                 restore(state);
-                warnUnavailable("Iris colortex" + outputTargets.get(i)
+                warnUnavailable("Iris colortex" + logicalTarget
                         + " has no allocated texture for Nvidium MRT output.");
                 return false;
             }
@@ -181,7 +183,7 @@ public final class NvidiumGBufferTargets {
                         + Integer.toHexString(status) + ").");
                 return false;
             }
-            if (clearAttachments) clearAuxiliaryAttachments();
+            if (clearAttachments) clearAuxiliaryAttachments(physicalTargets);
             GL20C.glDrawBuffers(drawBuffers);
             activeState = state;
             warnedUnavailable = false;
@@ -205,6 +207,17 @@ public final class NvidiumGBufferTargets {
             return;
         }
         restore(state);
+    }
+
+    private static List<Integer> physicalOutputTargets() {
+        List<Integer> targets = new java.util.ArrayList<>(outputTargets);
+        for (int candidate = 1; targets.size() < ATTACHMENT_COUNT && candidate <= 15; candidate++) {
+            if (!targets.contains(candidate)) targets.add(candidate);
+        }
+        if (targets.size() != ATTACHMENT_COUNT) {
+            throw new IllegalStateException("Nvidium could not construct seven unique color attachment targets.");
+        }
+        return List.copyOf(targets);
     }
 
     private static int outputTexture(int colortex) {
@@ -323,13 +336,11 @@ public final class NvidiumGBufferTargets {
         }
     }
 
-    private static void clearAuxiliaryAttachments() {
-        Set<Integer> clearedTargets = new HashSet<>();
+    private static void clearAuxiliaryAttachments(List<Integer> physicalTargets) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             for (int i = 0; i < ATTACHMENT_COUNT; i++) {
                 int physicalAttachment = i + 1;
-                int logicalTarget = i < outputTargets.size() ? outputTargets.get(i) : physicalAttachment;
-                if (!clearedTargets.add(logicalTarget)) continue;
+                int logicalTarget = physicalTargets.get(i);
                 IrisTerrainPassScheduler.RenderTarget spec = targetSpecs.get(logicalTarget);
                 if (spec != null && (!spec.clear()
                         || (spec.persistent() && PERSISTENT_INITIALIZED.contains(logicalTarget)))) continue;
