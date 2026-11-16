@@ -1056,7 +1056,7 @@ public final class IrisNvidiumTerrainTranslator {
             case "cameraPosition", "previousCameraPosition", "fogColor", "light_dir", "sun_dir", "eyePosition" -> "vec3";
             case "heavyFog", "isElytraFlying" -> "bool";
             case "isEyeInWater", "moonPhase", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2" -> "int";
-            case "frameTimeCounter", "sunAngle", "viewWidth", "viewHeight", "near", "far", "rainStrength",
+            case "frameTimeCounter", "sunAngle", "blindness", "viewWidth", "viewHeight", "near", "far", "rainStrength",
                     "wetness", "world_age", "day_factor", "aspectRatio", "time_sunrise", "time_noon", "time_sunset",
                     "time_midnight", "biome_pale_garden", "biome_cave", "biome_arid",
                     "biome_snowy", "biome_taiga", "biome_jungle", "biome_swamp",
