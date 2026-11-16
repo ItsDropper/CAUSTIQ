@@ -13,8 +13,8 @@ import java.util.TreeMap;
 
 /** Persistent, bounded local settings for Caustiq. */
 public final class CaustiqConfig {
-    public static final int MIN_COMPILE_BUDGET = 1;
-    public static final int MAX_COMPILE_BUDGET = 8;
+    public static final int MIN_COMPILE_BUDGET = CompileBudget.MIN;
+    public static final int MAX_COMPILE_BUDGET = CompileBudget.MAX;
     private static final Path FILE = net.fabricmc.loader.api.FabricLoader.getInstance()
             .getConfigDir().resolve("caustiq.properties");
     private static final CaustiqConfig INSTANCE = load();

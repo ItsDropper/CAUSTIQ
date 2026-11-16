@@ -2,6 +2,7 @@ package dev.itsdropper.caustiq.gui;
 
 import dev.itsdropper.caustiq.CaustiqClient;
 import dev.itsdropper.caustiq.CaustiqConfig;
+import dev.itsdropper.caustiq.CompileBudget;
 import dev.itsdropper.caustiq.diagnostics.CaustiqDiagnostics;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackDescriptor;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackMetadata;
@@ -60,16 +61,21 @@ public final class CaustiqSettingsScreen extends Screen {
         addRenderableWidget(nextPack);
 
         ShaderPackRefreshStatus refreshStatus = CaustiqClient.refreshStatus();
-        Button refreshButton = Button.builder(refreshButtonLabel(refreshStatus),
+        Button refreshButton = Button.builder(Component.translatable("caustiq.settings.refresh_short"),
                 button -> CaustiqClient.refreshShaderPacks())
-                .bounds(width / 2 - 155, 68, 150, 20).build();
+                .bounds(width / 2 - 155, 68, 100, 20).build();
         refreshButton.active = !refreshStatus.isScanning();
         addRenderableWidget(refreshButton);
-        addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.copy_diagnostics"),
+        addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.copy_diagnostics_short"),
                 button -> {
                     Minecraft.getInstance().keyboardHandler.setClipboard(CaustiqDiagnostics.createReport());
                     button.setMessage(Component.translatable("caustiq.settings.diagnostics_copied"));
-                }).bounds(width / 2 + 5, 68, 150, 20).build());
+                }).bounds(width / 2 - 50, 68, 100, 20).build());
+        addRenderableWidget(Button.builder(compileBudgetLabel(config.compileBudget()), button -> {
+            int nextBudget = CompileBudget.next(config.compileBudget());
+            config.setCompileBudget(nextBudget);
+            button.setMessage(compileBudgetLabel(nextBudget));
+        }).bounds(width / 2 + 55, 68, 100, 20).build());
 
         if (selected != null) addOptionButtons(selected, config);
         else addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.no_selection"),
@@ -125,12 +131,8 @@ public final class CaustiqSettingsScreen extends Screen {
         }
     }
 
-    private static Component refreshButtonLabel(ShaderPackRefreshStatus status) {
-        return switch (status.state()) {
-            case SCANNING -> Component.translatable("caustiq.settings.scanning");
-            case FAILED -> Component.translatable("caustiq.settings.retry_scan");
-            case IDLE, COMPLETE -> Component.translatable("caustiq.settings.refresh");
-        };
+    private static Component compileBudgetLabel(int budget) {
+        return Component.translatable("caustiq.settings.compile_budget_short", budget);
     }
 
     private static Component refreshStatusMessage(ShaderPackRefreshStatus status) {
