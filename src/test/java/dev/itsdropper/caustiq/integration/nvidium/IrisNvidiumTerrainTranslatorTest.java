@@ -237,6 +237,30 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesPhotonNightVisionDarknessAndEyeAltitudeToBoundRuntimeUniforms() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform float nightVision;
+                uniform float darknessFactor;
+                uniform float eyeAltitude;
+                void main() {
+                    gl_FragColor = vec4(nightVision, darknessFactor, eyeAltitude, 1.0);
+                }
+                """);
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform float caustiqNightVision;"));
+        assertTrue(fragment.contains("uniform float caustiqDarknessFactor;"));
+        assertTrue(fragment.contains("uniform float caustiqEyeAltitude;"));
+        assertTrue(fragment.contains("vec4(caustiqNightVision, caustiqDarknessFactor, caustiqEyeAltitude, 1.0)"));
+        assertEquals("caustiqNightVision", IrisNvidiumTerrainTranslator.uniformAliases().get("nightVision"));
+        assertEquals("caustiqDarknessFactor", IrisNvidiumTerrainTranslator.uniformAliases().get("darknessFactor"));
+        assertEquals("caustiqEyeAltitude", IrisNvidiumTerrainTranslator.uniformAliases().get("eyeAltitude"));
+    }
+
+    @Test
     void translatesPreviousCameraPositionToTheBoundRuntimeVector() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150
