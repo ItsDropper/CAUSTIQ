@@ -77,6 +77,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("darknessFactor", "caustiqDarknessFactor"),
             Map.entry("eyeAltitude", "caustiqEyeAltitude"),
             Map.entry("eye_skylight", "caustiqEyeSkylight"),
+            Map.entry("relativeEyePosition", "caustiqRelativeEyePosition"),
             Map.entry("frameCounter", "caustiqFrameCounter"),
             Map.entry("viewSize", "(screenSize * 2.0)"),
             Map.entry("pixelSize", "(1.0 / (screenSize * 2.0))"),
@@ -982,6 +983,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform float caustiqDarknessFactor;
                 uniform float caustiqEyeAltitude;
                 uniform float caustiqEyeSkylight;
+                uniform vec3 caustiqRelativeEyePosition;
                 uniform int caustiqFrameCounter;
                 #endif
                 layout(binding = 2) uniform sampler2D caustiqNoiseTexture;
@@ -1061,7 +1063,7 @@ public final class IrisNvidiumTerrainTranslator {
                     "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse",
                     "dhProjection", "dhProjectionInverse", "dhPreviousProjection", "dhModelView",
                     "dhModelViewInverse", "vxProj", "vxProjInv", "vxProjPrev" -> "mat4";
-            case "cameraPosition", "previousCameraPosition", "fogColor", "light_dir", "sun_dir", "eyePosition" -> "vec3";
+            case "cameraPosition", "previousCameraPosition", "relativeEyePosition", "fogColor", "light_dir", "sun_dir", "eyePosition" -> "vec3";
             case "heavyFog", "isElytraFlying" -> "bool";
             case "isEyeInWater", "moonPhase", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2" -> "int";
             case "frameTimeCounter", "sunAngle", "blindness", "nightVision", "darknessFactor", "eyeAltitude", "eye_skylight", "viewWidth", "viewHeight", "near", "far", "rainStrength",

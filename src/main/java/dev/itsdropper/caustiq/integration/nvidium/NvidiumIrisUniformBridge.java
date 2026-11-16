@@ -167,6 +167,11 @@ public final class NvidiumIrisUniformBridge {
         scalar(program, "caustiqDarknessFactor", (float) darknessFactor(cameraEntity));
         scalar(program, "caustiqEyeAltitude", (float) invokeDouble(cameraEntity, "getEyeY", snapshot.cameraY()));
         scalar(program, "caustiqEyeSkylight", eyeBrightness(level, cameraEntity, true) / 240.0f);
+        Object player = client.player;
+        vector3(program, "caustiqRelativeEyePosition",
+                (float) (invokeDouble(player, "getX", snapshot.cameraX()) - snapshot.cameraX()),
+                (float) (invokeDouble(player, "getEyeY", snapshot.cameraY()) - snapshot.cameraY()),
+                (float) (invokeDouble(player, "getZ", snapshot.cameraZ()) - snapshot.cameraZ()));
         int[] atlasSize = blockAtlasSize();
         integer2(program, "caustiqAtlasSize", atlasSize[0], atlasSize[1]);
         scalar(program, "caustiqRainStrength", rain);

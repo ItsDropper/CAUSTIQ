@@ -264,6 +264,23 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesRelativeEyePositionToItsCameraRelativeRuntimeVector() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform vec3 relativeEyePosition;
+                void main() { gl_FragColor = vec4(relativeEyePosition, 1.0); }
+                """);
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform vec3 caustiqRelativeEyePosition;"));
+        assertTrue(fragment.contains("vec4(caustiqRelativeEyePosition, 1.0)"));
+        assertEquals("caustiqRelativeEyePosition",
+                IrisNvidiumTerrainTranslator.uniformAliases().get("relativeEyePosition"));
+    }
+
+    @Test
     void translatesPreviousCameraPositionToTheBoundRuntimeVector() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150
