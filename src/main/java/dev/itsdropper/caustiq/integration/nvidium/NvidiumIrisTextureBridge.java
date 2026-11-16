@@ -13,6 +13,7 @@ import java.util.Random;
 
 /** Owns the fallback Iris textures used by the translated Photon terrain shader. */
 public final class NvidiumIrisTextureBridge {
+    public static final int MAX_COLORTEX_SAMPLER = 8;
     private static final int NOISE_SIZE = 512;
     private static int noiseTexture;
     private static int fallbackDepthTexture;
@@ -96,7 +97,7 @@ public final class NvidiumIrisTextureBridge {
         java.util.ArrayList<Integer> previousBindings = new java.util.ArrayList<>();
         java.util.ArrayList<Integer> previousSamplers = new java.util.ArrayList<>();
         try {
-            for (int attachment = 1; attachment <= 8; attachment++) {
+            for (int attachment = 1; attachment <= MAX_COLORTEX_SAMPLER; attachment++) {
                 int location = GL20C.glGetUniformLocation(program, "caustiqColortex" + attachment);
                 if (location < 0) continue;
                 if (unit >= Math.min(maximum, 12)) {

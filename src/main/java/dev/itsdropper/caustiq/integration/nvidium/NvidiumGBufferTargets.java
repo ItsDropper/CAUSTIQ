@@ -96,6 +96,39 @@ public final class NvidiumGBufferTargets {
         return routing;
     }
 
+    /**
+     * Generates mip chains after the terrain draw has completed but before
+     * the attachments are detached and sampled by later Iris passes.
+     */
+    public static void completeTerrainDraw() {
+        if (activeState == null) return;
+        int previousActiveTexture = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
+        GL13C.glActiveTexture(GL13C.GL_TEXTURE0);
+        int previousTexture = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
+        try {
+            for (int logicalTarget : mipmapTargets(outputTargets, targetSpecs)) {
+                int texture = outputTexture(logicalTarget);
+                if (texture == 0) continue;
+                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
+                GL30C.glGenerateMipmap(GL11C.GL_TEXTURE_2D);
+            }
+        } finally {
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
+            GL13C.glActiveTexture(previousActiveTexture);
+        }
+    }
+
+    static List<Integer> mipmapTargets(
+            List<Integer> outputTargets,
+            Map<Integer, IrisTerrainPassScheduler.RenderTarget> specs) {
+        return outputTargets.stream().distinct()
+                .filter(target -> {
+                    IrisTerrainPassScheduler.RenderTarget spec = specs.get(target);
+                    return spec != null && spec.mipmap();
+                })
+                .toList();
+    }
+
     /** Restores Nvidium's native location-to-attachment mapping. */
     public static void resetOutputRouting() {
         outputTargets = List.of(1, 2, 3, 4, 5, 6, 7);

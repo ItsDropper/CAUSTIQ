@@ -1,6 +1,7 @@
 package dev.itsdropper.caustiq.shaderpack;
 
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTerrainAbi;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTextureBridge;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -71,7 +72,7 @@ public final class IrisTerrainCompatibilityAnalyzer {
             "blockEntityId", "entityId", "currentRenderedItemId", "entityColor", "view_res", "view_pixel_size");
     private static final Set<String> AVAILABLE_SAMPLERS = Set.of(
             "gtexture", "lightmap", "tex_diffuse", "tex_light", "noisetex",
-            "colortex1", "colortex2", "colortex4", "shadowtex0", "shadowtex1", "shadowcolor0", "shadowcolor1");
+            "shadowtex0", "shadowtex1", "shadowcolor0", "shadowcolor1");
 
 
     public Result analyze(String vertexSource, String fragmentSource) {
@@ -173,13 +174,26 @@ public final class IrisTerrainCompatibilityAnalyzer {
                 return new Result(deduplicate(issues));
     }
 
+    private static boolean isAvailableSampler(String sampler) {
+        if (AVAILABLE_SAMPLERS.contains(sampler)) return true;
+        if (!sampler.startsWith("colortex")) return false;
+        String indexText = sampler.substring("colortex".length());
+        if (!indexText.matches("\\d+")) return false;
+        try {
+            int index = Integer.parseInt(indexText);
+            return index >= 1 && index <= NvidiumIrisTextureBridge.MAX_COLORTEX_SAMPLER;
+        } catch (NumberFormatException ignored) {
+            return false;
+        }
+    }
+
     private static void auditSamplers(String source, String stage, List<Issue> issues) {
         String usageSource = SAMPLER.matcher(source).replaceAll("");
         Matcher samplers = SAMPLER.matcher(source);
         while (samplers.find()) {
             String sampler = samplers.group(2);
             if (!isReferenced(usageSource, sampler)) continue;
-            if (!AVAILABLE_SAMPLERS.contains(sampler)) {
+            if (!isAvailableSampler(sampler)) {
                 issues.add(new Issue("UNBOUND_SAMPLER", sampler,
                         "The sampler has no binding in Nvidium's current terrain stage ABI."));
             }

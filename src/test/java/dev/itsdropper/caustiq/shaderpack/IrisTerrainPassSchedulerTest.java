@@ -301,4 +301,13 @@ class IrisTerrainPassSchedulerTest {
                 temporaryDirectory.resolve(name), "", ShaderPackSourceType.DIRECTORY,
                 ShaderPackLayout.OPTIFINE_STYLE, fileCount, fileCount, 0);
     }
+
+    @Test
+    void sharesLegacyDrawBuffersParsingWithTheNvidiumTerrainTranslator() {
+        assertEquals(java.util.List.of(3, 5),
+                IrisTerrainPassScheduler.parseOutputTargetMapping("/* DRAWBUFFERS: 35 */"));
+        assertEquals(java.util.List.of(1, 4),
+                IrisTerrainPassScheduler.parseOutputTargetMapping(
+                        "/* DRAWBUFFERS: 35 */\\n/* RENDERTARGETS: 1,4 */"));
+    }
 }

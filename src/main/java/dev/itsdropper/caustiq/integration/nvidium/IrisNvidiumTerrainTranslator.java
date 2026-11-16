@@ -2,6 +2,7 @@ package dev.itsdropper.caustiq.integration.nvidium;
 
 import dev.itsdropper.caustiq.shaderpack.IrisGlslConditionalPreprocessor;
 import dev.itsdropper.caustiq.shaderpack.IrisShaderPackModel;
+import dev.itsdropper.caustiq.shaderpack.IrisTerrainPassScheduler;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackProgramCatalog;
 
 import java.util.ArrayList;
@@ -39,8 +40,6 @@ public final class IrisNvidiumTerrainTranslator {
     private static final Pattern MAIN = Pattern.compile("\\bvoid\\s+main\\s*\\(\\s*\\)");
     private static final Pattern TEXTURE_FUNCTION = Pattern.compile("\\b(texture2DProj|texture2DLod|texture2DGradARB|texture2D|textureCube)\\b");
     private static final Pattern FRAG_DATA_INDEX = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]");
-    private static final Pattern RENDERTARGETS = Pattern.compile(
-            "(?s)/\\*\\s*RENDERTARGETS\\s*:\\s*([0-9,\\s]+)\\s*\\*/");
     private static final Set<String> UNSUPPORTED_RUNTIME_UNIFORMS = Set.of(
             "normals", "specular", "colortex15",
             "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans");
@@ -501,26 +500,21 @@ public final class IrisNvidiumTerrainTranslator {
     }
 
     private List<Integer> parseRenderTargetIndices(String source) {
-        Matcher matcher = RENDERTARGETS.matcher(source);
-        String activeDirective = null;
-        while (matcher.find()) activeDirective = matcher.group(1);
-        if (activeDirective == null) return List.of(1);
-        List<Integer> targets = new ArrayList<>();
-        for (String token : activeDirective.split("[,\\s]+")) {
-            if (token.isBlank()) continue;
-            int target = Integer.parseInt(token);
-            boolean shadowProgram = programName.equalsIgnoreCase("shadow")
-                    || programName.toLowerCase(java.util.Locale.ROOT).startsWith("shadow_");
+        List<Integer> parsed = IrisTerrainPassScheduler.parseOutputTargetMapping(source);
+        if (parsed == null) return List.of(1);
+        List<Integer> targets = new ArrayList<>(parsed);
+        boolean shadowProgram = programName.equalsIgnoreCase("shadow")
+                || programName.toLowerCase(java.util.Locale.ROOT).startsWith("shadow_");
+        for (int index = 0; index < targets.size(); index++) {
+            int target = targets.get(index);
             if (target < (shadowProgram ? 0 : 1) || target > (shadowProgram ? 6 : 15)) {
                 throw new IllegalArgumentException("Nvidium reserves colortex0 for native forward color and supports up to seven terrain MRT outputs; Iris colortex indices must be "
                         + (shadowProgram ? "0 through 6" : "1 through 15") + "; got colortex" + target + ".");
             }
-            if (targets.contains(target)) {
-                throw new IllegalArgumentException("Iris RENDERTARGETS contains duplicate colortex" + target + ".");
+            if (targets.indexOf(target) != index) {
+                throw new IllegalArgumentException("Iris fragment-output mapping contains duplicate colortex" + target + ".");
             }
-            targets.add(target);
         }
-        if (targets.isEmpty()) throw new IllegalArgumentException("Iris RENDERTARGETS directive is empty.");
         return List.copyOf(targets);
     }
 

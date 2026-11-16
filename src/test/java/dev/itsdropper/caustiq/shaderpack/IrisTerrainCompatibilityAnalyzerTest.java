@@ -414,4 +414,20 @@ class IrisTerrainCompatibilityAnalyzerTest {
                 i.code().equals("UNSUPPORTED_FRAGMENT_OUTPUT_ARRAY") && i.symbol().equals("color")));
     }
 
+
+    @Test
+    void acceptsEveryColortexSamplerActuallyBoundByTheNvidiumTerrainBridge() {
+        StringBuilder fragment = new StringBuilder("#version 400\\n");
+        StringBuilder expression = new StringBuilder();
+        for (int index = 1; index <= NvidiumIrisTextureBridge.MAX_COLORTEX_SAMPLER; index++) {
+            fragment.append("uniform sampler2D colortex").append(index).append(";\\n");
+            if (index > 1) expression.append(" + ");
+            expression.append("texture(colortex").append(index).append(", vec2(0.5))");
+        }
+        fragment.append("layout(location = 0) out vec4 color;\\n")
+                .append("void main() { color = ").append(expression).append("; }");
+        var result = analyzer.analyze(
+                "#version 400\\nvoid main() { gl_Position = vec4(0.0); }", fragment.toString());
+        assertTrue(result.compatible(), result.issues().toString());
+    }
 }

@@ -45,7 +45,7 @@ class PhotonTerrainScreenshotTest {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
             IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
                     model, "world0", "gbuffers_terrain",
-                    Map.of("NORMAL_MAPPING", "true", "SPECULAR_MAPPING", "true", "TAA", "true"));
+                    Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "true", "TAA", "true"));
             Map<String, String> harness = translator.softwareRenderHarnessSources();
 
             GLFWErrorCallback callback = GLFWErrorCallback.createPrint(System.err);

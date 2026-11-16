@@ -42,6 +42,7 @@ public abstract class NvidiumTerrainRasterizerMixin {
             NvidiumIrisTextureBridge.restoreBindings();
             return;
         }
+        NvidiumGBufferTargets.completeTerrainDraw();
         NvidiumGBufferTargets.end();
         NvidiumIrisTextureBridge.restoreBindings();
     }

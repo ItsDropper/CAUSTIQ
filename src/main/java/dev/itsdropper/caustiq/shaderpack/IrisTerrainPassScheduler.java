@@ -200,7 +200,7 @@ public final class IrisTerrainPassScheduler {
         return assignment.matcher(source).find();
     }
 
-    private static List<Integer> parseOutputTargetMapping(String source) {
+    public static List<Integer> parseOutputTargetMapping(String source) {
         Matcher renderTargets = RENDERTARGETS.matcher(source);
         Matcher drawBuffers = DRAWBUFFERS.matcher(source);
         String renderTargetDirective = null;
