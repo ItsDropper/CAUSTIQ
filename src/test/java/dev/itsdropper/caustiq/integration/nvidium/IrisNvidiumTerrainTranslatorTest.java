@@ -173,6 +173,36 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesPreviousFrameMatrixUniformsToBoundRuntimeMatrices() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform mat4 gbufferPreviousModelView;
+                uniform mat4 gbufferPreviousModelViewInverse;
+                uniform mat4 gbufferPreviousProjection;
+                uniform mat4 gbufferPreviousProjectionInverse;
+                void main() {
+                    gl_FragColor = gbufferPreviousModelView * gbufferPreviousModelViewInverse
+                            * gbufferPreviousProjection * gbufferPreviousProjectionInverse * vec4(1.0);
+                }
+                """);
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        for (String name : List.of("caustiqPreviousModelView", "caustiqPreviousModelViewInverse",
+                "caustiqPreviousProjection", "caustiqPreviousProjectionInverse")) {
+            assertTrue(fragment.contains("uniform mat4 " + name + ";"),
+                    "Missing runtime declaration for " + name);
+            assertTrue(fragment.contains(name), "Previous-frame matrix was not translated: " + name);
+        }
+        Map<String, String> aliases = IrisNvidiumTerrainTranslator.uniformAliases();
+        assertEquals("caustiqPreviousModelView", aliases.get("gbufferPreviousModelView"));
+        assertEquals("caustiqPreviousModelViewInverse", aliases.get("gbufferPreviousModelViewInverse"));
+        assertEquals("caustiqPreviousProjection", aliases.get("gbufferPreviousProjection"));
+        assertEquals("caustiqPreviousProjectionInverse", aliases.get("gbufferPreviousProjectionInverse"));
+    }
+
+    @Test
     void translatesPhotonWaterAndAllTerrainShadowVariantsForEveryDimension() throws Exception {
         String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
         Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),

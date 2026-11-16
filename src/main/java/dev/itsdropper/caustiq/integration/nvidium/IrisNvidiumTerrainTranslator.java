@@ -961,6 +961,10 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform mat4 caustiqModelView;
                 uniform mat4 caustiqProjectionInverse;
                 uniform mat4 caustiqModelViewInverse;
+                uniform mat4 caustiqPreviousProjection;
+                uniform mat4 caustiqPreviousProjectionInverse;
+                uniform mat4 caustiqPreviousModelView;
+                uniform mat4 caustiqPreviousModelViewInverse;
                 uniform mat3 caustiqNormalMatrix;
                 uniform vec3 caustiqCameraPosition;
                 uniform float caustiqFrameTimeCounter;
@@ -1039,6 +1043,8 @@ public final class IrisNvidiumTerrainTranslator {
                     "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans" -> "sampler2D";
             case "shadowtex1" -> "sampler2DShadow";
             case "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
+                    "gbufferPreviousModelView", "gbufferPreviousModelViewInverse",
+                    "gbufferPreviousProjection", "gbufferPreviousProjectionInverse",
                     "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse",
                     "dhProjection", "dhProjectionInverse", "dhPreviousProjection", "dhModelView",
                     "dhModelViewInverse", "vxProj", "vxProjInv", "vxProjPrev" -> "mat4";
