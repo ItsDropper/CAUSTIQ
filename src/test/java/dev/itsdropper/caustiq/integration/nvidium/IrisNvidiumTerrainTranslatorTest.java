@@ -246,15 +246,18 @@ class IrisNvidiumTerrainTranslatorTest {
                 uniform float nightVision;
                 uniform float darknessFactor;
                 uniform float eyeAltitude;
+                uniform float eye_skylight;
                 void main() {
-                    gl_FragColor = vec4(nightVision, darknessFactor, eyeAltitude, 1.0);
+                    gl_FragColor = vec4(nightVision, darknessFactor, eyeAltitude + eye_skylight, 1.0);
                 }
                 """);
         String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
         assertTrue(fragment.contains("uniform float caustiqNightVision;"));
         assertTrue(fragment.contains("uniform float caustiqDarknessFactor;"));
         assertTrue(fragment.contains("uniform float caustiqEyeAltitude;"));
-        assertTrue(fragment.contains("vec4(caustiqNightVision, caustiqDarknessFactor, caustiqEyeAltitude, 1.0)"));
+        assertTrue(fragment.contains("uniform float caustiqEyeSkylight;"));
+        assertTrue(fragment.contains("caustiqEyeAltitude + caustiqEyeSkylight"));
+        assertEquals("caustiqEyeSkylight", IrisNvidiumTerrainTranslator.uniformAliases().get("eye_skylight"));
         assertEquals("caustiqNightVision", IrisNvidiumTerrainTranslator.uniformAliases().get("nightVision"));
         assertEquals("caustiqDarknessFactor", IrisNvidiumTerrainTranslator.uniformAliases().get("darknessFactor"));
         assertEquals("caustiqEyeAltitude", IrisNvidiumTerrainTranslator.uniformAliases().get("eyeAltitude"));

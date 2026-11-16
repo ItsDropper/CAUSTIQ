@@ -166,6 +166,7 @@ public final class NvidiumIrisUniformBridge {
         scalar(program, "caustiqNightVision", (float) nightVisionFactor(client, cameraEntity));
         scalar(program, "caustiqDarknessFactor", (float) darknessFactor(cameraEntity));
         scalar(program, "caustiqEyeAltitude", (float) invokeDouble(cameraEntity, "getEyeY", snapshot.cameraY()));
+        scalar(program, "caustiqEyeSkylight", eyeBrightness(level, cameraEntity, true) / 240.0f);
         int[] atlasSize = blockAtlasSize();
         integer2(program, "caustiqAtlasSize", atlasSize[0], atlasSize[1]);
         scalar(program, "caustiqRainStrength", rain);

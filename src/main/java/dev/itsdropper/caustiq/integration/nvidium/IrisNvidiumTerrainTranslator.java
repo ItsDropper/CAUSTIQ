@@ -76,6 +76,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("nightVision", "caustiqNightVision"),
             Map.entry("darknessFactor", "caustiqDarknessFactor"),
             Map.entry("eyeAltitude", "caustiqEyeAltitude"),
+            Map.entry("eye_skylight", "caustiqEyeSkylight"),
             Map.entry("frameCounter", "caustiqFrameCounter"),
             Map.entry("viewSize", "(screenSize * 2.0)"),
             Map.entry("pixelSize", "(1.0 / (screenSize * 2.0))"),
@@ -980,6 +981,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform float caustiqNightVision;
                 uniform float caustiqDarknessFactor;
                 uniform float caustiqEyeAltitude;
+                uniform float caustiqEyeSkylight;
                 uniform int caustiqFrameCounter;
                 #endif
                 layout(binding = 2) uniform sampler2D caustiqNoiseTexture;
@@ -1062,7 +1064,7 @@ public final class IrisNvidiumTerrainTranslator {
             case "cameraPosition", "previousCameraPosition", "fogColor", "light_dir", "sun_dir", "eyePosition" -> "vec3";
             case "heavyFog", "isElytraFlying" -> "bool";
             case "isEyeInWater", "moonPhase", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2" -> "int";
-            case "frameTimeCounter", "sunAngle", "blindness", "nightVision", "darknessFactor", "eyeAltitude", "viewWidth", "viewHeight", "near", "far", "rainStrength",
+            case "frameTimeCounter", "sunAngle", "blindness", "nightVision", "darknessFactor", "eyeAltitude", "eye_skylight", "viewWidth", "viewHeight", "near", "far", "rainStrength",
                     "wetness", "world_age", "day_factor", "aspectRatio", "time_sunrise", "time_noon", "time_sunset",
                     "time_midnight", "biome_pale_garden", "biome_cave", "biome_arid",
                     "biome_snowy", "biome_taiga", "biome_jungle", "biome_swamp",
