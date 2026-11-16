@@ -174,6 +174,7 @@ public final class ShaderRuntime {
 
         try (ShaderPackSources selectedSources = ShaderPackSources.open(selected)) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(selectedSources);
+            warnUnsupportedShadowGeometry(model, selected.displayName());
             Map<String, String> optionDefines = new LinkedHashMap<>();
             for (ShaderPackMetadata.Option option : model.options().options()) {
                 optionDefines.put(option.name(), CaustiqConfig.get().option(
@@ -265,6 +266,22 @@ public final class ShaderRuntime {
             CaustiqClient.LOGGER.warn(
                     "Selected shader pack '{}' cannot be installed into Nvidium's terrain compiler; preserving Nvidium's Iris safety gate: {}",
                     selected.displayName(), exception.getMessage());
+        }
+    }
+
+
+    private static void warnUnsupportedShadowGeometry(IrisShaderPackModel model, String packName) {
+        Set<String> programs = new LinkedHashSet<>(model.base().programs().keySet());
+        model.dimensionOverrides().values().forEach(programSet ->
+                programs.addAll(programSet.programs().keySet()));
+        List<String> unsupported = programs.stream()
+                .filter(name -> name.equals("shadow_entities") || name.equals("shadow_block"))
+                .sorted()
+                .toList();
+        if (!unsupported.isEmpty()) {
+            CaustiqClient.LOGGER.warn(
+                    "Shader pack '{}' declares {}. CAUSTIQ's Nvidium shadow renderer currently renders terrain only; entity and block-entity geometry will not cast shader shadows.",
+                    packName, unsupported);
         }
     }
 

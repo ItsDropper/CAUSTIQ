@@ -28,6 +28,7 @@ public abstract class NvidiumWorldRendererMixin {
     @Inject(method = "delete", at = @At("TAIL"), remap = false, require = 1)
     private void caustiq$releaseShaderTextures(CallbackInfo callbackInfo) {
         NvidiumIrisTextureBridge.destroy();
+        NvidiumIrisUniformBridge.destroy();
         NvidiumShadowRenderer.destroy(this);
     }
 
@@ -68,6 +69,7 @@ public abstract class NvidiumWorldRendererMixin {
             @Coerce Object pass, @Coerce Object viewport, @Coerce Object fogParameters,
             @Coerce Object matrices, double x, double y, double z,
             @Coerce Object terrainSampler, CallbackInfo callbackInfo) {
+        NvidiumIrisUniformBridge.captureCenterDepth();
         NvidiumShadowRenderer.render(this, pass, fogParameters, x, y, z, terrainSampler);
     }
 

@@ -6,7 +6,11 @@ import org.joml.Matrix3f;
 import org.joml.Matrix3fc;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.lwjgl.opengl.GL11C;
+import org.lwjgl.opengl.GL15C;
 import org.lwjgl.opengl.GL20C;
+import org.lwjgl.opengl.GL21C;
+import org.lwjgl.opengl.GL32C;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.component.DataComponents;
@@ -34,6 +38,19 @@ public final class NvidiumIrisUniformBridge {
     private static volatile long worldStartNanos;
     private static volatile long lastCaptureNanos;
     private static volatile boolean warnedUploadFailure;
+    private static volatile boolean warnedImmutableProjection;
+    private static volatile float taaOffsetX;
+    private static volatile float taaOffsetY;
+    private static volatile float centerDepthSmooth = 1.0f;
+    private static volatile boolean centerDepthCaptureDisabled;
+    private static volatile boolean warnedCenterDepthFailure;
+    private static final int[] CENTER_DEPTH_PBOS = new int[2];
+    private static final long[] CENTER_DEPTH_FENCES = new long[2];
+    private static final long[] CENTER_DEPTH_SEQUENCES = new long[2];
+    private static long centerDepthSequence;
+    private static int centerDepthWriteIndex;
+    private static int wetnessFrame = Integer.MIN_VALUE;
+    private static float wetnessForCurrentFrame;
 
     private NvidiumIrisUniformBridge() { }
 
@@ -43,6 +60,27 @@ public final class NvidiumIrisUniformBridge {
         try {
             Matrix4fc projection = (Matrix4fc) invoke(chunkRenderMatrices, "projection");
             Matrix4fc modelView = (Matrix4fc) invoke(chunkRenderMatrices, "modelView");
+            int frameCounter = FRAME_COUNTER.incrementAndGet();
+            if (isTaaEnabled()) {
+                var target = Minecraft.getInstance().getMainRenderTarget();
+                if (projection instanceof Matrix4f mutableProjection && target.width > 0 && target.height > 0) {
+                    float projectionScale = isTaaUEnabled() ? 1.0f : 0.66f;
+                    NvidiumTaaJitter.Offset offset = NvidiumTaaJitter.apply(
+                            mutableProjection, frameCounter, target.width, target.height, projectionScale);
+                    taaOffsetX = offset.x();
+                    taaOffsetY = offset.y();
+                } else {
+                    taaOffsetX = 0.0f;
+                    taaOffsetY = 0.0f;
+                    if (!warnedImmutableProjection) {
+                        warnedImmutableProjection = true;
+                        CaustiqClient.LOGGER.warn("TAA is enabled, but Nvidium supplied a non-mutable projection matrix; temporal jitter is disabled.");
+                    }
+                }
+            } else {
+                taaOffsetX = 0.0f;
+                taaOffsetY = 0.0f;
+            }
             Matrix4f projectionInverse = new Matrix4f(projection).invert();
             Matrix4f modelViewInverse = new Matrix4f(modelView).invert();
             Matrix3f normalMatrix = new Matrix3f(modelView).invert().transpose();
@@ -63,7 +101,7 @@ public final class NvidiumIrisUniformBridge {
                     (float) cameraZ,
                     frameTime,
                     (now - worldStartNanos) / 1_000_000_000.0f,
-                    FRAME_COUNTER.incrementAndGet());
+                    frameCounter);
             Snapshot previous = CURRENT.getAndSet(next);
             PREVIOUS.set(previous == null ? next : previous);
         } catch (ReflectiveOperationException | ClassCastException exception) {
@@ -101,6 +139,8 @@ public final class NvidiumIrisUniformBridge {
             }
             vector3(program, "caustiqCameraPosition",
                     snapshot.cameraX(), snapshot.cameraY(), snapshot.cameraZ());
+            int frameTimeLocation = GL20C.glGetUniformLocation(program, "caustiqFrameTime");
+            if (frameTimeLocation >= 0) GL20C.glUniform1f(frameTimeLocation, snapshot.frameTime());
             int timeLocation = GL20C.glGetUniformLocation(program, "caustiqFrameTimeCounter");
             if (timeLocation >= 0) GL20C.glUniform1f(timeLocation, snapshot.frameTimeCounter());
             int frameLocation = GL20C.glGetUniformLocation(program, "caustiqFrameCounter");
@@ -138,8 +178,8 @@ public final class NvidiumIrisUniformBridge {
         float near = projectionDistance(snapshot.projection(), false);
         float far = projectionDistance(snapshot.projection(), true);
         Object level = Minecraft.getInstance().level;
-        float rain = invokeFloat(level, "getRainLevel", 1.0f, 0.0f);
-        float wetness = rain;
+        float rain = clamp01(invokeFloat(level, "getRainLevel", 1.0f, 0.0f));
+        float wetness = wetnessForFrame(rain, snapshot.frameCounter());
         float worldAge = invokeLong(level, "getGameTime", 0L);
         int worldTime = (int) Math.floorMod(invokeLong(level, "getDayTime", 0L), 24_000L);
         float dayProgress = worldTime / 24_000.0f;
@@ -153,9 +193,8 @@ public final class NvidiumIrisUniformBridge {
                 snapshot.modelView(), sunDegrees, sunPathRotation);
         org.joml.Vector3f lightDirection = celestialDirection(
                 snapshot.modelView(), isDay ? sunDegrees : moonDegrees, sunPathRotation);
-        var window = Minecraft.getInstance().getWindow();
-        float aspectRatio = window.getHeight() > 0
-                ? (float) window.getWidth() / (float) window.getHeight() : 1.0f;
+        int[] viewport = currentViewportSize();
+        float aspectRatio = viewport[1] > 0 ? (float) viewport[0] / (float) viewport[1] : 1.0f;
 
         scalar(program, "caustiqNear", near);
         scalar(program, "caustiqFar", far);
@@ -176,7 +215,8 @@ public final class NvidiumIrisUniformBridge {
         integer2(program, "caustiqAtlasSize", atlasSize[0], atlasSize[1]);
         scalar(program, "caustiqRainStrength", rain);
         scalar(program, "caustiqWetness", wetness);
-        vector2(program, "caustiqTaaOffset", 0.0f, 0.0f);
+        scalar(program, "caustiqFrameTime", snapshot.frameTime());
+        vector2(program, "caustiqTaaOffset", taaOffsetX, taaOffsetY);
         vector3(program, "caustiqLightDirection",
                 lightDirection.x, lightDirection.y, lightDirection.z);
         vector3(program, "caustiqSunDirection",
@@ -648,7 +688,8 @@ public final class NvidiumIrisUniformBridge {
         putScalar(values, "sunAngle", normalizedSunAngle);
         putScalar(values, "shadowAngle", isDay ? normalizedSunAngle : moonAngleDegrees / 360.0);
         putScalar(values, "rainStrength", rain);
-        putScalar(values, "wetness", smoothUniform("wetness", rain, 600.0, 200.0));
+        putScalar(values, "wetness", wetnessForFrame(rain,
+                snapshot == null ? FRAME_COUNTER.get() : snapshot.frameCounter()));
         putScalar(values, "thunderStrength", thunder);
         putScalar(values, "moonPhase", moonPhase(client, level));
         putScalar(values, "near", near);
@@ -759,7 +800,7 @@ public final class NvidiumIrisUniformBridge {
         putScalar(values, "fogMode", fogDensity < 0.0 ? 9729.0 : fogDensity > 0.0 ? 2049.0 : 0.0);
         putScalar(values, "fogShape", fogDensity == 0.0 ? -1.0 : 1.0);
         putScalar(values, "alphaTestRef", irisCapturedFloat("getCurrentAlphaTest", 0.1));
-        putScalar(values, "centerDepthSmooth", 0.0);
+        putScalar(values, "centerDepthSmooth", centerDepthSmooth);
         putScalar(values, "pi", Math.PI);
         putScalar(values, "currentColorSpace", irisColorSpace());
         int filtering = textureFilteringMode(client);
@@ -1262,6 +1303,140 @@ public final class NvidiumIrisUniformBridge {
             }
         }
         return fallback;
+    }
+
+
+    private static boolean isTaaEnabled() {
+        return isEnabledDefine("TAA");
+    }
+
+    private static boolean isTaaUEnabled() {
+        return isEnabledDefine("TAAU");
+    }
+
+    private static boolean isEnabledDefine(String name) {
+        String value = ShaderRuntime.selectedDefine(name, "false");
+        return "true".equalsIgnoreCase(value) || "1".equals(value)
+                || "on".equalsIgnoreCase(value) || "yes".equalsIgnoreCase(value);
+    }
+
+    private static synchronized float wetnessForFrame(float rain, int frameCounter) {
+        if (wetnessFrame != frameCounter) {
+            wetnessForCurrentFrame = (float) smoothUniform("wetness", clamp01(rain), 600.0, 200.0);
+            wetnessFrame = frameCounter;
+        }
+        return wetnessForCurrentFrame;
+    }
+
+    private static int[] currentViewportSize() {
+        try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+            java.nio.IntBuffer viewport = stack.mallocInt(4);
+            GL11C.glGetIntegerv(GL11C.GL_VIEWPORT, viewport);
+            return new int[]{Math.max(0, viewport.get(2)), Math.max(0, viewport.get(3))};
+        }
+    }
+
+    /** Capture center depth asynchronously after Nvidium's opaque terrain pass. */
+    public static void captureCenterDepth() {
+        if (centerDepthCaptureDisabled || Minecraft.getInstance().level == null) return;
+        try {
+            pollCenterDepthReadbacks();
+            int[] viewport = new int[4];
+            try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                java.nio.IntBuffer values = stack.mallocInt(4);
+                GL11C.glGetIntegerv(GL11C.GL_VIEWPORT, values);
+                for (int i = 0; i < 4; i++) viewport[i] = values.get(i);
+            }
+            if (viewport[2] <= 0 || viewport[3] <= 0) return;
+
+            int slot = -1;
+            for (int i = 0; i < CENTER_DEPTH_PBOS.length; i++) {
+                int candidate = (centerDepthWriteIndex + i) % CENTER_DEPTH_PBOS.length;
+                if (CENTER_DEPTH_FENCES[candidate] == 0L) {
+                    slot = candidate;
+                    break;
+                }
+            }
+            if (slot < 0) return;
+
+            int previousPackBuffer = GL11C.glGetInteger(GL21C.GL_PIXEL_PACK_BUFFER_BINDING);
+            try {
+                if (CENTER_DEPTH_PBOS[slot] == 0) CENTER_DEPTH_PBOS[slot] = GL15C.glGenBuffers();
+                GL15C.glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, CENTER_DEPTH_PBOS[slot]);
+                GL15C.glBufferData(GL21C.GL_PIXEL_PACK_BUFFER, Float.BYTES, GL15C.GL_STREAM_READ);
+                GL11C.glReadPixels(viewport[0] + viewport[2] / 2, viewport[1] + viewport[3] / 2,
+                        1, 1, GL11C.GL_DEPTH_COMPONENT, GL11C.GL_FLOAT, 0L);
+                long fence = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+                if (fence == 0L) throw new IllegalStateException("Could not fence asynchronous center-depth readback.");
+                CENTER_DEPTH_FENCES[slot] = fence;
+                CENTER_DEPTH_SEQUENCES[slot] = ++centerDepthSequence;
+                centerDepthWriteIndex = (slot + 1) % CENTER_DEPTH_PBOS.length;
+            } finally {
+                GL15C.glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, previousPackBuffer);
+            }
+        } catch (RuntimeException exception) {
+            centerDepthCaptureDisabled = true;
+            if (!warnedCenterDepthFailure) {
+                warnedCenterDepthFailure = true;
+                CaustiqClient.LOGGER.warn("Center-depth sampling is unavailable; retaining the last valid centerDepthSmooth value.", exception);
+            }
+        }
+    }
+
+    private static void pollCenterDepthReadbacks() {
+        int previousPackBuffer = GL11C.glGetInteger(GL21C.GL_PIXEL_PACK_BUFFER_BINDING);
+        float latestValue = Float.NaN;
+        long latestSequence = -1L;
+        try {
+            for (int i = 0; i < CENTER_DEPTH_FENCES.length; i++) {
+                long fence = CENTER_DEPTH_FENCES[i];
+                if (fence == 0L) continue;
+                int status = GL32C.glClientWaitSync(fence, 0, 0L);
+                if (status == GL32C.GL_WAIT_FAILED) {
+                    GL32C.glDeleteSync(fence);
+                    CENTER_DEPTH_FENCES[i] = 0L;
+                    CENTER_DEPTH_SEQUENCES[i] = 0L;
+                    continue;
+                }
+                if (status != GL32C.GL_ALREADY_SIGNALED && status != GL32C.GL_CONDITION_SATISFIED) continue;
+                GL15C.glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, CENTER_DEPTH_PBOS[i]);
+                java.nio.ByteBuffer mapped = GL15C.glMapBuffer(GL21C.GL_PIXEL_PACK_BUFFER, GL15C.GL_READ_ONLY);
+                if (mapped != null) {
+                    float sample = mapped.order(java.nio.ByteOrder.nativeOrder()).getFloat(0);
+                    GL15C.glUnmapBuffer(GL21C.GL_PIXEL_PACK_BUFFER);
+                    if (Float.isFinite(sample) && sample >= 0.0f && sample <= 1.0f
+                            && CENTER_DEPTH_SEQUENCES[i] > latestSequence) {
+                        latestValue = sample;
+                        latestSequence = CENTER_DEPTH_SEQUENCES[i];
+                    }
+                }
+                GL32C.glDeleteSync(fence);
+                CENTER_DEPTH_FENCES[i] = 0L;
+                CENTER_DEPTH_SEQUENCES[i] = 0L;
+            }
+        } finally {
+            GL15C.glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, previousPackBuffer);
+        }
+        if (Float.isFinite(latestValue)) {
+            centerDepthSmooth = (float) smoothUniform("centerDepthSmooth", latestValue, 1.0, 1.0);
+        }
+    }
+
+    /** Releases asynchronous depth-readback resources while the GL context is current. */
+    public static void destroy() {
+        for (int i = 0; i < CENTER_DEPTH_PBOS.length; i++) {
+            if (CENTER_DEPTH_FENCES[i] != 0L) GL32C.glDeleteSync(CENTER_DEPTH_FENCES[i]);
+            if (CENTER_DEPTH_PBOS[i] != 0) GL15C.glDeleteBuffers(CENTER_DEPTH_PBOS[i]);
+            CENTER_DEPTH_FENCES[i] = 0L;
+            CENTER_DEPTH_PBOS[i] = 0;
+            CENTER_DEPTH_SEQUENCES[i] = 0L;
+        }
+        centerDepthWriteIndex = 0;
+        centerDepthSequence = 0L;
+        centerDepthSmooth = 1.0f;
+        centerDepthCaptureDisabled = false;
+        warnedCenterDepthFailure = false;
+        SMOOTHED_UNIFORMS.remove("centerDepthSmooth");
     }
 
     private static float clamp01(float value) {

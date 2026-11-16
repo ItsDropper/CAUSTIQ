@@ -87,6 +87,7 @@ class NvidiumIrisUniformBridgeTest {
                 "u_ModelScale.z", "dhNearPlane", "dhFarPlane", "dhRenderDistance",
                 "CAT_NONE", "aspectRatio", "viewWidth", "viewHeight", "frameTime"
         };
+        assertEquals("caustiqFrameTime", IrisNvidiumTerrainTranslator.uniformAliases().get("frameTime"));
         for (String name : required) {
             assertTrue(values.containsKey(name), "Missing Iris expression symbol: " + name);
             assertTrue(Double.isFinite(values.get(name)), "Non-finite Iris symbol: " + name);
