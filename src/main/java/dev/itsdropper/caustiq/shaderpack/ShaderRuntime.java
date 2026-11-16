@@ -127,6 +127,11 @@ public final class ShaderRuntime {
         }
     }
 
+    /** Returns the last frame's Iris-owned color target for a terrain sampler. */
+    public static int irisColorTexture(int index) {
+        return IRIS_PASS_EXECUTOR.terrainSamplerTexture(index);
+    }
+
     public static IrisTerrainPassScheduler.Plan activePassPlan() { return activePassPlan; }
 
     /** Selected shader-pack define exposed to render-time built-in uniform providers. */

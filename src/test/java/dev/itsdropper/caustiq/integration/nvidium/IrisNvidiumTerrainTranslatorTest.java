@@ -236,7 +236,7 @@ class IrisNvidiumTerrainTranslatorTest {
                 void main() { gl_FragColor = vec4(1.0); }
                 """);
         String declarations = translator.adapt(nativeStages()).get("FRAGMENT");
-        for (int attachment = 1; attachment <= 7; attachment++) {
+        for (int attachment = 1; attachment <= 8; attachment++) {
             String name = "colortex" + attachment;
             String alias = "caustiqColortex" + attachment;
             assertEquals(alias, aliases.get(name), "Missing runtime alias for " + name);

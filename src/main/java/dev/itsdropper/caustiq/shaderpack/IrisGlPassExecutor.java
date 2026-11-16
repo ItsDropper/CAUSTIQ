@@ -44,6 +44,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
     private final String[][] customFormats = new String[MAX_COLOR_TARGET + 1][2];
     private final boolean[] persistentAlternateCurrent = new boolean[MAX_COLOR_TARGET + 1];
     private final boolean[] persistentInitialized = new boolean[MAX_COLOR_TARGET + 1];
+    private final int[] terrainSamplerTextures = new int[MAX_COLOR_TARGET + 1];
     private int persistentWidth;
     private int persistentHeight;
     private int width;
@@ -126,6 +127,11 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             }
             for (int index = 1; index <= MAX_COLOR_TARGET; index++) {
                 IrisTerrainPassScheduler.RenderTarget target = plan.targets().get(index);
+                if (hasWritten[index] && index > MAX_TERRAIN_TARGET) {
+                    terrainSamplerTextures[index] = currentTexture(index, mainTarget, alternateCurrent, hasWritten);
+                } else if (target == null || !target.persistent()) {
+                    terrainSamplerTextures[index] = 0;
+                }
                 if (target != null && target.persistent() && hasWritten[index]) {
                     persistentAlternateCurrent[index] = alternateCurrent[index];
                     persistentInitialized[index] = true;
@@ -495,6 +501,12 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         }
     }
 
+    /** Returns the last Iris-owned colortex texture made available to Nvidium terrain. */
+    public int terrainSamplerTexture(int index) {
+        if (index <= MAX_TERRAIN_TARGET || index > MAX_COLOR_TARGET) return 0;
+        return terrainSamplerTextures[index];
+    }
+
     private int writeTexture(int location, RenderTarget mainTarget,
                               boolean[] alternateCurrent, boolean[] hasWritten) {
         if (location == 0) {
@@ -609,6 +621,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 if (allocate) {
                     persistentInitialized[index] = false;
                     persistentAlternateCurrent[index] = false;
+                    terrainSamplerTextures[index] = 0;
                 }
                 customWidths[index][side] = size.width();
                 customHeights[index][side] = size.height();
@@ -685,6 +698,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
     }
 
     private void destroyCustomTargets(int index) {
+        terrainSamplerTextures[index] = 0;
         for (int side = 0; side < 2; side++) {
             if (customTargets[index][side] != 0) GL11C.glDeleteTextures(customTargets[index][side]);
             customTargets[index][side] = 0;
@@ -776,6 +790,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         for (int index = 1; index <= MAX_COLOR_TARGET; index++) destroyCustomTargets(index);
         Arrays.fill(persistentInitialized, false);
         Arrays.fill(persistentAlternateCurrent, false);
+        Arrays.fill(terrainSamplerTextures, 0);
         persistentWidth = 0;
         persistentHeight = 0;
         width = 0;

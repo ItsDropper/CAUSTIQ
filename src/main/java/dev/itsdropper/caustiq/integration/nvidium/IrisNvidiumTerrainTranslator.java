@@ -94,6 +94,7 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("colortex5", "caustiqColortex5"),
             Map.entry("colortex6", "caustiqColortex6"),
             Map.entry("colortex7", "caustiqColortex7"),
+            Map.entry("colortex8", "caustiqColortex8"),
             Map.entry("shadowcolor0", "caustiqShadowcolor0"),
             Map.entry("shadowcolor1", "caustiqShadowcolor1"),
             Map.entry("depthtex1", "caustiqDepthTexture1"),
@@ -982,6 +983,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform sampler2D caustiqColortex5;
                 uniform sampler2D caustiqColortex6;
                 uniform sampler2D caustiqColortex7;
+                uniform sampler2D caustiqColortex8;
                 uniform float caustiqNear;
                 uniform float caustiqFar;
                 uniform ivec2 caustiqAtlasSize;
@@ -1031,7 +1033,7 @@ public final class IrisNvidiumTerrainTranslator {
     private static String expectedUniformType(String name) {
         return switch (name) {
             case "gtexture", "tex", "lightmap", "noisetex", "normals", "specular", "shadowtex0", "shadowtex1", "shadow",
-                    "colortex1", "colortex2", "colortex3", "colortex4", "colortex5", "colortex6", "colortex7",
+                    "colortex1", "colortex2", "colortex3", "colortex4", "colortex5", "colortex6", "colortex7", "colortex8",
                     "shadowcolor0", "shadowcolor1",
                     "depthtex1", "colortex15",
                     "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans" -> "sampler2D";

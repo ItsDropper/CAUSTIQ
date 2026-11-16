@@ -5,6 +5,7 @@ import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL30C;
 import dev.itsdropper.caustiq.shaderpack.IrisShaderResources;
+import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 
 import java.nio.ByteBuffer;
 import java.util.Random;
@@ -73,17 +74,20 @@ public final class NvidiumIrisTextureBridge {
         java.util.ArrayList<Integer> units = new java.util.ArrayList<>();
         java.util.ArrayList<Integer> previousBindings = new java.util.ArrayList<>();
         try {
-            for (int attachment = 1; attachment <= NvidiumGBufferTargets.MAX_ATTACHMENT; attachment++) {
+            for (int attachment = 1; attachment <= 8; attachment++) {
                 int location = GL20C.glGetUniformLocation(program, "caustiqColortex" + attachment);
                 if (location < 0) continue;
-                if (unit >= maximum) {
-                    throw new IllegalStateException("Iris colortex samplers exceed the fragment-stage texture-unit limit.");
+                if (unit >= Math.min(maximum, 12)) {
+                    throw new IllegalStateException("Iris colortex samplers exceed the texture units reserved before shadow samplers.");
                 }
                 int textureUnit = GL13C.GL_TEXTURE0 + unit;
                 GL13C.glActiveTexture(textureUnit);
                 units.add(textureUnit);
                 previousBindings.add(GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D));
-                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, NvidiumGBufferTargets.texture(attachment));
+                int texture = attachment <= NvidiumGBufferTargets.MAX_ATTACHMENT
+                        ? NvidiumGBufferTargets.texture(attachment)
+                        : ShaderRuntime.irisColorTexture(attachment);
+                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, colorOrFallback(texture));
                 GL20C.glUniform1i(location, unit);
                 unit++;
             }
