@@ -21,7 +21,7 @@ class ShaderPackSelectionTest {
         assertEquals(1, ShaderPackSelection.nextIndex(packs, "a", 1));
         assertEquals(2, ShaderPackSelection.nextIndex(packs, "a", -1));
         assertEquals(0, ShaderPackSelection.nextIndex(packs, "c", 1));
-        assertEquals(2, ShaderPackSelection.nextIndex(packs, "b", 2));
+        assertEquals(0, ShaderPackSelection.nextIndex(packs, "b", 2));
     }
 
     @Test
