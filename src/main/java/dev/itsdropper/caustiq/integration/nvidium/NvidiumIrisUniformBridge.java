@@ -160,7 +160,7 @@ public final class NvidiumIrisUniformBridge {
         scalar(program, "caustiqNear", near);
         scalar(program, "caustiqFar", far);
         scalar(program, "caustiqAspectRatio", aspectRatio);
-        scalar(program, "caustiqSunAngle", normalizeDegrees(sunDegrees + 90.0) / 360.0f);
+        scalar(program, "caustiqSunAngle", (float) (normalizeDegrees(sunDegrees + 90.0) / 360.0));
         int[] atlasSize = blockAtlasSize();
         integer2(program, "caustiqAtlasSize", atlasSize[0], atlasSize[1]);
         scalar(program, "caustiqRainStrength", rain);
