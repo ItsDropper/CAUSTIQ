@@ -7,6 +7,7 @@ import dev.itsdropper.caustiq.integration.nvidium.NvidiumShaderProgramBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumTerrainVaryingAdapter;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackRefreshStatus;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanner;
 import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 import net.fabricmc.api.ClientModInitializer;
@@ -27,6 +28,7 @@ public final class CaustiqClient implements ClientModInitializer {
     private static final String SHADER_PACK_DIRECTORY = "shaderpacks";
     private static final int MAX_LOGGED_ISSUES = 10;
     private static volatile ShaderPackScanResult scanResult;
+    private static volatile ShaderPackRefreshStatus refreshStatus = ShaderPackRefreshStatus.idle();
     private static Path shaderPackDirectory;
 
     @Override
@@ -59,6 +61,7 @@ public final class CaustiqClient implements ClientModInitializer {
     }
 
     public static ShaderPackScanResult scanResult() { return scanResult; }
+    public static ShaderPackRefreshStatus refreshStatus() { return refreshStatus; }
 
     private static void logScanResult(ShaderPackScanResult result, Path directory) {
         LOGGER.info("Shader-pack discovery completed: {} valid pack(s), {} rejected candidate(s).",
@@ -84,28 +87,45 @@ public final class CaustiqClient implements ClientModInitializer {
     private static void scanShaderPacksAtStartup() {
         ShaderPackScanResult result = new ShaderPackScanner().scan(shaderPackDirectory);
         scanResult = result;
+        refreshStatus = ShaderPackRefreshStatus.complete(result);
         ShaderRuntime.publishScanResult(result);
         logScanResult(result, shaderPackDirectory);
     }
 
-    public static void refreshShaderPacks() {
+    public static synchronized void refreshShaderPacks() {
+        if (refreshStatus.isScanning()) return;
+        refreshStatus = ShaderPackRefreshStatus.scanning();
+        refreshSettingsScreen();
+
         Path directory = shaderPackDirectory;
-        if (directory == null) return;
+        if (directory == null) {
+            refreshStatus = ShaderPackRefreshStatus.failed();
+            refreshSettingsScreen();
+            return;
+        }
         CompletableFuture.supplyAsync(() -> new ShaderPackScanner().scan(directory))
                 .whenComplete((result, failure) -> {
-                    if (failure != null) {
-                        LOGGER.error("Shader-pack discovery failed for {}", directory.toAbsolutePath(), failure);
-                        return;
-                    }
                     Minecraft.getInstance().execute(() -> {
-                        ShaderRuntime.requestReload();
-                        scanResult = result;
-                        ShaderRuntime.publishScanResult(result);
-                        logScanResult(result, directory);
-                        if (Minecraft.getInstance().screen instanceof CaustiqSettingsScreen settingsScreen) {
-                            settingsScreen.refreshView();
+                        if (failure != null) {
+                            LOGGER.error("Shader-pack discovery failed for {}", directory.toAbsolutePath(), failure);
+                            refreshStatus = ShaderPackRefreshStatus.failed();
+                        } else {
+                            ShaderRuntime.requestReload();
+                            scanResult = result;
+                            ShaderRuntime.publishScanResult(result);
+                            refreshStatus = ShaderPackRefreshStatus.complete(result);
+                            logScanResult(result, directory);
                         }
+                        refreshSettingsScreen();
                     });
                 });
     }
-}
+
+    private static void refreshSettingsScreen() {
+        Minecraft client = Minecraft.getInstance();
+        client.execute(() -> {
+            if (client.screen instanceof CaustiqSettingsScreen settingsScreen) {
+                settingsScreen.refreshView();
+            }
+        });
+    }}
