@@ -203,6 +203,23 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesSunAngleToTheRuntimeCelestialPhaseUniform() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform float sunAngle;
+                void main() { gl_FragColor = vec4(sunAngle); }
+                """);
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform float caustiqSunAngle;"));
+        assertTrue(fragment.contains("vec4(caustiqSunAngle)"));
+        assertFalse(fragment.contains("uniform float sunAngle;"));
+        assertEquals("caustiqSunAngle", IrisNvidiumTerrainTranslator.uniformAliases().get("sunAngle"));
+    }
+
+    @Test
     void translatesPreviousCameraPositionToTheBoundRuntimeVector() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150
