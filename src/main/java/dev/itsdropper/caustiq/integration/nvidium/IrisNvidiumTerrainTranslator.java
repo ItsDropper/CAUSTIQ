@@ -967,6 +967,7 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform mat4 caustiqPreviousModelViewInverse;
                 uniform mat3 caustiqNormalMatrix;
                 uniform vec3 caustiqCameraPosition;
+                uniform vec3 caustiqPreviousCameraPosition;
                 uniform float caustiqFrameTimeCounter;
                 uniform float caustiqAspectRatio;
                 uniform int caustiqFrameCounter;
@@ -1048,7 +1049,7 @@ public final class IrisNvidiumTerrainTranslator {
                     "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse",
                     "dhProjection", "dhProjectionInverse", "dhPreviousProjection", "dhModelView",
                     "dhModelViewInverse", "vxProj", "vxProjInv", "vxProjPrev" -> "mat4";
-            case "cameraPosition", "fogColor", "light_dir", "sun_dir", "eyePosition" -> "vec3";
+            case "cameraPosition", "previousCameraPosition", "fogColor", "light_dir", "sun_dir", "eyePosition" -> "vec3";
             case "heavyFog", "isElytraFlying" -> "bool";
             case "isEyeInWater", "moonPhase", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2" -> "int";
             case "frameTimeCounter", "viewWidth", "viewHeight", "near", "far", "rainStrength",

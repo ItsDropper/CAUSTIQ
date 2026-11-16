@@ -203,6 +203,24 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesPreviousCameraPositionToTheBoundRuntimeVector() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform vec3 previousCameraPosition;
+                void main() { gl_FragColor = vec4(previousCameraPosition, 1.0); }
+                """);
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform vec3 caustiqPreviousCameraPosition;"));
+        assertTrue(fragment.contains("vec4(caustiqPreviousCameraPosition, 1.0)"));
+        assertFalse(fragment.contains("uniform vec3 previousCameraPosition;"));
+        assertEquals("caustiqPreviousCameraPosition",
+                IrisNvidiumTerrainTranslator.uniformAliases().get("previousCameraPosition"));
+    }
+
+    @Test
     void translatesPhotonWaterAndAllTerrainShadowVariantsForEveryDimension() throws Exception {
         String photonDirectory = System.getenv("PHOTON_SOURCE_DIR");
         Assumptions.assumeTrue(photonDirectory != null && !photonDirectory.isBlank(),
