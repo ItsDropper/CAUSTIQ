@@ -193,6 +193,9 @@ assert "NvidiumGBufferTargets.texture(attachment)" in texture_bridge
 assert "ShaderRuntime.irisColorTexture(attachment)" in texture_bridge
 assert "terrainSamplerTexture(int index)" in (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/IrisGlPassExecutor.java").read_text(encoding="utf-8")
 assert 'Map.entry("colortex8", "caustiqColortex8")' in translator
+assert "sampler2DShadow caustiqShadowtex1" in translator
+assert "GL33C.glBindSampler" in texture_bridge
+assert "0x884C, 0x884E" in texture_bridge
 assert "bindTerrainTextures(program, firstTextureUnit, 12)" in texture_bridge
 assert "noiseTexture, noiseTexture" not in texture_bridge, "Unavailable Iris samplers must not receive dummy noise textures"
 vertex_encoder = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")

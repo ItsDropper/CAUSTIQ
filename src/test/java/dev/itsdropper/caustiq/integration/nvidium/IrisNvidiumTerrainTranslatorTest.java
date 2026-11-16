@@ -226,6 +226,21 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void preservesIrisShadowComparisonSamplerType() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform sampler2DShadow shadowtex1;
+                void main() { gl_FragColor = vec4(texture(shadowtex1, vec3(0.5))); }
+                """);
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("layout(binding = 13) uniform sampler2DShadow caustiqShadowtex1;"));
+        assertTrue(fragment.contains("texture(caustiqShadowtex1, vec3(0.5))"));
+    }
+
+    @Test
     void exposesAllIrisColorAttachmentsAsRuntimeSamplers() {
         Map<String, String> aliases = IrisNvidiumTerrainTranslator.uniformAliases();
         IrisNvidiumTerrainTranslator translator = translator("""

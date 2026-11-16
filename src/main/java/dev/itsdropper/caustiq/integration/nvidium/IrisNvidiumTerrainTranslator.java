@@ -969,7 +969,7 @@ public final class IrisNvidiumTerrainTranslator {
                 #endif
                 layout(binding = 2) uniform sampler2D caustiqNoiseTexture;
                 layout(binding = 12) uniform sampler2D caustiqShadowtex0;
-                layout(binding = 13) uniform sampler2D caustiqShadowtex1;
+                layout(binding = 13) uniform sampler2DShadow caustiqShadowtex1;
                 layout(binding = 14) uniform sampler2D caustiqShadowcolor0;
                 layout(binding = 15) uniform sampler2D caustiqShadowcolor1;
                 uniform mat4 caustiqShadowModelView;
@@ -1032,11 +1032,12 @@ public final class IrisNvidiumTerrainTranslator {
 
     private static String expectedUniformType(String name) {
         return switch (name) {
-            case "gtexture", "tex", "lightmap", "noisetex", "normals", "specular", "shadowtex0", "shadowtex1", "shadow",
+            case "gtexture", "tex", "lightmap", "noisetex", "normals", "specular", "shadowtex0", "shadow",
                     "colortex1", "colortex2", "colortex3", "colortex4", "colortex5", "colortex6", "colortex7", "colortex8",
                     "shadowcolor0", "shadowcolor1",
                     "depthtex1", "colortex15",
                     "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans" -> "sampler2D";
+            case "shadowtex1" -> "sampler2DShadow";
             case "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
                     "shadowModelView", "shadowModelViewInverse", "shadowProjection", "shadowProjectionInverse",
                     "dhProjection", "dhProjectionInverse", "dhPreviousProjection", "dhModelView",

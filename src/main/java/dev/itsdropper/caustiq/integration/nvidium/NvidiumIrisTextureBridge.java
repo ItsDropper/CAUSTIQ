@@ -4,6 +4,7 @@ import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL30C;
+import org.lwjgl.opengl.GL33C;
 import dev.itsdropper.caustiq.shaderpack.IrisShaderResources;
 import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 
@@ -16,6 +17,7 @@ public final class NvidiumIrisTextureBridge {
     private static int noiseTexture;
     private static int fallbackDepthTexture;
     private static int fallbackColorTexture;
+    private static int shadowComparisonSampler;
     private static BindingState bindingState;
     private static IrisShaderResources customResources;
 
@@ -37,7 +39,8 @@ public final class NvidiumIrisTextureBridge {
                 shadowOrFallback(NvidiumShadowRenderer.shadowTexture1()),
                 colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0)),
                 colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))};
-        bindingState = bindTextures(previousActive, units, textures);
+        int[] samplers = {0, 0, shadowComparisonSampler, 0, 0};
+        bindingState = bindTextures(previousActive, units, textures, samplers);
         setSampler(program, "noisetex", 2);
         setSampler(program, "shadowtex0", 12);
         setSampler(program, "shadowtex1", 13);
@@ -58,7 +61,8 @@ public final class NvidiumIrisTextureBridge {
                 shadowOrFallback(NvidiumShadowRenderer.shadowTexture1()),
                 colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0)),
                 colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))};
-        bindingState = bindTextures(previousActive, units, textures);
+        int[] samplers = {0, 0, shadowComparisonSampler, 0, 0};
+        bindingState = bindTextures(previousActive, units, textures, samplers);
         setSampler(program, "noisetex", 2);
         setSampler(program, "shadowtex0", 12);
         setSampler(program, "shadowtex1", 13);
@@ -73,6 +77,7 @@ public final class NvidiumIrisTextureBridge {
         int maximum = GL11C.glGetInteger(GL20C.GL_MAX_TEXTURE_IMAGE_UNITS);
         java.util.ArrayList<Integer> units = new java.util.ArrayList<>();
         java.util.ArrayList<Integer> previousBindings = new java.util.ArrayList<>();
+        java.util.ArrayList<Integer> previousSamplers = new java.util.ArrayList<>();
         try {
             for (int attachment = 1; attachment <= 8; attachment++) {
                 int location = GL20C.glGetUniformLocation(program, "caustiqColortex" + attachment);
@@ -84,6 +89,8 @@ public final class NvidiumIrisTextureBridge {
                 GL13C.glActiveTexture(textureUnit);
                 units.add(textureUnit);
                 previousBindings.add(GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D));
+                previousSamplers.add(GL33C.glGetIntegeri(GL33C.GL_SAMPLER_BINDING, unit));
+                GL33C.glBindSampler(unit, 0);
                 int texture = attachment <= NvidiumGBufferTargets.MAX_ATTACHMENT
                         ? NvidiumGBufferTargets.texture(attachment)
                         : ShaderRuntime.irisColorTexture(attachment);
@@ -94,28 +101,34 @@ public final class NvidiumIrisTextureBridge {
         } catch (RuntimeException exception) {
             restoreState(new BindingState(previousActive,
                     units.stream().mapToInt(Integer::intValue).toArray(),
-                    previousBindings.stream().mapToInt(Integer::intValue).toArray()));
+                    previousBindings.stream().mapToInt(Integer::intValue).toArray(),
+                    previousSamplers.stream().mapToInt(Integer::intValue).toArray()));
             restoreBindings();
             throw exception;
         }
         if (!units.isEmpty()) {
             bindingState = merge(bindingState, new BindingState(previousActive,
                     units.stream().mapToInt(Integer::intValue).toArray(),
-                    previousBindings.stream().mapToInt(Integer::intValue).toArray()));
+                    previousBindings.stream().mapToInt(Integer::intValue).toArray(),
+                    previousSamplers.stream().mapToInt(Integer::intValue).toArray()));
         }
         GL13C.glActiveTexture(previousActive);
         return unit;
     }
 
-    private static BindingState bindTextures(int previousActive, int[] units, int[] textures) {
+    private static BindingState bindTextures(int previousActive, int[] units, int[] textures, int[] samplers) {
         int[] previousBindings = new int[units.length];
+        int[] previousSamplers = new int[units.length];
         for (int i = 0; i < units.length; i++) {
+            int unit = units[i] - GL13C.GL_TEXTURE0;
             GL13C.glActiveTexture(units[i]);
             previousBindings[i] = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
+            previousSamplers[i] = GL33C.glGetIntegeri(GL33C.GL_SAMPLER_BINDING, unit);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, textures[i]);
+            GL33C.glBindSampler(unit, samplers[i]);
         }
         GL13C.glActiveTexture(previousActive);
-        return new BindingState(previousActive, units, previousBindings);
+        return new BindingState(previousActive, units, previousBindings, previousSamplers);
     }
 
     private static void setSampler(int program, String name, int unit) {
@@ -128,15 +141,18 @@ public final class NvidiumIrisTextureBridge {
         if (first == null) return second;
         int[] units = java.util.Arrays.copyOf(first.units(), first.units().length + second.units().length);
         int[] bindings = java.util.Arrays.copyOf(first.bindings(), first.bindings().length + second.bindings().length);
+        int[] samplers = java.util.Arrays.copyOf(first.samplers(), first.samplers().length + second.samplers().length);
         System.arraycopy(second.units(), 0, units, first.units().length, second.units().length);
         System.arraycopy(second.bindings(), 0, bindings, first.bindings().length, second.bindings().length);
-        return new BindingState(first.activeTexture(), units, bindings);
+        System.arraycopy(second.samplers(), 0, samplers, first.samplers().length, second.samplers().length);
+        return new BindingState(first.activeTexture(), units, bindings, samplers);
     }
 
     private static void restoreState(BindingState state) {
         for (int i = 0; i < state.units().length; i++) {
             GL13C.glActiveTexture(state.units()[i]);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, state.bindings()[i]);
+            GL33C.glBindSampler(state.units()[i] - GL13C.GL_TEXTURE0, state.samplers()[i]);
         }
         GL13C.glActiveTexture(state.activeTexture());
     }
@@ -174,13 +190,16 @@ public final class NvidiumIrisTextureBridge {
         if (noiseTexture != 0) GL11C.glDeleteTextures(noiseTexture);
         if (fallbackDepthTexture != 0) GL11C.glDeleteTextures(fallbackDepthTexture);
         if (fallbackColorTexture != 0) GL11C.glDeleteTextures(fallbackColorTexture);
+        if (shadowComparisonSampler != 0) GL33C.glDeleteSamplers(shadowComparisonSampler);
         noiseTexture = 0;
         fallbackDepthTexture = 0;
         fallbackColorTexture = 0;
+        shadowComparisonSampler = 0;
     }
 
     private static void ensureTextures() {
         if (noiseTexture == 0) noiseTexture = createNoiseTexture();
+        if (shadowComparisonSampler == 0) shadowComparisonSampler = createShadowComparisonSampler();
         if (fallbackDepthTexture == 0) fallbackDepthTexture = createFallbackDepthTexture();
         if (fallbackColorTexture == 0) {
             ByteBuffer white = ByteBuffer.allocateDirect(4);
@@ -195,6 +214,17 @@ public final class NvidiumIrisTextureBridge {
 
     private static int colorOrFallback(int texture) {
         return texture == 0 ? fallbackColorTexture : texture;
+    }
+
+    private static int createShadowComparisonSampler() {
+        int sampler = GL33C.glGenSamplers();
+        GL33C.glSamplerParameteri(sampler, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_LINEAR);
+        GL33C.glSamplerParameteri(sampler, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_LINEAR);
+        GL33C.glSamplerParameteri(sampler, GL11C.GL_TEXTURE_WRAP_S, 0x812F);
+        GL33C.glSamplerParameteri(sampler, GL11C.GL_TEXTURE_WRAP_T, 0x812F);
+        GL33C.glSamplerParameteri(sampler, 0x884C, 0x884E);
+        GL33C.glSamplerParameteri(sampler, 0x884D, GL11C.GL_LEQUAL);
+        return sampler;
     }
 
     private static int createFallbackDepthTexture() {
@@ -242,10 +272,11 @@ public final class NvidiumIrisTextureBridge {
         return texture;
     }
 
-    private record BindingState(int activeTexture, int[] units, int[] bindings) {
+    private record BindingState(int activeTexture, int[] units, int[] bindings, int[] samplers) {
         private BindingState {
             units = units.clone();
             bindings = bindings.clone();
+            samplers = samplers.clone();
         }
     }
 }
