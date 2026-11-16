@@ -7,6 +7,7 @@ import dev.itsdropper.caustiq.CaustiqClient;
 import dev.itsdropper.caustiq.shaderpack.IrisTerrainPassScheduler;
 import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 import org.lwjgl.opengl.GL11C;
+import org.lwjgl.opengl.GL12C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL30C;
@@ -359,6 +360,11 @@ public final class NvidiumGBufferTargets {
         GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
         GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER,
                 mipmap ? GL11C.GL_LINEAR_MIPMAP_LINEAR : (nearest ? GL11C.GL_NEAREST : GL11C.GL_LINEAR));
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL12C.GL_TEXTURE_BASE_LEVEL, 0);
+        int maximumMipLevel = mipmap
+                ? 31 - Integer.numberOfLeadingZeros(Math.max(textureWidth, textureHeight))
+                : 0;
+        GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL12C.GL_TEXTURE_MAX_LEVEL, maximumMipLevel);
         GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER,
                 nearest ? GL11C.GL_NEAREST : GL11C.GL_LINEAR);
         GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, GL12_CLAMP_TO_EDGE);
