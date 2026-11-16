@@ -30,5 +30,12 @@
   "caustiq.settings.shader_option_tooltip": "Select a setting from the active shader pack.",
   "caustiq.settings.shader_option_value": "Option value",
   "caustiq.settings.shader_option_value_tooltip": "Change the selected shader-pack setting.",
-  "caustiq.settings.no_option_values": "No values available"
+  "caustiq.settings.no_option_values": "No values available",
+  "caustiq.settings.previous_pack": "Previous",
+  "caustiq.settings.next_pack": "Next",
+  "caustiq.settings.pack_source_directory": "Folder",
+  "caustiq.settings.pack_source_archive": "ZIP archive",
+  "caustiq.settings.pack_summary": "%s · %s shader source files",
+  "caustiq.settings.pack_detail": "%s pipeline entry points · %s declared size",
+  "caustiq.settings.structural_only": "Detected layout only; shader-feature compatibility is not implied."
 }
