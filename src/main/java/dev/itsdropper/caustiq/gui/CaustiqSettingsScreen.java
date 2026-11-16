@@ -7,6 +7,7 @@ import dev.itsdropper.caustiq.shaderpack.ShaderPackDescriptor;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackMetadata;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackRefreshStatus;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackSelection;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackSources;
 import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 import net.minecraft.client.Minecraft;
@@ -47,18 +48,16 @@ public final class CaustiqSettingsScreen extends Screen {
         ShaderPackDescriptor selected = packs.stream()
                 .filter(pack -> pack.id().equals(config.selectedPackId()))
                 .findFirst().orElse(null);
-        String packLabel = selected == null
-                ? (packs.isEmpty() ? "No shader packs found" : "Select shader pack")
-                : selected.displayName();
-        addRenderableWidget(Button.builder(Component.literal("Pack: " + packLabel), button -> {
-            if (packs.isEmpty()) return;
-            int current = selected == null ? -1 : packs.indexOf(selected);
-            ShaderPackDescriptor next = packs.get((current + 1) % packs.size());
-            config.selectPack(next.id());
-            optionPage = 0;
-            ShaderRuntime.requestReload();
-            init();
-        }).bounds(width / 2 + 5, 42, 150, 20).build());
+        Button previousPack = Button.builder(Component.translatable("caustiq.settings.previous_pack"),
+                button -> movePackSelection(packs, config, -1))
+                .bounds(width / 2 + 5, 42, 70, 20).build();
+        Button nextPack = Button.builder(Component.translatable("caustiq.settings.next_pack"),
+                button -> movePackSelection(packs, config, 1))
+                .bounds(width / 2 + 85, 42, 70, 20).build();
+        previousPack.active = !packs.isEmpty();
+        nextPack.active = !packs.isEmpty();
+        addRenderableWidget(previousPack);
+        addRenderableWidget(nextPack);
 
         ShaderPackRefreshStatus refreshStatus = CaustiqClient.refreshStatus();
         Button refreshButton = Button.builder(refreshButtonLabel(refreshStatus),
@@ -74,7 +73,7 @@ public final class CaustiqSettingsScreen extends Screen {
 
         if (selected != null) addOptionButtons(selected, config);
         else addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.no_selection"),
-                button -> { }).bounds(width / 2 - 155, 104, 310, 20).build());
+                button -> { }).bounds(width / 2 - 155, 152, 310, 20).build());
 
         addRenderableWidget(Button.builder(Component.translatable("gui.done"),
                 button -> Minecraft.getInstance().setScreen(parent))
@@ -86,6 +85,27 @@ public final class CaustiqSettingsScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
+        ShaderPackScanResult scan = CaustiqClient.scanResult();
+        List<ShaderPackDescriptor> packs = scan == null ? List.of() : scan.packs();
+        ShaderPackDescriptor selected = packs.stream()
+                .filter(pack -> pack.id().equals(CaustiqConfig.get().selectedPackId()))
+                .findFirst().orElse(null);
+        Component packName = selected == null
+                ? Component.translatable(packs.isEmpty()
+                        ? "caustiq.settings.no_packs" : "caustiq.settings.select_pack")
+                : Component.literal(selected.displayName());
+        graphics.drawCenteredString(font, packName, width / 2 + 80, 48, 0xFFFFFFFF);
+        if (selected != null) {
+            graphics.drawCenteredString(font, Component.translatable("caustiq.settings.pack_summary",
+                    sourceTypeLabel(selected), selected.shaderFileCount()),
+                    width / 2 + 80, 108, 0xFFCCCCCC);
+            graphics.drawCenteredString(font, Component.translatable("caustiq.settings.pack_detail",
+                    selected.pipelineEntryPointCount(), formatSize(selected.declaredUncompressedBytes())),
+                    width / 2 + 80, 120, 0xFFAAAAAA);
+            graphics.drawCenteredString(font, Component.translatable("caustiq.settings.structural_only"),
+                    width / 2 + 80, 132, 0xFF888888);
+        }
+
         ShaderPackRefreshStatus status = CaustiqClient.refreshStatus();
         Component message = refreshStatusMessage(status);
         if (message != null) {
@@ -117,6 +137,26 @@ public final class CaustiqSettingsScreen extends Screen {
         };
     }
 
+    private void movePackSelection(List<ShaderPackDescriptor> packs, CaustiqConfig config, int direction) {
+        int next = ShaderPackSelection.nextIndex(packs, config.selectedPackId(), direction);
+        if (next < 0) return;
+        config.selectPack(packs.get(next).id());
+        optionPage = 0;
+        ShaderRuntime.requestReload();
+        init();
+    }
+
+    private static Component sourceTypeLabel(ShaderPackDescriptor pack) {
+        return Component.translatable(pack.sourceType() == dev.itsdropper.caustiq.shaderpack.ShaderPackSourceType.DIRECTORY
+                ? "caustiq.settings.pack_source_directory" : "caustiq.settings.pack_source_archive");
+    }
+
+    private static String formatSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024L * 1024) return String.format(java.util.Locale.ROOT, "%.1f KiB", bytes / 1024.0);
+        return String.format(java.util.Locale.ROOT, "%.1f MiB", bytes / (1024.0 * 1024.0));
+    }
+
     private void addOptionButtons(ShaderPackDescriptor pack, CaustiqConfig config) {
         ShaderPackMetadata metadata = readMetadata(pack);
         if (metadata == null || metadata.options().isEmpty()) {
@@ -131,7 +171,7 @@ public final class CaustiqSettingsScreen extends Screen {
             start = 0;
         }
         int end = Math.min(start + PAGE_SIZE, metadata.options().size());
-        int y = 104;
+        int y = 152;
         for (ShaderPackMetadata.Option option : metadata.options().subList(start, end)) {
             String value = config.option(pack.id(), option.name(), option.defaultValue());
             int selectedIndex = option.values().indexOf(value);
