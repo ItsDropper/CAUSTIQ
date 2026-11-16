@@ -5,11 +5,13 @@ import dev.itsdropper.caustiq.CaustiqConfig;
 import dev.itsdropper.caustiq.diagnostics.CaustiqDiagnostics;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackDescriptor;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackMetadata;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackRefreshStatus;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackSources;
 import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
@@ -58,9 +60,12 @@ public final class CaustiqSettingsScreen extends Screen {
             init();
         }).bounds(width / 2 + 5, 42, 150, 20).build());
 
-        addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.refresh"),
+        ShaderPackRefreshStatus refreshStatus = CaustiqClient.refreshStatus();
+        Button refreshButton = Button.builder(refreshButtonLabel(refreshStatus),
                 button -> CaustiqClient.refreshShaderPacks())
-                .bounds(width / 2 - 155, 68, 150, 20).build());
+                .bounds(width / 2 - 155, 68, 150, 20).build();
+        refreshButton.active = !refreshStatus.isScanning();
+        addRenderableWidget(refreshButton);
         addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.copy_diagnostics"),
                 button -> {
                     Minecraft.getInstance().keyboardHandler.setClipboard(CaustiqDiagnostics.createReport());
@@ -77,6 +82,40 @@ public final class CaustiqSettingsScreen extends Screen {
     }
 
     public void refreshView() { init(); }
+
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.render(graphics, mouseX, mouseY, partialTick);
+        ShaderPackRefreshStatus status = CaustiqClient.refreshStatus();
+        Component message = refreshStatusMessage(status);
+        if (message != null) {
+            int color = switch (status.state()) {
+                case SCANNING -> 0xFFFFAA00;
+                case COMPLETE -> 0xFF55FF55;
+                case FAILED -> 0xFFFF5555;
+                case IDLE -> 0xFFFFFFFF;
+            };
+            graphics.drawCenteredString(font, message, width / 2, 92, color);
+        }
+    }
+
+    private static Component refreshButtonLabel(ShaderPackRefreshStatus status) {
+        return switch (status.state()) {
+            case SCANNING -> Component.translatable("caustiq.settings.scanning");
+            case FAILED -> Component.translatable("caustiq.settings.retry_scan");
+            case IDLE, COMPLETE -> Component.translatable("caustiq.settings.refresh");
+        };
+    }
+
+    private static Component refreshStatusMessage(ShaderPackRefreshStatus status) {
+        return switch (status.state()) {
+            case IDLE -> null;
+            case SCANNING -> Component.translatable("caustiq.settings.scan_in_progress");
+            case COMPLETE -> Component.translatable("caustiq.settings.scan_complete",
+                    status.packCount(), status.rejectedCandidateCount());
+            case FAILED -> Component.translatable("caustiq.settings.scan_failed");
+        };
+    }
 
     private void addOptionButtons(ShaderPackDescriptor pack, CaustiqConfig config) {
         ShaderPackMetadata metadata = readMetadata(pack);
