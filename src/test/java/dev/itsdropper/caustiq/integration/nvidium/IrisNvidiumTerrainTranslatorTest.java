@@ -220,6 +220,23 @@ class IrisNvidiumTerrainTranslatorTest {
     }
 
     @Test
+    void translatesBlindnessToItsBoundRuntimeUniform() {
+        IrisNvidiumTerrainTranslator translator = translator("""
+                #version 150
+                void main() { gl_Position = ftransform(); }
+                """, """
+                #version 150
+                uniform float blindness;
+                void main() { gl_FragColor = vec4(blindness); }
+                """);
+        String fragment = translator.adapt(nativeStages()).get("FRAGMENT");
+        assertTrue(fragment.contains("uniform float caustiqBlindness;"));
+        assertTrue(fragment.contains("vec4(caustiqBlindness)"));
+        assertFalse(fragment.contains("uniform float blindness;"));
+        assertEquals("caustiqBlindness", IrisNvidiumTerrainTranslator.uniformAliases().get("blindness"));
+    }
+
+    @Test
     void translatesPreviousCameraPositionToTheBoundRuntimeVector() {
         IrisNvidiumTerrainTranslator translator = translator("""
                 #version 150

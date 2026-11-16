@@ -71,6 +71,8 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("cameraPosition", "caustiqCameraPosition"),
             Map.entry("eyePosition", "caustiqCameraPosition"),
             Map.entry("frameTimeCounter", "caustiqFrameTimeCounter"),
+            Map.entry("sunAngle", "caustiqSunAngle"),
+            Map.entry("blindness", "caustiqBlindness"),
             Map.entry("frameCounter", "caustiqFrameCounter"),
             Map.entry("viewSize", "(screenSize * 2.0)"),
             Map.entry("pixelSize", "(1.0 / (screenSize * 2.0))"),
@@ -970,6 +972,8 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform vec3 caustiqPreviousCameraPosition;
                 uniform float caustiqFrameTimeCounter;
                 uniform float caustiqAspectRatio;
+                uniform float caustiqSunAngle;
+                uniform float caustiqBlindness;
                 uniform int caustiqFrameCounter;
                 #endif
                 layout(binding = 2) uniform sampler2D caustiqNoiseTexture;
