@@ -52,6 +52,8 @@ The exact pins are enforced in `fabric.mod.json`: Nvidium-specific mixins target
 
 Use **Scan details** on the settings screen to inspect rejected shader-pack candidates and their reasons. The screen supports paging, retrying a scan, and copying the bounded diagnostics report. Candidate filenames and sanitized reasons are included; absolute game-directory paths and shader source contents are omitted. If a refresh fails, the last completed results remain visible alongside the failure reason, and copied reports include the latest refresh state and sanitized error.
 
+Use **Browse packs** to search installed packs by display name, ZIP/folder filename, stable pack ID, or source type. Search terms are case-insensitive and all terms must match; results are paginated and the currently selected pack is marked in the list. Search is metadata-only and does not open or compile shader source. Select a result to apply it and return to settings.
+
 > [!TIP]
 > **Taking artifacts from GitHub Actions?** GitHub wraps each one in an outer ZIP. Extract it first; the inner file is the one to use.
 

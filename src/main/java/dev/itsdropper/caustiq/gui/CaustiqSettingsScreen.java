@@ -8,7 +8,6 @@ import dev.itsdropper.caustiq.shaderpack.ShaderPackDescriptor;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackMetadata;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackRefreshStatus;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
-import dev.itsdropper.caustiq.shaderpack.ShaderPackSelection;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackSources;
 import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 import net.minecraft.client.Minecraft;
@@ -49,16 +48,9 @@ public final class CaustiqSettingsScreen extends Screen {
         ShaderPackDescriptor selected = packs.stream()
                 .filter(pack -> pack.id().equals(config.selectedPackId()))
                 .findFirst().orElse(null);
-        Button previousPack = Button.builder(Component.translatable("caustiq.settings.previous_pack"),
-                button -> movePackSelection(packs, config, -1))
-                .bounds(width / 2 + 5, 42, 70, 20).build();
-        Button nextPack = Button.builder(Component.translatable("caustiq.settings.next_pack"),
-                button -> movePackSelection(packs, config, 1))
-                .bounds(width / 2 + 85, 42, 70, 20).build();
-        previousPack.active = !packs.isEmpty();
-        nextPack.active = !packs.isEmpty();
-        addRenderableWidget(previousPack);
-        addRenderableWidget(nextPack);
+        addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.browse_packs", packs.size()),
+                button -> Minecraft.getInstance().setScreen(new ShaderPackBrowserScreen(this)))
+                .bounds(width / 2 + 5, 42, 150, 20).build());
 
         ShaderPackRefreshStatus refreshStatus = CaustiqClient.refreshStatus();
         Button refreshButton = Button.builder(Component.translatable("caustiq.settings.refresh_short"),
@@ -157,15 +149,6 @@ public final class CaustiqSettingsScreen extends Screen {
                     status.packCount(), status.rejectedCandidateCount());
             case FAILED -> Component.translatable("caustiq.settings.scan_failed");
         };
-    }
-
-    private void movePackSelection(List<ShaderPackDescriptor> packs, CaustiqConfig config, int direction) {
-        int next = ShaderPackSelection.nextIndex(packs, config.selectedPackId(), direction);
-        if (next < 0) return;
-        config.selectPack(packs.get(next).id());
-        optionPage = 0;
-        ShaderRuntime.requestReload();
-        init();
     }
 
     private static Component sourceTypeLabel(ShaderPackDescriptor pack) {

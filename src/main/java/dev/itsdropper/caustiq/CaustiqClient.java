@@ -1,6 +1,7 @@
 package dev.itsdropper.caustiq;
 
 import dev.itsdropper.caustiq.gui.CaustiqSettingsScreen;
+import dev.itsdropper.caustiq.gui.ShaderPackBrowserScreen;
 import dev.itsdropper.caustiq.gui.ShaderPackDiagnosticsScreen;
 import dev.itsdropper.caustiq.integration.RendererEnvironment;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumCompatibility;
@@ -141,6 +142,8 @@ public final class CaustiqClient implements ClientModInitializer {
                 settingsScreen.refreshView();
             } else if (client.screen instanceof ShaderPackDiagnosticsScreen diagnosticsScreen) {
                 diagnosticsScreen.refreshView();
+            } else if (client.screen instanceof ShaderPackBrowserScreen browserScreen) {
+                browserScreen.refreshView();
             }
         });
     }
