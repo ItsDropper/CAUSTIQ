@@ -15,8 +15,6 @@ import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL30C;
 import dev.itsdropper.caustiq.mixin.TextureAtlasAccessorMixin;
 import dev.itsdropper.caustiq.mixin.SpriteAnimationStateAccessorMixin;
-import dev.itsdropper.caustiq.mixin.SpriteAnimatedTextureAccessorMixin;
-import dev.itsdropper.caustiq.mixin.SpriteFrameInfoAccessorMixin;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -111,7 +109,6 @@ public final class NvidiumPbrTextureAtlases {
             ensureCurrent();
             return;
         }
-        Map<Identifier, Integer> currentFrames = new HashMap<>();
         syncAnimationFrames(readAnimationFrames(atlas));
     }
 
