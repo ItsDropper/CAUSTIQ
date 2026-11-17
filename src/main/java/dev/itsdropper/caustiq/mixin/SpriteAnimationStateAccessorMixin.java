@@ -8,6 +8,4 @@ public interface SpriteAnimationStateAccessorMixin {
     @Accessor("frame")
     int caustiq$getFrame();
 
-    @Accessor("animationInfo")
-    SpriteAnimatedTextureAccessorMixin caustiq$getAnimationInfo();
 }

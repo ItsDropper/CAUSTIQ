@@ -4,6 +4,8 @@ import dev.itsdropper.caustiq.CaustiqClient;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.resources.metadata.animation.AnimationFrame;
+import net.minecraft.client.resources.metadata.animation.AnimationMetadataSection;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -27,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.IntStream;
 
 /** Iris-compatible resource-pack normal/specular block atlases without an Iris dependency. */
 public final class NvidiumPbrTextureAtlases {
@@ -41,6 +44,7 @@ public final class NvidiumPbrTextureAtlases {
     private static boolean warnedResourceFailure;
     private static Map<Identifier, PbrSprite> cachedPbrSprites = Map.of();
     private static Map<Identifier, Integer> cachedAnimationFrames = Map.of();
+    private static Map<Identifier, AnimationInfo> cachedAnimationInfo = Map.of();
 
     private NvidiumPbrTextureAtlases() { }
 
@@ -90,7 +94,7 @@ public final class NvidiumPbrTextureAtlases {
         if (specularTexture != 0) GL11C.glDeleteTextures(specularTexture);
         normalsTexture = 0; specularTexture = 0;
         cachedAtlas = null; cachedResources = null; cachedFingerprint = Long.MIN_VALUE;
-        cachedPbrSprites = Map.of(); cachedAnimationFrames = Map.of();
+        cachedPbrSprites = Map.of(); cachedAnimationFrames = Map.of(); cachedAnimationInfo = Map.of();
     }
 
     /** Invalidates cached PBR textures before Minecraft replaces the block atlas contents. */
@@ -108,10 +112,7 @@ public final class NvidiumPbrTextureAtlases {
             return;
         }
         Map<Identifier, Integer> currentFrames = new HashMap<>();
-        readAnimationInfo(atlas).forEach((id, info) -> {
-            if (info.frameCount() > 1) currentFrames.put(id, info.currentFrame());
-        });
-        syncAnimationFrames(Map.copyOf(currentFrames));
+        syncAnimationFrames(readAnimationFrames(atlas));
     }
 
     private static void ensureCurrent() {
@@ -120,7 +121,7 @@ public final class NvidiumPbrTextureAtlases {
         ResourceManager resources = minecraft.getResourceManager();
         if (atlas == cachedAtlas && resources == cachedResources
                 && normalsTexture != 0 && specularTexture != 0) return;
-        AtlasLayout layout = readAtlasLayout(atlas);
+        AtlasLayout layout = readAtlasLayout(atlas, resources);
         Map<Identifier, PbrSprite> nextSprites = loadPbrSprites(layout, resources);
         int nextNormals = 0, nextSpecular = 0;
         try {
@@ -137,15 +138,16 @@ public final class NvidiumPbrTextureAtlases {
         cachedAtlas = atlas; cachedResources = resources; cachedFingerprint = layout.fingerprint();
         cachedPbrSprites = Map.copyOf(nextSprites);
         cachedAnimationFrames = layout.animationFrames();
+        cachedAnimationInfo = layout.animationInfo();
     }
 
-    private static AtlasLayout readAtlasLayout(TextureAtlas atlas) {
+    private static AtlasLayout readAtlasLayout(TextureAtlas atlas, ResourceManager resources) {
         TextureAtlasAccessorMixin accessor = (TextureAtlasAccessorMixin) (Object) atlas;
         int width = accessor.caustiq$getWidth();
         int height = accessor.caustiq$getHeight();
         Map<Identifier, TextureAtlasSprite> spriteMap = accessor.caustiq$getTexturesByName();
         if (spriteMap == null) throw new IllegalStateException("Minecraft block atlas does not expose its sprite map.");
-        Map<Identifier, AnimationInfo> animationInfo = readAnimationInfo(atlas);
+        Map<Identifier, AnimationInfo> animationInfo = readAnimationInfo(atlas, resources);
         Map<Identifier, Integer> animationFrames = new HashMap<>();
         List<Sprite> sprites = new ArrayList<>(spriteMap.size());
         long fingerprint = 0xcbf29ce484222325L;
@@ -163,10 +165,11 @@ public final class NvidiumPbrTextureAtlases {
             fingerprint = mix(fingerprint, animation.columns());
             fingerprint = mix(fingerprint, animation.frameCount());
         }
-        return new AtlasLayout(width, height, List.copyOf(sprites), fingerprint, Map.copyOf(animationFrames));
+        return new AtlasLayout(width, height, List.copyOf(sprites), fingerprint,
+                Map.copyOf(animationFrames), Map.copyOf(animationInfo));
     }
 
-    private static Map<Identifier, AnimationInfo> readAnimationInfo(TextureAtlas atlas) {
+    private static Map<Identifier, AnimationInfo> readAnimationInfo(TextureAtlas atlas, ResourceManager resources) {
         TextureAtlasAccessorMixin accessor = (TextureAtlasAccessorMixin) (Object) atlas;
         Iterator<?> states = accessor.caustiq$getAnimatedTextureStates().iterator();
         Map<Identifier, AnimationInfo> animations = new HashMap<>();
@@ -176,25 +179,74 @@ public final class NvidiumPbrTextureAtlases {
                 throw new IllegalStateException("Minecraft's animated block-sprite list and animation-state list are out of sync.");
             }
             SpriteAnimationStateAccessorMixin state = (SpriteAnimationStateAccessorMixin) states.next();
-            Object animation = state.caustiq$getAnimationInfo();
-            SpriteAnimatedTextureAccessorMixin animated =
-                    (SpriteAnimatedTextureAccessorMixin) animation;
-            List<?> frameInfos = animated.caustiq$getFrames();
-            int maxFrame = -1;
-            for (Object frameInfo : frameInfos) {
-                maxFrame = Math.max(maxFrame,
-                        ((SpriteFrameInfoAccessorMixin) frameInfo).caustiq$getIndex());
+            Optional<Resource> baseResource = resources.getResource(spriteResourceId(sprite.contents().name()));
+            if (baseResource.isEmpty()) continue;
+            try (InputStream stream = baseResource.get().open()) {
+                BufferedImage baseImage = ImageIO.read(stream);
+                if (baseImage == null) continue;
+                int spriteWidth = sprite.contents().width();
+                int spriteHeight = sprite.contents().height();
+                if (spriteWidth <= 0 || spriteHeight <= 0
+                        || baseImage.getWidth() % spriteWidth != 0
+                        || baseImage.getHeight() % spriteHeight != 0) continue;
+                int columns = Math.max(1, baseImage.getWidth() / spriteWidth);
+                int rows = Math.max(1, baseImage.getHeight() / spriteHeight);
+                int availableFrames = Math.multiplyExact(columns, rows);
+                AnimationMetadataSection metadata = baseResource.get().metadata()
+                        .getSection(AnimationMetadataSection.TYPE).orElse(null);
+                List<AnimationFrame> metadataFrames = metadata == null
+                        ? List.of() : metadata.frames().orElse(List.of());
+                List<Integer> sequence = metadataFrames.isEmpty()
+                        ? IntStream.range(0, availableFrames).boxed().toList()
+                        : metadataFrames.stream().map(AnimationFrame::index).toList();
+                int frameCount = sequence.stream().mapToInt(Integer::intValue).max().orElse(0) + 1;
+                int sequenceIndex = state.caustiq$getFrame();
+                int currentFrame = sequenceIndex >= 0 && sequenceIndex < sequence.size()
+                        ? sequence.get(sequenceIndex) : sequenceIndex;
+                animations.put(sprite.contents().name(), new AnimationInfo(
+                        columns, frameCount, currentFrame, sequence));
+            } catch (IOException | RuntimeException exception) {
+                if (!warnedResourceFailure) {
+                    warnedResourceFailure = true;
+                    CaustiqClient.LOGGER.warn("Some animated block texture metadata could not be read; their PBR maps remain on the first frame.", exception);
+                }
             }
-            int frame = state.caustiq$getFrame();
-            if (frame < 0 || frame >= frameInfos.size()) continue;
-            int sourceFrame = ((SpriteFrameInfoAccessorMixin) frameInfos.get(frame)).caustiq$getIndex();
-            animations.put(sprite.contents().name(), new AnimationInfo(
-                    Math.max(1, animated.caustiq$getFrameRowSize()), maxFrame + 1, sourceFrame));
         }
         if (states.hasNext()) {
             throw new IllegalStateException("Minecraft's animated block-sprite list contains unmatched animation states.");
         }
         return Map.copyOf(animations);
+    }
+
+    private static Map<Identifier, Integer> readAnimationFrames(TextureAtlas atlas) {
+        TextureAtlasAccessorMixin accessor = (TextureAtlasAccessorMixin) (Object) atlas;
+        Iterator<?> states = accessor.caustiq$getAnimatedTextureStates().iterator();
+        Map<Identifier, Integer> frames = new HashMap<>();
+        for (TextureAtlasSprite sprite : accessor.caustiq$getSprites()) {
+            if (!sprite.contents().isAnimated()) continue;
+            if (!states.hasNext()) {
+                throw new IllegalStateException("Minecraft's animated block-sprite list and animation-state list are out of sync.");
+            }
+            SpriteAnimationStateAccessorMixin state = (SpriteAnimationStateAccessorMixin) states.next();
+            AnimationInfo metadata = cachedAnimationInfo.get(sprite.contents().name());
+            int sequenceIndex = state.caustiq$getFrame();
+            int sourceFrame = metadata != null && sequenceIndex >= 0 && sequenceIndex < metadata.sequence().size()
+                    ? metadata.sequence().get(sequenceIndex) : sequenceIndex;
+            if (metadata != null && metadata.frameCount() > 1) {
+                frames.put(sprite.contents().name(), sourceFrame);
+            }
+        }
+        if (states.hasNext()) {
+            throw new IllegalStateException("Minecraft's animated block-sprite list contains unmatched animation states.");
+        }
+        return Map.copyOf(frames);
+    }
+
+    private static Identifier spriteResourceId(Identifier sprite) {
+        String path = sprite.getPath();
+        String resourcePath = path.startsWith("optifine/cit/")
+                ? path + ".png" : "textures/" + path + ".png";
+        return Identifier.fromNamespaceAndPath(sprite.getNamespace(), resourcePath);
     }
 
     private static Map<Identifier, PbrSprite> loadPbrSprites(AtlasLayout layout, ResourceManager resources) {
@@ -370,7 +422,9 @@ public final class NvidiumPbrTextureAtlases {
     private static long mix(long hash, int value) { return (hash ^ Integer.toUnsignedLong(value)) * 0x100000001b3L; }
     private record Sprite(Identifier name, int x, int y, int width, int height,
                           int frameColumns, int frameCount) { }
-    private record AnimationInfo(int columns, int frameCount, int currentFrame) { }
+    private record AnimationInfo(int columns, int frameCount, int currentFrame,
+                                 List<Integer> sequence) { }
     private record AtlasLayout(int width, int height, List<Sprite> sprites, long fingerprint,
-                               Map<Identifier, Integer> animationFrames) { }
+                               Map<Identifier, Integer> animationFrames,
+                               Map<Identifier, AnimationInfo> animationInfo) { }
 }
