@@ -538,8 +538,9 @@ public final class ShaderRuntime {
                 compileNextProgram();
             }
         }
-        executeScheduledIrisPasses();
+        boolean executedIrisPasses = executeScheduledIrisPasses();
         executeFinalPass();
+        if (!executedIrisPasses) IRIS_PASS_EXECUTOR.publishTerrainOutputs(activePassPlan);
     }
 
     private static void compileNextProgram() {
@@ -575,11 +576,11 @@ public final class ShaderRuntime {
         }
     }
 
-    private static void executeScheduledIrisPasses() {
+    private static boolean executeScheduledIrisPasses() {
         // Do not execute a partially linked schedule while the per-frame compile budget
         // is still preparing later deferred/composite programs.
         if (!discoveryFinished || !FabricLoader.getInstance().isModLoaded("nvidium")
-                || activePassPlan == null || IRIS_GL_PROGRAMS.isEmpty()) return;
+                || activePassPlan == null || IRIS_GL_PROGRAMS.isEmpty()) return false;
         boolean hasWorldPasses = activePassPlan.passes().stream().anyMatch(scheduled ->
                 scheduled.pass().group() == ShaderPackProgramCatalog.Group.SETUP
                         || scheduled.pass().group() == ShaderPackProgramCatalog.Group.BEGIN
@@ -588,14 +589,16 @@ public final class ShaderRuntime {
                         || scheduled.pass().group() == ShaderPackProgramCatalog.Group.DEFERRED
                         || scheduled.pass().group() == ShaderPackProgramCatalog.Group.COMPOSITE
                         || scheduled.pass().group() == ShaderPackProgramCatalog.Group.FINAL);
-        if (!hasWorldPasses || irisPassFailureLogged) return;
+        if (!hasWorldPasses || irisPassFailureLogged) return false;
         try {
             observeNvidiumTerrainBackend();
             IRIS_PASS_EXECUTOR.render(activePassPlan, IRIS_GL_PROGRAMS,
                     Minecraft.getInstance().getMainRenderTarget(), irisShaderResources);
+            return true;
         } catch (RuntimeException exception) {
             irisPassFailureLogged = true;
             CaustiqClient.LOGGER.error("CAUSTIQ disabled its Iris multi-pass executor after a render failure.", exception);
+            return false;
         }
     }
 

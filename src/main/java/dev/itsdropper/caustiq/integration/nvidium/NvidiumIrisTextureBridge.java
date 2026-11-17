@@ -115,9 +115,7 @@ public final class NvidiumIrisTextureBridge {
                 previousBindings.add(GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D));
                 previousSamplers.add(GL33C.glGetIntegeri(GL33C.GL_SAMPLER_BINDING, unit));
                 GL33C.glBindSampler(unit, 0);
-                int texture = attachment <= NvidiumGBufferTargets.MAX_ATTACHMENT
-                        ? NvidiumGBufferTargets.texture(attachment)
-                        : ShaderRuntime.irisColorTexture(attachment);
+                int texture = ShaderRuntime.irisColorTexture(attachment);
                 GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, colorOrFallback(texture));
                 GL20C.glUniform1i(location, unit);
                 unit++;

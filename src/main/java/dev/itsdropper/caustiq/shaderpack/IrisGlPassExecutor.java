@@ -135,7 +135,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             }
             for (int index = 1; index <= MAX_COLOR_TARGET; index++) {
                 IrisTerrainPassScheduler.RenderTarget target = plan.targets().get(index);
-                if (hasWritten[index] && index > MAX_TERRAIN_TARGET) {
+                if (hasWritten[index]) {
                     terrainSamplerTextures[index] = currentTexture(index, mainTarget, alternateCurrent, hasWritten);
                 } else if (target == null || !target.persistent()) {
                     terrainSamplerTextures[index] = 0;
@@ -537,16 +537,17 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         for (IrisTerrainPassScheduler.ScheduledPass scheduled : plan.passes()) {
             if (scheduled.pass().group() != ShaderPackProgramCatalog.Group.GBUFFERS) continue;
             for (int index : scheduled.pass().writes()) {
-                if (index > MAX_TERRAIN_TARGET && index <= MAX_COLOR_TARGET && customTargets[index][0] != 0) {
-                    terrainSamplerTextures[index] = customTargets[index][0];
-                }
+                if (index < 1 || index > MAX_COLOR_TARGET) continue;
+                int texture = index <= MAX_TERRAIN_TARGET
+                        ? NvidiumGBufferTargets.texture(index) : customTargets[index][0];
+                if (texture != 0) terrainSamplerTextures[index] = texture;
             }
         }
     }
 
     /** Returns the last Iris-owned colortex texture made available to Nvidium terrain. */
     public int terrainSamplerTexture(int index) {
-        if (index <= MAX_TERRAIN_TARGET || index > MAX_COLOR_TARGET) return 0;
+        if (index < 1 || index > MAX_COLOR_TARGET) return 0;
         return terrainSamplerTextures[index];
     }
 

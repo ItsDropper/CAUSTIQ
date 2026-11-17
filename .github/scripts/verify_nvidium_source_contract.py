@@ -193,8 +193,9 @@ assert 'uniform bool caustiqIsElytraFlying;' in translator
 assert 'integer(program, "caustiqIsElytraFlying", isElytraFlying() ? 1 : 0)' in uniform_bridge
 assert 'invokeBoolean(Minecraft.getInstance().player, "isFallFlying", false)' in uniform_bridge
 assert "GL_TEXTURE2" in texture_bridge and "GL_TEXTURE0 + unit" in texture_bridge
-assert "NvidiumGBufferTargets.texture(attachment)" in texture_bridge
 assert "ShaderRuntime.irisColorTexture(attachment)" in texture_bridge
+assert "MAX_COLORTEX_SAMPLER = 15" in texture_bridge
+assert "terrainSamplerTexture(int index)" in (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/IrisGlPassExecutor.java").read_text(encoding="utf-8")
 assert "terrainSamplerTexture(int index)" in (caustiq_root / "src/main/java/dev/itsdropper/caustiq/shaderpack/IrisGlPassExecutor.java").read_text(encoding="utf-8")
 assert 'Map.entry("colortex8", "caustiqColortex8")' in translator
 assert "sampler2DShadow caustiqShadowtex1" in translator
