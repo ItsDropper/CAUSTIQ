@@ -95,7 +95,7 @@ public final class NvidiumIrisTextureBridge {
     }
 
     private static int bindColortexSamplers(int program, int previousActive) {
-        if (program == 0) return 16;
+        if (program == 0) return 6;
         int unit = 6;
         int maximum = GL11C.glGetInteger(GL20C.GL_MAX_TEXTURE_IMAGE_UNITS);
         java.util.ArrayList<Integer> units = new java.util.ArrayList<>();
@@ -135,7 +135,7 @@ public final class NvidiumIrisTextureBridge {
                     previousSamplers.stream().mapToInt(Integer::intValue).toArray()));
         }
         GL13C.glActiveTexture(previousActive);
-        return Math.max(unit, 16);
+        return unit;
     }
 
     private static BindingState bindTextures(int previousActive, int[] units, int[] textures, int[] samplers) {
