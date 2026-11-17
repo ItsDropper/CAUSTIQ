@@ -66,13 +66,11 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
           MESA_GL_VERSION_OVERRIDE: "4.5"
           MESA_GLSL_VERSION_OVERRIDE: "450"
-          CAUSTIQ_CI_SCREENSHOT: ${{ github.workspace }}/build/caustiq-photon-minecraft/minecraft-photon-validation.png
         run: |
           set -uo pipefail
           mkdir -p build/caustiq-photon-minecraft
           log="$GITHUB_WORKSPACE/build/caustiq-photon-minecraft/minecraft.log"
-          screenshot="$GITHUB_WORKSPACE/build/caustiq-photon-minecraft/minecraft-photon-validation.png"
-          export CAUSTIQ_CI_SHADER_VALIDATION CAUSTIQ_CI_VALIDATE_PBR_ATLAS CAUSTIQ_CI_SHADERPACK LIBGL_ALWAYS_SOFTWARE MESA_GL_VERSION_OVERRIDE MESA_GLSL_VERSION_OVERRIDE CAUSTIQ_CI_SCREENSHOT
+          export CAUSTIQ_CI_SHADER_VALIDATION CAUSTIQ_CI_VALIDATE_PBR_ATLAS CAUSTIQ_CI_SHADERPACK LIBGL_ALWAYS_SOFTWARE MESA_GL_VERSION_OVERRIDE MESA_GLSL_VERSION_OVERRIDE
           setsid ./gradlew runClient --stacktrace --info > "$log" 2>&1 &
           client_pid=$!
           result=timeout
@@ -96,7 +94,6 @@ jobs:
           wait "$client_pid" 2>/dev/null || true
           echo "Minecraft validation result: $result"
           test "$result" = pass
-          test -s "$screenshot"
 
       - name: Verify Minecraft and Photon validation result
         if: always()
@@ -119,7 +116,7 @@ jobs:
             echo "Shader-related error was reported by Minecraft."
             exit 1
           fi
-          echo "Minecraft launched without Nvidium and linked the pinned Photon shader programs in its OpenGL context." >> "$GITHUB_STEP_SUMMARY"
+          echo "Minecraft launched without Nvidium and linked the pinned Photon fullscreen/compute programs in its OpenGL context. Translated terrain rendering is verified separately by the Mesa framebuffer test in the Build workflow." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Minecraft screenshot and diagnostics
         if: always()

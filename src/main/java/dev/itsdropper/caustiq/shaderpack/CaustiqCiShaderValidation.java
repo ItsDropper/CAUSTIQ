@@ -4,23 +4,13 @@ import dev.itsdropper.caustiq.CaustiqClient;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumPbrTextureAtlases;
 import net.fabricmc.loader.api.FabricLoader;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.lwjgl.BufferUtils;
-import org.lwjgl.opengl.GL11C;
-import org.lwjgl.opengl.GL30C;
 
 /**
  * Render-thread validation hook used by the dedicated Photon CI workflow.
@@ -49,78 +39,13 @@ public final class CaustiqCiShaderValidation {
             // texture atlases have been uploaded. renderLevel is not called there.
             NvidiumPbrTextureAtlases.validateForTests();
             CaustiqClient.LOGGER.info("CAUSTIQ_CI_PBR_ATLAS_PASS");
-            captureMinecraftFrame();
             String result = "CAUSTIQ_CI_SHADER_VALIDATION_PASS programs=" + compiled;
             CaustiqClient.LOGGER.info(result);
             System.out.println(result);
         } catch (Exception exception) {
-            try {
-                captureMinecraftFrame();
-            } catch (Exception screenshotFailure) {
-                exception.addSuppressed(screenshotFailure);
-            }
             String result = "CAUSTIQ_CI_SHADER_VALIDATION_FAIL " + exception.getMessage();
             CaustiqClient.LOGGER.error(result, exception);
             System.err.println(result);
-        }
-    }
-
-
-    private static void captureMinecraftFrame() throws IOException {
-        String configuredPath = System.getenv("CAUSTIQ_CI_SCREENSHOT");
-        if (configuredPath == null || configuredPath.isBlank()) {
-            throw new IOException("CAUSTIQ_CI_SCREENSHOT is not set.");
-        }
-
-        IntBuffer viewport = BufferUtils.createIntBuffer(4);
-        GL11C.glGetIntegerv(GL11C.GL_VIEWPORT, viewport);
-        int x = viewport.get(0);
-        int y = viewport.get(1);
-        int width = viewport.get(2);
-        int height = viewport.get(3);
-        if (width <= 0 || height <= 0) {
-            throw new IOException("Minecraft exposed an empty OpenGL viewport: " + width + "x" + height);
-        }
-
-        int readFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
-        int readBuffer = GL11C.glGetInteger(GL11C.GL_READ_BUFFER);
-        int previousPackAlignment = GL11C.glGetInteger(GL11C.GL_PACK_ALIGNMENT);
-        try {
-            // GameRenderer has rendered into Minecraft's main RenderTarget at this
-            // injection point; the window back buffer is not blitted until later.
-            // Read the currently bound render target instead of framebuffer zero.
-            GL11C.glPixelStorei(GL11C.GL_PACK_ALIGNMENT, 1);
-            GL11C.glFinish();
-
-            ByteBuffer pixels = BufferUtils.createByteBuffer(Math.multiplyExact(Math.multiplyExact(width, height), 4));
-            GL11C.glReadPixels(x, y, width, height, GL11C.GL_RGBA, GL11C.GL_UNSIGNED_BYTE, pixels);
-            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-            boolean nonBlackPixel = false;
-            for (int row = 0; row < height; row++) {
-                for (int column = 0; column < width; column++) {
-                    int offset = (row * width + column) * 4;
-                    int red = Byte.toUnsignedInt(pixels.get(offset));
-                    int green = Byte.toUnsignedInt(pixels.get(offset + 1));
-                    int blue = Byte.toUnsignedInt(pixels.get(offset + 2));
-                    int alpha = Byte.toUnsignedInt(pixels.get(offset + 3));
-                    nonBlackPixel |= red > 8 || green > 8 || blue > 8;
-                    image.setRGB(column, height - row - 1,
-                            (alpha << 24) | (red << 16) | (green << 8) | blue);
-                }
-            }
-            if (!nonBlackPixel) {
-                throw new IOException("Minecraft render target was entirely black (read FBO "
-                        + readFramebuffer + ", read buffer 0x" + Integer.toHexString(readBuffer) + ").");
-            }
-            Path output = Path.of(configuredPath).toAbsolutePath().normalize();
-            Files.createDirectories(output.getParent());
-            if (!ImageIO.write(image, "png", output.toFile())) {
-                throw new IOException("No PNG image writer is available.");
-            }
-            CaustiqClient.LOGGER.info("Captured actual Minecraft framebuffer screenshot: {} ({}x{}, FBO {}, read buffer 0x{}).",
-                    output, width, height, readFramebuffer, Integer.toHexString(readBuffer));
-        } finally {
-            GL11C.glPixelStorei(GL11C.GL_PACK_ALIGNMENT, previousPackAlignment);
         }
     }
 
