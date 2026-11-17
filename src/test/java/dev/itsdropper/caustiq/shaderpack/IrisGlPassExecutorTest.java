@@ -38,6 +38,14 @@ class IrisGlPassExecutorTest {
     }
 
     @Test
+    void onlyTreatsNvidiumTerrainProgramsAsTerrainMrtWriters() {
+        assertTrue(IrisGlPassExecutor.isNvidiumTerrainProgram("gbuffers_terrain"));
+        assertTrue(IrisGlPassExecutor.isNvidiumTerrainProgram("gbuffers_water"));
+        assertFalse(IrisGlPassExecutor.isNvidiumTerrainProgram("gbuffers_entities"));
+        assertFalse(IrisGlPassExecutor.isNvidiumTerrainProgram("gbuffers_hand"));
+    }
+
+    @Test
     void rejectsMappingsToUnattachedTargets() {
         assertThrows(IllegalStateException.class,
                 () -> IrisGlPassExecutor.createDrawBuffers(Map.of(0, 3), Set.of(0)));

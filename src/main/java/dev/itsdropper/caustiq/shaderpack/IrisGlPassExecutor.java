@@ -73,7 +73,8 @@ public final class IrisGlPassExecutor implements AutoCloseable {
             Set<Integer> usedTargets = new HashSet<>();
             Set<Integer> terrainWrites = new HashSet<>();
             for (IrisTerrainPassScheduler.ScheduledPass scheduled : plan.passes()) {
-                if (scheduled.pass().group() == ShaderPackProgramCatalog.Group.GBUFFERS) {
+                if (scheduled.pass().group() == ShaderPackProgramCatalog.Group.GBUFFERS
+                        && isNvidiumTerrainProgram(scheduled.pass().name())) {
                     terrainWrites.addAll(scheduled.pass().writes());
                 } else {
                     usedTargets.addAll(scheduled.pass().writes());
@@ -509,6 +510,10 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         }
     }
 
+    static boolean isNvidiumTerrainProgram(String programName) {
+        return "gbuffers_terrain".equals(programName) || "gbuffers_water".equals(programName);
+    }
+
     /** Allocates scheduled targets before Nvidium attaches high-index terrain outputs. */
     public void prepareTerrainOutputs(IrisTerrainPassScheduler.Plan plan, int targetWidth, int targetHeight) {
         if (plan == null || plan.isEmpty() || targetWidth <= 0 || targetHeight <= 0) return;
@@ -535,7 +540,8 @@ public final class IrisGlPassExecutor implements AutoCloseable {
     public void publishTerrainOutputs(IrisTerrainPassScheduler.Plan plan) {
         if (plan == null) return;
         for (IrisTerrainPassScheduler.ScheduledPass scheduled : plan.passes()) {
-            if (scheduled.pass().group() != ShaderPackProgramCatalog.Group.GBUFFERS) continue;
+            if (scheduled.pass().group() != ShaderPackProgramCatalog.Group.GBUFFERS
+                    || !isNvidiumTerrainProgram(scheduled.pass().name())) continue;
             for (int index : scheduled.pass().writes()) {
                 if (index < 1 || index > MAX_COLOR_TARGET) continue;
                 int texture = index <= MAX_TERRAIN_TARGET
