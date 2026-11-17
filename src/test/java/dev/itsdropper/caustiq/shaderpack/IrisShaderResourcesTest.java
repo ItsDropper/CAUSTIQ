@@ -17,6 +17,16 @@ class IrisShaderResourcesTest {
     @TempDir Path temporaryDirectory;
 
     @Test
+    void customTerrainSamplerAllocationSkipsFixedAndShadowTextureUnits() {
+        assertEquals(6, IrisShaderResources.nextAvailableTerrainTextureUnit(0));
+        assertEquals(6, IrisShaderResources.nextAvailableTerrainTextureUnit(6));
+        assertEquals(11, IrisShaderResources.nextAvailableTerrainTextureUnit(11));
+        assertEquals(16, IrisShaderResources.nextAvailableTerrainTextureUnit(12));
+        assertEquals(16, IrisShaderResources.nextAvailableTerrainTextureUnit(15));
+        assertEquals(16, IrisShaderResources.nextAvailableTerrainTextureUnit(16));
+    }
+
+    @Test
     void loadsCustomPngTexturesAndScalarAndVectorUniformDeclarations() throws IOException {
         Path textureDirectory = Files.createDirectories(temporaryDirectory.resolve("Pack/shaders/textures"));
         BufferedImage image = new BufferedImage(2, 2, BufferedImage.TYPE_INT_ARGB);

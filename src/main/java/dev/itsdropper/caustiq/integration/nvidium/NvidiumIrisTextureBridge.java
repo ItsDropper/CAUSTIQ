@@ -7,6 +7,7 @@ import org.lwjgl.opengl.GL30C;
 import org.lwjgl.opengl.GL33C;
 import dev.itsdropper.caustiq.shaderpack.IrisShaderResources;
 import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
+import dev.itsdropper.caustiq.shaderpack.IrisShaderResources;
 
 import java.nio.ByteBuffer;
 import java.util.Random;
@@ -140,7 +141,7 @@ public final class NvidiumIrisTextureBridge {
     }
 
     static int firstCustomTextureUnit(int nextUnit) {
-        return nextUnit >= 12 && nextUnit <= 15 ? 16 : nextUnit;
+        return IrisShaderResources.nextAvailableTerrainTextureUnit(nextUnit);
     }
 
     private static BindingState bindTextures(int previousActive, int[] units, int[] textures, int[] samplers) {

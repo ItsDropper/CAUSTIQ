@@ -201,6 +201,13 @@ public final class IrisShaderResources implements AutoCloseable {
                 || (sampler.equals("noisetex") && textureAssets.containsKey("noise"));
     }
 
+    /** Returns the next unit not reserved by Nvidium's fixed terrain/shadow bindings. */
+    public static int nextAvailableTerrainTextureUnit(int unit) {
+        if (unit < 6) unit = 6;
+        if (unit >= 12 && unit <= 15) unit = 16;
+        return unit;
+    }
+
     /** Binds all declared custom sampler2D textures to free units for Nvidium's terrain program. */
     public void bindTerrainTextures(int program, int firstUnit) {
         bindTerrainTextures(program, firstUnit, Integer.MAX_VALUE);
@@ -222,6 +229,7 @@ public final class IrisShaderResources implements AutoCloseable {
             String sampler = name.equals("noise") ? "noisetex" : name;
             int location = GL20C.glGetUniformLocation(program, sampler);
             if (location < 0) continue;
+            unit = nextAvailableTerrainTextureUnit(unit);
             if (unit >= maximum) {
                 terrainUnits = units.stream().mapToInt(Integer::intValue).toArray();
                 terrainBindings = bindings.stream().mapToInt(Integer::intValue).toArray();
