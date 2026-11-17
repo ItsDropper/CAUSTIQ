@@ -7,6 +7,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import java.util.Map;
+import java.util.List;
 
 /** Mapped access to the block atlas layout used to construct aligned PBR atlases. */
 @Mixin(TextureAtlas.class)
@@ -19,4 +20,10 @@ public interface TextureAtlasAccessorMixin {
 
     @Accessor("height")
     int caustiq$getHeight();
+
+    @Accessor("sprites")
+    List<TextureAtlasSprite> caustiq$getSprites();
+
+    @Accessor("animatedTexturesStates")
+    List<?> caustiq$getAnimatedTextureStates();
 }

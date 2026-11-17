@@ -1,8 +1,11 @@
 package dev.itsdropper.caustiq.integration.nvidium;
 
 import net.minecraft.resources.Identifier;
+
+import java.awt.image.BufferedImage;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class NvidiumPbrTextureAtlasesTest {
@@ -13,6 +16,23 @@ class NvidiumPbrTextureAtlasesTest {
                 NvidiumPbrTextureAtlases.pbrResourceId(sprite, true).toString());
         assertEquals("minecraft:textures/block/stone_s.png",
                 NvidiumPbrTextureAtlases.pbrResourceId(sprite, false).toString());
+    }
+
+
+    @Test
+    void mapsAnimatedPbrSpriteFramesUsingMinecraftRowMajorFrameIndices() {
+        BufferedImage sheet = new BufferedImage(64, 32, BufferedImage.TYPE_INT_ARGB);
+        assertArrayEquals(new int[]{16, 16, 16, 16},
+                NvidiumPbrTextureAtlases.frameRegionForTests(sheet, 16, 16, 5));
+        assertArrayEquals(new int[]{48, 16, 16, 16},
+                NvidiumPbrTextureAtlases.frameRegionForTests(sheet, 16, 16, 99));
+    }
+
+    @Test
+    void scalesSingleFramePbrMapsWithoutTreatingThemAsAnimationSheets() {
+        BufferedImage image = new BufferedImage(32, 16, BufferedImage.TYPE_INT_ARGB);
+        assertArrayEquals(new int[]{0, 0, 32, 16},
+                NvidiumPbrTextureAtlases.frameRegionForTests(image, 16, 16, 3));
     }
 
     @Test

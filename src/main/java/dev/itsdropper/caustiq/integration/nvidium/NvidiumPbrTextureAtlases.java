@@ -12,6 +12,9 @@ import org.lwjgl.opengl.GL12C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL30C;
 import dev.itsdropper.caustiq.mixin.TextureAtlasAccessorMixin;
+import dev.itsdropper.caustiq.mixin.SpriteAnimationStateAccessorMixin;
+import dev.itsdropper.caustiq.mixin.SpriteAnimatedTextureAccessorMixin;
+import dev.itsdropper.caustiq.mixin.SpriteFrameInfoAccessorMixin;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -19,6 +22,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,6 +39,8 @@ public final class NvidiumPbrTextureAtlases {
     private static int normalsTexture;
     private static int specularTexture;
     private static boolean warnedResourceFailure;
+    private static Map<Identifier, PbrSprite> cachedPbrSprites = Map.of();
+    private static Map<Identifier, Integer> cachedAnimationFrames = Map.of();
 
     private NvidiumPbrTextureAtlases() { }
 
@@ -83,6 +90,7 @@ public final class NvidiumPbrTextureAtlases {
         if (specularTexture != 0) GL11C.glDeleteTextures(specularTexture);
         normalsTexture = 0; specularTexture = 0;
         cachedAtlas = null; cachedResources = null; cachedFingerprint = Long.MIN_VALUE;
+        cachedPbrSprites = Map.of(); cachedAnimationFrames = Map.of();
     }
 
     private static void ensureCurrent() {
@@ -91,11 +99,15 @@ public final class NvidiumPbrTextureAtlases {
         ResourceManager resources = minecraft.getResourceManager();
         AtlasLayout layout = readAtlasLayout(atlas);
         if (atlas == cachedAtlas && resources == cachedResources && layout.fingerprint() == cachedFingerprint
-                && normalsTexture != 0 && specularTexture != 0) return;
+                && normalsTexture != 0 && specularTexture != 0) {
+            syncAnimationFrames(atlas);
+            return;
+        }
+        Map<Identifier, PbrSprite> nextSprites = loadPbrSprites(layout, resources);
         int nextNormals = 0, nextSpecular = 0;
         try {
-            nextNormals = buildAtlas(layout, resources, true);
-            nextSpecular = buildAtlas(layout, resources, false);
+            nextNormals = buildAtlas(layout, nextSprites, true);
+            nextSpecular = buildAtlas(layout, nextSprites, false);
         } catch (RuntimeException exception) {
             if (nextNormals != 0) GL11C.glDeleteTextures(nextNormals);
             if (nextSpecular != 0) GL11C.glDeleteTextures(nextSpecular);
@@ -105,6 +117,8 @@ public final class NvidiumPbrTextureAtlases {
         if (specularTexture != 0) GL11C.glDeleteTextures(specularTexture);
         normalsTexture = nextNormals; specularTexture = nextSpecular;
         cachedAtlas = atlas; cachedResources = resources; cachedFingerprint = layout.fingerprint();
+        cachedPbrSprites = Map.copyOf(nextSprites);
+        cachedAnimationFrames = readAnimationFrames(atlas);
     }
 
     private static AtlasLayout readAtlasLayout(TextureAtlas atlas) {
@@ -128,7 +142,33 @@ public final class NvidiumPbrTextureAtlases {
             return new AtlasLayout(width, height, List.copyOf(sprites), fingerprint);
     }
 
-    private static int buildAtlas(AtlasLayout layout, ResourceManager resources, boolean normal) {
+    private static Map<Identifier, PbrSprite> loadPbrSprites(AtlasLayout layout, ResourceManager resources) {
+        Map<Identifier, PbrSprite> loaded = new HashMap<>();
+        for (Sprite sprite : layout.sprites()) {
+            BufferedImage normal = readPbrImage(resources, pbrResourceId(sprite.name(), true));
+            BufferedImage specular = readPbrImage(resources, pbrResourceId(sprite.name(), false));
+            if (normal != null || specular != null) {
+                loaded.put(sprite.name(), new PbrSprite(sprite, normal, specular));
+            }
+        }
+        return Map.copyOf(loaded);
+    }
+
+    private static BufferedImage readPbrImage(ResourceManager resources, Identifier id) {
+        Optional<Resource> resource = resources.getResource(id);
+        if (resource.isEmpty()) return null;
+        try (InputStream stream = resource.get().open()) {
+            return ImageIO.read(stream);
+        } catch (IOException | RuntimeException exception) {
+            if (!warnedResourceFailure) {
+                warnedResourceFailure = true;
+                CaustiqClient.LOGGER.warn("Some resource-pack PBR maps could not be loaded; missing sprites use Iris-compatible defaults.", exception);
+            }
+            return null;
+        }
+    }
+
+    private static int buildAtlas(AtlasLayout layout, Map<Identifier, PbrSprite> sprites, boolean normal) {
         long byteCount = (long) layout.width() * layout.height() * 4L;
         if (layout.width() <= 0 || layout.height() <= 0 || byteCount > MAX_ATLAS_BYTES)
             throw new IllegalStateException("Block atlas dimensions exceed CAUSTIQ's bounded PBR atlas allocation.");
@@ -136,31 +176,20 @@ public final class NvidiumPbrTextureAtlases {
         int color = normal ? NORMAL_DEFAULT : SPECULAR_DEFAULT;
         byte r = (byte)(color >>> 24), g = (byte)(color >>> 16), b = (byte)(color >>> 8), a = (byte)color;
         for (int i = 0; i < layout.width() * layout.height(); i++) pixels.put(r).put(g).put(b).put(a);
-        for (Sprite sprite : layout.sprites()) {
-            Optional<Resource> resource = resources.getResource(pbrResourceId(sprite.name(), normal));
-            if (resource.isEmpty()) continue;
-            try (InputStream stream = resource.get().open()) {
-                BufferedImage image = ImageIO.read(stream);
-                if (image != null) blit(image, pixels, layout.width(), sprite);
-            } catch (IOException | RuntimeException exception) {
-                if (!warnedResourceFailure) {
-                    warnedResourceFailure = true;
-                    CaustiqClient.LOGGER.warn("Some resource-pack PBR maps could not be loaded; missing sprites use Iris-compatible defaults.", exception);
-                }
-            }
+        for (PbrSprite pbrSprite : sprites.values()) {
+            BufferedImage image = normal ? pbrSprite.normal() : pbrSprite.specular();
+            if (image != null) blit(image, pixels, layout.width(), pbrSprite.sprite(), 0);
         }
         pixels.flip();
         return upload(layout.width(), layout.height(), pixels);
     }
 
-    private static void blit(BufferedImage image, ByteBuffer atlas, int atlasWidth, Sprite sprite) {
-        int fw = image.getWidth(), fh = image.getHeight();
-        if (fw == sprite.width() && fh > sprite.height() && fh % sprite.height() == 0) fh = sprite.height();
-        else if (fh == sprite.height() && fw > sprite.width() && fw % sprite.width() == 0) fw = sprite.width();
+    private static void blit(BufferedImage image, ByteBuffer atlas, int atlasWidth, Sprite sprite, int frameIndex) {
+        FrameRegion frame = frameRegion(image, sprite.width(), sprite.height(), frameIndex);
         for (int y = 0; y < sprite.height(); y++) {
-            int sy = Math.min(fh - 1, (int)((long)y * fh / sprite.height()));
+            int sy = frame.y() + Math.min(frame.height() - 1, (int)((long)y * frame.height() / sprite.height()));
             for (int x = 0; x < sprite.width(); x++) {
-                int sx = Math.min(fw - 1, (int)((long)x * fw / sprite.width()));
+                int sx = frame.x() + Math.min(frame.width() - 1, (int)((long)x * frame.width() / sprite.width()));
                 int argb = image.getRGB(sx, sy);
                 int dst = ((sprite.y() + y) * atlasWidth + sprite.x() + x) * 4;
                 atlas.put(dst, (byte)(argb >>> 16)); atlas.put(dst + 1, (byte)(argb >>> 8));
@@ -168,6 +197,110 @@ public final class NvidiumPbrTextureAtlases {
             }
         }
     }
+
+    private static FrameRegion frameRegion(BufferedImage image, int spriteWidth, int spriteHeight, int frameIndex) {
+        boolean grid = image.getWidth() >= spriteWidth && image.getHeight() >= spriteHeight
+                && image.getWidth() % spriteWidth == 0 && image.getHeight() % spriteHeight == 0;
+        if (!grid) return new FrameRegion(0, 0, image.getWidth(), image.getHeight());
+        int columns = image.getWidth() / spriteWidth;
+        int rows = image.getHeight() / spriteHeight;
+        int frameCount = Math.multiplyExact(columns, rows);
+        int frame = Math.max(0, Math.min(frameIndex, frameCount - 1));
+        return new FrameRegion((frame % columns) * spriteWidth,
+                (frame / columns) * spriteHeight, spriteWidth, spriteHeight);
+    }
+
+    private static void syncAnimationFrames(TextureAtlas atlas) {
+        Map<Identifier, Integer> current = readAnimationFrames(atlas);
+        if (current.equals(cachedAnimationFrames)) return;
+        boolean normalsChanged = false;
+        boolean specularChanged = false;
+        for (Map.Entry<Identifier, Integer> entry : current.entrySet()) {
+            Integer previous = cachedAnimationFrames.get(entry.getKey());
+            if (previous != null && previous.intValue() == entry.getValue()) continue;
+            PbrSprite pbrSprite = cachedPbrSprites.get(entry.getKey());
+            if (pbrSprite == null) continue;
+            if (pbrSprite.normal() != null) {
+                uploadSpriteRegion(normalsTexture, pbrSprite.normal(), pbrSprite.sprite(), entry.getValue());
+                normalsChanged = true;
+            }
+            if (pbrSprite.specular() != null) {
+                uploadSpriteRegion(specularTexture, pbrSprite.specular(), pbrSprite.sprite(), entry.getValue());
+                specularChanged = true;
+            }
+        }
+        if (normalsChanged) regenerateMipmaps(normalsTexture);
+        if (specularChanged) regenerateMipmaps(specularTexture);
+        cachedAnimationFrames = Map.copyOf(current);
+    }
+
+    private static Map<Identifier, Integer> readAnimationFrames(TextureAtlas atlas) {
+        TextureAtlasAccessorMixin accessor = (TextureAtlasAccessorMixin) (Object) atlas;
+        Iterator<?> states = accessor.caustiq$getAnimatedTextureStates().iterator();
+        Map<Identifier, Integer> frames = new HashMap<>();
+        for (TextureAtlasSprite sprite : accessor.caustiq$getSprites()) {
+            if (!sprite.contents().isAnimated()) continue;
+            if (!states.hasNext()) {
+                throw new IllegalStateException("Minecraft's animated block-sprite list and animation-state list are out of sync.");
+            }
+            SpriteAnimationStateAccessorMixin state = (SpriteAnimationStateAccessorMixin) states.next();
+            Object animation = state.caustiq$getAnimationInfo();
+            List<?> frameInfos = ((SpriteAnimatedTextureAccessorMixin) animation).caustiq$getFrames();
+            int frame = state.caustiq$getFrame();
+            if (frame < 0 || frame >= frameInfos.size()) continue;
+            int sourceFrame = ((SpriteFrameInfoAccessorMixin) frameInfos.get(frame)).caustiq$getIndex();
+            frames.put(sprite.contents().name(), sourceFrame);
+        }
+        if (states.hasNext()) {
+            throw new IllegalStateException("Minecraft's animated block-sprite list contains unmatched animation states.");
+        }
+        return Map.copyOf(frames);
+    }
+
+    private static void uploadSpriteRegion(int texture, BufferedImage image, Sprite sprite, int frameIndex) {
+        FrameRegion frame = frameRegion(image, sprite.width(), sprite.height(), frameIndex);
+        ByteBuffer pixels = ByteBuffer.allocateDirect(sprite.width() * sprite.height() * 4);
+        for (int y = 0; y < sprite.height(); y++) {
+            int sy = frame.y() + Math.min(frame.height() - 1, (int)((long)y * frame.height() / sprite.height()));
+            for (int x = 0; x < sprite.width(); x++) {
+                int sx = frame.x() + Math.min(frame.width() - 1, (int)((long)x * frame.width() / sprite.width()));
+                int argb = image.getRGB(sx, sy);
+                pixels.put((byte)(argb >>> 16)).put((byte)(argb >>> 8))
+                        .put((byte)argb).put((byte)(argb >>> 24));
+            }
+        }
+        pixels.flip();
+        int active = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
+        int binding = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
+        try {
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
+            GL11C.glTexSubImage2D(GL11C.GL_TEXTURE_2D, 0, sprite.x(), sprite.y(),
+                    sprite.width(), sprite.height(), GL11C.GL_RGBA, GL11C.GL_UNSIGNED_BYTE, pixels);
+        } finally {
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, binding);
+            GL13C.glActiveTexture(active);
+        }
+    }
+
+    private static void regenerateMipmaps(int texture) {
+        int active = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
+        int binding = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
+        try {
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
+            GL30C.glGenerateMipmap(GL11C.GL_TEXTURE_2D);
+        } finally {
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, binding);
+            GL13C.glActiveTexture(active);
+        }
+    }
+
+    static int[] frameRegionForTests(BufferedImage image, int spriteWidth, int spriteHeight, int frameIndex) {
+        FrameRegion frame = frameRegion(image, spriteWidth, spriteHeight, frameIndex);
+        return new int[]{frame.x(), frame.y(), frame.width(), frame.height()};
+    }
+
+    private record PbrSprite(Sprite sprite, BufferedImage normal, BufferedImage specular) { }
+    private record FrameRegion(int x, int y, int width, int height) { }
 
     private static int upload(int width, int height, ByteBuffer pixels) {
         int active = GL11C.glGetInteger(0x84E0), binding = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);

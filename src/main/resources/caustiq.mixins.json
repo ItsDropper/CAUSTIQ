@@ -19,7 +19,10 @@
     "NvidiumPrimaryTerrainRasterizerMixin",
     "NvidiumTranslucentTerrainRasterizerMixin",
     "MinecraftMixin",
-    "TextureAtlasAccessorMixin"
+    "TextureAtlasAccessorMixin",
+    "SpriteAnimationStateAccessorMixin",
+    "SpriteAnimatedTextureAccessorMixin",
+    "SpriteFrameInfoAccessorMixin"
   ],
   "injectors": {
     "defaultRequire": 1
