@@ -259,8 +259,7 @@ public final class NvidiumPbrTextureAtlases {
                 (frame / columns) * frameHeight, frameWidth, frameHeight);
     }
 
-    private static void syncAnimationFrames(TextureAtlas atlas) {
-        Map<Identifier, Integer> current = readAnimationFrames(atlas);
+    private static void syncAnimationFrames(Map<Identifier, Integer> current) {
         if (current.equals(cachedAnimationFrames)) return;
         boolean normalsChanged = false;
         boolean specularChanged = false;
@@ -351,7 +350,9 @@ public final class NvidiumPbrTextureAtlases {
     }
 
     private static long mix(long hash, int value) { return (hash ^ Integer.toUnsignedLong(value)) * 0x100000001b3L; }
-    private record Sprite(Identifier name, int x, int y, int width, int height) { }
+    private record Sprite(Identifier name, int x, int y, int width, int height,
+                          int frameColumns, int frameCount) { }
+    private record AnimationInfo(int columns, int frameCount, int currentFrame) { }
     private record AtlasLayout(int width, int height, List<Sprite> sprites, long fingerprint,
                                Map<Identifier, Integer> animationFrames) { }
 }
