@@ -213,8 +213,8 @@ public final class IrisShaderPackParser {
                 return;
             }
             String property = matcher.group(2).toLowerCase(Locale.ROOT);
-            if (index > 31) {
-                diagnostics.add("CAUSTIQ's bounded Iris render-target range is colortex0-colortex31; "
+            if (index > 15) {
+                diagnostics.add("CAUSTIQ's Nvidium terrain sampler bridge supports colortex0-colortex15; "
                         + key + "=" + value + " exceeds that limit.");
                 return;
             }

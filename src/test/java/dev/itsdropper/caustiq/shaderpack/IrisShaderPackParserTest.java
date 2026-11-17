@@ -56,7 +56,7 @@ class IrisShaderPackParserTest {
                 colortex8Mipmap=true
                 colortex8Nearest=true
                 colortex8Scale=0.5
-                colortex32Format=RGBA16F
+                colortex16Format=RGBA16F
                 """);
         Files.writeString(shaders.resolve("composite.vsh"), """
                 #version 150
@@ -78,7 +78,7 @@ class IrisShaderPackParserTest {
                     issue.contains("multi-render-target allocation and pass routing are not implemented")),
                     model.diagnostics().toString());
             assertTrue(model.diagnostics().stream().anyMatch(issue ->
-                    issue.contains("colortex0-colortex31") && issue.contains("32Format=RGBA16F")),
+                    issue.contains("colortex0-colortex15") && issue.contains("16Format=RGBA16F")),
                     model.diagnostics().toString());
             assertEquals(1, model.diagnostics().size(), model.diagnostics().toString());
             IrisTerrainPassScheduler.Plan plan = new IrisTerrainPassScheduler().schedule(model, null);
