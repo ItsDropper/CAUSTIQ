@@ -25,13 +25,24 @@ class ShaderPackIssueTest {
     @Test
     void sanitizesWindowsPathsAndControlCharacters() {
         String result = ShaderPackIssue.sanitizeDisplayText(
-                "Access denied at C:\\Users\\player\\AppData\\Roaming\\.minecraft\\shaderpacks\r\nPermission denied"
+                "Access denied at C:\\Users\\player name\\AppData\\Roaming\\.minecraft\\shaderpacks: Permission denied"
         );
 
         assertTrue(result.startsWith("Access denied at [path]"));
         assertTrue(result.endsWith("Permission denied"));
         assertFalse(result.contains("C:\\Users"));
         assertFalse(result.contains("\n"));
+    }
+
+    @Test
+    void sanitizesAbsolutePathsThatContainSpaces() {
+        String result = ShaderPackIssue.sanitizeDisplayText(
+                "Unable to read /home/player name/.minecraft/shaderpacks/Broken Pack.zip: invalid ZIP"
+        );
+
+        assertEquals("Unable to read [path]: invalid ZIP", result);
+        assertFalse(result.contains("player name"));
+        assertFalse(result.contains(".minecraft"));
     }
 
     @Test

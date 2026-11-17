@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 /** A candidate that could not safely be accepted as a shader pack. */
 public record ShaderPackIssue(Path source, String reason) {
     private static final Pattern ABSOLUTE_PATH = Pattern.compile(
-            "(?i)(?:[A-Z]:[\\\\/][^\\s,;)]*|\\\\\\\\[^\\s,;)]*|(?<![A-Za-z0-9._-])/(?:[^\\s,;)]*)"
+            "(?i)(?:[A-Z]:[\\\\/][^:;)]*|\\\\\\\\[^:;)]*|(?<![A-Za-z0-9._-])/[^:;)]*)"
     );
     private static final int MAX_DISPLAY_LENGTH = 240;
 
@@ -27,7 +27,7 @@ public record ShaderPackIssue(Path source, String reason) {
 
     /** Returns a bounded, single-line reason with absolute paths removed. */
     public String displayReason() {
-        return sanitizeDisplayText(reason);
+        return sanitizeDisplayText(reason.replace(source.toString(), "[path]"));
     }
 
     public static String sanitizeDisplayText(String value) {
