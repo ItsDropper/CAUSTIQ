@@ -41,7 +41,6 @@ public final class IrisNvidiumTerrainTranslator {
     private static final Pattern TEXTURE_FUNCTION = Pattern.compile("\\b(texture2DProj|texture2DLod|texture2DGradARB|texture2D|textureCube)\\b");
     private static final Pattern FRAG_DATA_INDEX = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]");
     private static final Set<String> UNSUPPORTED_RUNTIME_UNIFORMS = Set.of(
-            "normals", "specular", "colortex15",
             "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans");
     private static final Set<String> SUPPORTED_ATTRIBUTES = Set.of(
             "mc_Entity", "at_midBlock", "mc_midTexCoord", "at_midTexCoord",
@@ -102,6 +101,12 @@ public final class IrisNvidiumTerrainTranslator {
             Map.entry("colortex6", "caustiqColortex6"),
             Map.entry("colortex7", "caustiqColortex7"),
             Map.entry("colortex8", "caustiqColortex8"),
+            Map.entry("colortex9", "caustiqColortex9"),
+            Map.entry("colortex10", "caustiqColortex10"),
+            Map.entry("colortex11", "caustiqColortex11"),
+            Map.entry("colortex12", "caustiqColortex12"),
+            Map.entry("colortex13", "caustiqColortex13"),
+            Map.entry("colortex14", "caustiqColortex14"),
             Map.entry("shadowcolor0", "caustiqShadowcolor0"),
             Map.entry("shadowcolor1", "caustiqShadowcolor1"),
             Map.entry("depthtex1", "caustiqDepthTexture1"),
@@ -992,6 +997,8 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform mat4 caustiqShadowModelViewInverse;
                 uniform mat4 caustiqShadowProjection;
                 uniform mat4 caustiqShadowProjectionInverse;
+                uniform sampler2D caustiqNormalTexture;
+                uniform sampler2D caustiqSpecularTexture;
                 uniform sampler2D caustiqColortex1;
                 uniform sampler2D caustiqColortex2;
                 uniform sampler2D caustiqColortex3;
@@ -1000,6 +1007,13 @@ public final class IrisNvidiumTerrainTranslator {
                 uniform sampler2D caustiqColortex6;
                 uniform sampler2D caustiqColortex7;
                 uniform sampler2D caustiqColortex8;
+                uniform sampler2D caustiqColortex9;
+                uniform sampler2D caustiqColortex10;
+                uniform sampler2D caustiqColortex11;
+                uniform sampler2D caustiqColortex12;
+                uniform sampler2D caustiqColortex13;
+                uniform sampler2D caustiqColortex14;
+                uniform sampler2D caustiqColortex15;
                 uniform float caustiqNear;
                 uniform float caustiqFar;
                 uniform ivec2 caustiqAtlasSize;
@@ -1049,9 +1063,9 @@ public final class IrisNvidiumTerrainTranslator {
     private static String expectedUniformType(String name) {
         return switch (name) {
             case "gtexture", "tex", "lightmap", "noisetex", "normals", "specular", "shadowtex0", "shadow",
-                    "colortex1", "colortex2", "colortex3", "colortex4", "colortex5", "colortex6", "colortex7", "colortex8",
-                    "shadowcolor0", "shadowcolor1",
-                    "depthtex1", "colortex15",
+                    "colortex1", "colortex2", "colortex3", "colortex4", "colortex5", "colortex6", "colortex7",
+                    "colortex8", "colortex9", "colortex10", "colortex11", "colortex12", "colortex13",
+                    "colortex14", "colortex15", "shadowcolor0", "shadowcolor1", "depthtex1",
                     "dhDepthTex", "dhDepthTex1", "vxDepthTexOpaque", "vxDepthTexTrans" -> "sampler2D";
             case "shadowtex1" -> "sampler2DShadow";
             case "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",

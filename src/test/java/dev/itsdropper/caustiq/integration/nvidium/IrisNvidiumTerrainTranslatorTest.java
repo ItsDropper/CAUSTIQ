@@ -787,7 +787,7 @@ class IrisNvidiumTerrainTranslatorTest {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
             IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
                     model, "world0", "gbuffers_terrain",
-                    Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false", "TAA", "false"));
+                    Map.of("NORMAL_MAPPING", "true", "SPECULAR_MAPPING", "true", "TAA", "true"));
             Map<String, String> combined = translator.adapt(extended);
             assertTrue(combined.get("MESH").contains("caustiqIrisVertexMain"));
             assertTrue(combined.get("FRAGMENT").contains("caustiqIrisFragmentMain"));
@@ -796,6 +796,10 @@ class IrisNvidiumTerrainTranslatorTest {
                     "Nvidium's native forward color output must remain at location zero");
             assertTrue(combined.get("FRAGMENT").contains("layout(location = 1) out vec4 caustiqIrisOutput0;"),
                     "Iris colortex1 must be routed through a separate output location");
+            assertTrue(combined.get("FRAGMENT").contains("uniform sampler2D caustiqNormalTexture;"),
+                    "Photon normal-map sampling must survive terrain translation.");
+            assertTrue(combined.get("FRAGMENT").contains("uniform sampler2D caustiqSpecularTexture;"),
+                    "Photon specular-map sampling must survive terrain translation.");
             String outputDirectory = System.getenv("CAUSTIQ_COMPAT_OUTPUT_DIR");
             Assumptions.assumeTrue(outputDirectory != null && !outputDirectory.isBlank(),
                     "Combined Photon/Nvidium source artifacts are captured in CI");

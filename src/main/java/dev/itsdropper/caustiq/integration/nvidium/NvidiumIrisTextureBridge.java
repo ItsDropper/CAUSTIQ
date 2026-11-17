@@ -13,7 +13,7 @@ import java.util.Random;
 
 /** Owns the fallback Iris textures used by the translated Photon terrain shader. */
 public final class NvidiumIrisTextureBridge {
-    public static final int MAX_COLORTEX_SAMPLER = 7;
+    public static final int MAX_COLORTEX_SAMPLER = 15;
     private static final int NOISE_SIZE = 512;
     private static int noiseTexture;
     private static int fallbackDepthTexture;
@@ -36,30 +36,26 @@ public final class NvidiumIrisTextureBridge {
         if (bindingState != null || customResources != null) restoreBindings();
         ensureTextures();
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
-        boolean needsDepthSnapshot = program != 0
-                && GL20C.glGetUniformLocation(program, "caustiqDepthTexture1") >= 0;
-        int[] units = needsDepthSnapshot
-                ? new int[]{GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE3, GL13C.GL_TEXTURE12,
-                        GL13C.GL_TEXTURE13, GL13C.GL_TEXTURE14, GL13C.GL_TEXTURE15}
-                : new int[]{GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE12, GL13C.GL_TEXTURE13,
-                        GL13C.GL_TEXTURE14, GL13C.GL_TEXTURE15};
-        int[] textures = needsDepthSnapshot
-                ? new int[]{noiseTexture, captureDepthSnapshot(),
-                        shadowOrFallback(NvidiumShadowRenderer.shadowTexture()),
-                        shadowOrFallback(NvidiumShadowRenderer.shadowTexture1()),
-                        colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0)),
-                        colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))}
-                : new int[]{noiseTexture,
-                        shadowOrFallback(NvidiumShadowRenderer.shadowTexture()),
-                        shadowOrFallback(NvidiumShadowRenderer.shadowTexture1()),
-                        colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0)),
-                        colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))};
-        int[] samplers = needsDepthSnapshot
-                ? new int[]{0, 0, 0, shadowComparisonSampler, 0, 0}
-                : new int[]{0, 0, shadowComparisonSampler, 0, 0};
-        bindingState = bindTextures(previousActive, units, textures, samplers);
+        boolean needsDepthSnapshot = program != 0 && GL20C.glGetUniformLocation(program, "caustiqDepthTexture1") >= 0;
+        boolean needsNormals = program != 0 && GL20C.glGetUniformLocation(program, "caustiqNormalTexture") >= 0;
+        boolean needsSpecular = program != 0 && GL20C.glGetUniformLocation(program, "caustiqSpecularTexture") >= 0;
+        java.util.ArrayList<Integer> units = new java.util.ArrayList<>();
+        java.util.ArrayList<Integer> textures = new java.util.ArrayList<>();
+        java.util.ArrayList<Integer> samplers = new java.util.ArrayList<>();
+        units.add(GL13C.GL_TEXTURE2); textures.add(noiseTexture); samplers.add(0);
+        if (needsDepthSnapshot) { units.add(GL13C.GL_TEXTURE3); textures.add(captureDepthSnapshot()); samplers.add(0); }
+        if (needsNormals) { units.add(GL13C.GL_TEXTURE4); textures.add(NvidiumPbrTextureAtlases.normalsTexture()); samplers.add(0); }
+        if (needsSpecular) { units.add(GL13C.GL_TEXTURE5); textures.add(NvidiumPbrTextureAtlases.specularTexture()); samplers.add(0); }
+        units.add(GL13C.GL_TEXTURE12); textures.add(shadowOrFallback(NvidiumShadowRenderer.shadowTexture())); samplers.add(0);
+        units.add(GL13C.GL_TEXTURE13); textures.add(shadowOrFallback(NvidiumShadowRenderer.shadowTexture1())); samplers.add(shadowComparisonSampler);
+        units.add(GL13C.GL_TEXTURE14); textures.add(colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0))); samplers.add(0);
+        units.add(GL13C.GL_TEXTURE15); textures.add(colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))); samplers.add(0);
+        bindingState = bindTextures(previousActive, units.stream().mapToInt(Integer::intValue).toArray(),
+                textures.stream().mapToInt(Integer::intValue).toArray(), samplers.stream().mapToInt(Integer::intValue).toArray());
         setSampler(program, "noisetex", 2);
         if (needsDepthSnapshot) setSampler(program, "caustiqDepthTexture1", 3);
+        if (needsNormals) setSampler(program, "caustiqNormalTexture", 4);
+        if (needsSpecular) setSampler(program, "caustiqSpecularTexture", 5);
         setSampler(program, "shadowtex0", 12);
         setSampler(program, "shadowtex1", 13);
         setSampler(program, "shadowcolor0", 14);
@@ -72,15 +68,24 @@ public final class NvidiumIrisTextureBridge {
         if (bindingState != null || customResources != null) restoreBindings();
         ensureTextures();
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
-        int[] units = {GL13C.GL_TEXTURE2, GL13C.GL_TEXTURE12, GL13C.GL_TEXTURE13,
-                GL13C.GL_TEXTURE14, GL13C.GL_TEXTURE15};
-        int[] textures = {noiseTexture,
-                shadowOrFallback(NvidiumShadowRenderer.shadowTexture()),
-                shadowOrFallback(NvidiumShadowRenderer.shadowTexture1()),
-                colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0)),
-                colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))};
-        int[] samplers = {0, 0, shadowComparisonSampler, 0, 0};
-        bindingState = bindTextures(previousActive, units, textures, samplers);
+        java.util.ArrayList<Integer> units = new java.util.ArrayList<>();
+        java.util.ArrayList<Integer> textures = new java.util.ArrayList<>();
+        java.util.ArrayList<Integer> samplers = new java.util.ArrayList<>();
+        units.add(GL13C.GL_TEXTURE2); textures.add(noiseTexture); samplers.add(0);
+        if (program != 0 && GL20C.glGetUniformLocation(program, "caustiqNormalTexture") >= 0) {
+            units.add(GL13C.GL_TEXTURE4); textures.add(NvidiumPbrTextureAtlases.normalsTexture()); samplers.add(0);
+            setSampler(program, "caustiqNormalTexture", 4);
+        }
+        if (program != 0 && GL20C.glGetUniformLocation(program, "caustiqSpecularTexture") >= 0) {
+            units.add(GL13C.GL_TEXTURE5); textures.add(NvidiumPbrTextureAtlases.specularTexture()); samplers.add(0);
+            setSampler(program, "caustiqSpecularTexture", 5);
+        }
+        units.add(GL13C.GL_TEXTURE12); textures.add(shadowOrFallback(NvidiumShadowRenderer.shadowTexture())); samplers.add(0);
+        units.add(GL13C.GL_TEXTURE13); textures.add(shadowOrFallback(NvidiumShadowRenderer.shadowTexture1())); samplers.add(shadowComparisonSampler);
+        units.add(GL13C.GL_TEXTURE14); textures.add(colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(0))); samplers.add(0);
+        units.add(GL13C.GL_TEXTURE15); textures.add(colorOrFallback(NvidiumShadowRenderer.shadowColorTexture(1))); samplers.add(0);
+        bindingState = bindTextures(previousActive, units.stream().mapToInt(Integer::intValue).toArray(),
+                textures.stream().mapToInt(Integer::intValue).toArray(), samplers.stream().mapToInt(Integer::intValue).toArray());
         setSampler(program, "noisetex", 2);
         setSampler(program, "shadowtex0", 12);
         setSampler(program, "shadowtex1", 13);
@@ -90,8 +95,8 @@ public final class NvidiumIrisTextureBridge {
     }
 
     private static int bindColortexSamplers(int program, int previousActive) {
-        if (program == 0) return 5;
-        int unit = 5;
+        if (program == 0) return 16;
+        int unit = 6;
         int maximum = GL11C.glGetInteger(GL20C.GL_MAX_TEXTURE_IMAGE_UNITS);
         java.util.ArrayList<Integer> units = new java.util.ArrayList<>();
         java.util.ArrayList<Integer> previousBindings = new java.util.ArrayList<>();
@@ -100,8 +105,9 @@ public final class NvidiumIrisTextureBridge {
             for (int attachment = 1; attachment <= MAX_COLORTEX_SAMPLER; attachment++) {
                 int location = GL20C.glGetUniformLocation(program, "caustiqColortex" + attachment);
                 if (location < 0) continue;
-                if (unit >= Math.min(maximum, 12)) {
-                    throw new IllegalStateException("Iris colortex samplers exceed the texture units reserved before shadow samplers.");
+                if (unit >= 12 && unit <= 15) unit = 16;
+                if (unit >= maximum) {
+                    throw new IllegalStateException("Iris colortex samplers exceed the fragment texture-unit limit after reserving PBR and shadow textures.");
                 }
                 int textureUnit = GL13C.GL_TEXTURE0 + unit;
                 GL13C.glActiveTexture(textureUnit);
@@ -131,7 +137,7 @@ public final class NvidiumIrisTextureBridge {
                     previousSamplers.stream().mapToInt(Integer::intValue).toArray()));
         }
         GL13C.glActiveTexture(previousActive);
-        return unit;
+        return Math.max(unit, 16);
     }
 
     private static BindingState bindTextures(int previousActive, int[] units, int[] textures, int[] samplers) {
@@ -189,7 +195,8 @@ public final class NvidiumIrisTextureBridge {
     public static void bindCustomTextures(IrisShaderResources resources, int program, int firstTextureUnit) {
         if (customResources != null) customResources.restoreTerrainTextures();
         customResources = resources;
-        if (resources != null) resources.bindTerrainTextures(program, firstTextureUnit, 12);
+        if (resources != null) resources.bindTerrainTextures(
+                program, firstTextureUnit, GL11C.glGetInteger(GL20C.GL_MAX_TEXTURE_IMAGE_UNITS));
     }
 
     public static void restoreBindings() {
@@ -210,6 +217,7 @@ public final class NvidiumIrisTextureBridge {
         if (depthSnapshotTexture != 0) GL11C.glDeleteTextures(depthSnapshotTexture);
         if (fallbackColorTexture != 0) GL11C.glDeleteTextures(fallbackColorTexture);
         if (shadowComparisonSampler != 0) GL33C.glDeleteSamplers(shadowComparisonSampler);
+        NvidiumPbrTextureAtlases.destroy();
         noiseTexture = 0;
         fallbackDepthTexture = 0;
         depthSnapshotTexture = 0;

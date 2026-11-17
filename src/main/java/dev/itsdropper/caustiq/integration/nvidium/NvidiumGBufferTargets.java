@@ -113,6 +113,7 @@ public final class NvidiumGBufferTargets {
                 GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
                 GL30C.glGenerateMipmap(GL11C.GL_TEXTURE_2D);
             }
+            ShaderRuntime.publishTerrainOutputs();
         } finally {
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
             GL13C.glActiveTexture(previousActiveTexture);

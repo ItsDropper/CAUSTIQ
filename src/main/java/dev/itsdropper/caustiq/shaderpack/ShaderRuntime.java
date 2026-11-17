@@ -128,8 +128,24 @@ public final class ShaderRuntime {
     }
 
     /** Returns the last frame's Iris-owned color target for a terrain sampler. */
+    /** Previous completed frame's Iris-owned target, sampled by Nvidium terrain. */
     public static int irisColorTexture(int index) {
         return IRIS_PASS_EXECUTOR.terrainSamplerTexture(index);
+    }
+
+    /** Current frame's writable terrain target, attached before Nvidium rasterization. */
+    public static int irisTerrainOutputTexture(int index) {
+        return IRIS_PASS_EXECUTOR.terrainOutputTexture(index);
+    }
+
+    /** Ensures high-index terrain MRT targets exist before Nvidium attaches them. */
+    public static void prepareTerrainOutputs(int width, int height) {
+        if (activePassPlan != null) IRIS_PASS_EXECUTOR.prepareTerrainOutputs(activePassPlan, width, height);
+    }
+
+    /** Publishes terrain MRT writes when no fullscreen pass runs this frame. */
+    public static void publishTerrainOutputs() {
+        if (activePassPlan != null) IRIS_PASS_EXECUTOR.publishTerrainOutputs(activePassPlan);
     }
 
     public static IrisTerrainPassScheduler.Plan activePassPlan() { return activePassPlan; }

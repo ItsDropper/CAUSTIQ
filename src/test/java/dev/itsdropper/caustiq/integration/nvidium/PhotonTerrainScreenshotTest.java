@@ -45,7 +45,7 @@ class PhotonTerrainScreenshotTest {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
             IrisNvidiumTerrainTranslator translator = IrisNvidiumTerrainTranslator.from(
                     model, "world0", "gbuffers_terrain",
-                    Map.of("NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false", "TAA", "true"));
+                    Map.of("NORMAL_MAPPING", "true", "SPECULAR_MAPPING", "true", "TAA", "true"));
             Map<String, String> harness = translator.softwareRenderHarnessSources();
 
             GLFWErrorCallback callback = GLFWErrorCallback.createPrint(System.err);
@@ -189,6 +189,8 @@ class PhotonTerrainScreenshotTest {
         vec2(program, "renderFog", 0, 0);
         vec4(program, "fogColour", 0, 0, 0, 0);
         vec2(program, "caustiqTaaOffset", 0, 0);
+        sampler(program, "caustiqNormalTexture", 4);
+        sampler(program, "caustiqSpecularTexture", 5);
         scalar(program, "caustiqAspectRatio", 1);
         scalar(program, "caustiqNear", 0.1f);
         scalar(program, "caustiqFar", 1000);
@@ -210,6 +212,10 @@ class PhotonTerrainScreenshotTest {
         }
     }
 
+    private static void sampler(int p, String n, int unit) {
+        int location = GL20C.glGetUniformLocation(p, n);
+        if (location >= 0) GL20C.glUniform1i(location, unit);
+    }
     private static void scalar(int p, String n, float v) {
         int l = GL20C.glGetUniformLocation(p, n); if (l >= 0) GL20C.glUniform1f(l, v);
     }

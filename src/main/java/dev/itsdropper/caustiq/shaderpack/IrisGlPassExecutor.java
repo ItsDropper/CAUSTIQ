@@ -501,6 +501,41 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         }
     }
 
+    /** Allocates scheduled targets before Nvidium attaches high-index terrain outputs. */
+    public void prepareTerrainOutputs(IrisTerrainPassScheduler.Plan plan, int targetWidth, int targetHeight) {
+        if (plan == null || plan.isEmpty() || targetWidth <= 0 || targetHeight <= 0) return;
+        Set<Integer> usedTargets = new HashSet<>();
+        for (IrisTerrainPassScheduler.ScheduledPass scheduled : plan.passes()) {
+            usedTargets.addAll(scheduled.pass().reads());
+            usedTargets.addAll(scheduled.pass().writes());
+        }
+        GlState previous = captureState();
+        try {
+            ensureResources(targetWidth, targetHeight, plan.targets(), usedTargets);
+        } finally {
+            restoreState(previous);
+        }
+    }
+
+    /** Writable primary side for this frame's Nvidium terrain output, colortex8-31. */
+    public int terrainOutputTexture(int index) {
+        if (index <= MAX_TERRAIN_TARGET || index > MAX_COLOR_TARGET) return 0;
+        return customTargets[index][0];
+    }
+
+    /** Publishes Nvidium's just-written high-index targets for next-frame terrain sampling. */
+    public void publishTerrainOutputs(IrisTerrainPassScheduler.Plan plan) {
+        if (plan == null) return;
+        for (IrisTerrainPassScheduler.ScheduledPass scheduled : plan.passes()) {
+            if (scheduled.pass().group() != ShaderPackProgramCatalog.Group.GBUFFERS) continue;
+            for (int index : scheduled.pass().writes()) {
+                if (index > MAX_TERRAIN_TARGET && index <= MAX_COLOR_TARGET && customTargets[index][0] != 0) {
+                    terrainSamplerTextures[index] = customTargets[index][0];
+                }
+            }
+        }
+    }
+
     /** Returns the last Iris-owned colortex texture made available to Nvidium terrain. */
     public int terrainSamplerTexture(int index) {
         if (index <= MAX_TERRAIN_TARGET || index > MAX_COLOR_TARGET) return 0;

@@ -22,6 +22,12 @@ class NvidiumGBufferTargetsTest {
     }
 
     @Test
+    void mapsHighLogicalColortexIndicesIntoPhysicalMrtSlots() {
+        assertArrayEquals(new int[]{0, 1, 2, 3, -1, -1, -1, -1},
+                NvidiumGBufferTargets.createOutputRouting(List.of(8, 9, 15)));
+    }
+
+    @Test
     void preservesNvidiumsIdentityRoutingWhenNoIrisAdapterIsInstalled() {
         assertArrayEquals(new int[]{0, 1, 2, 3, 4, 5, 6, 7},
                 NvidiumGBufferTargets.createOutputRouting(List.of(0, 1, 2, 3, 4, 5, 6, 7)));
