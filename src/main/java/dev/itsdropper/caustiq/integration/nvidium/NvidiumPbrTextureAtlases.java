@@ -100,7 +100,7 @@ public final class NvidiumPbrTextureAtlases {
         AtlasLayout layout = readAtlasLayout(atlas);
         if (atlas == cachedAtlas && resources == cachedResources && layout.fingerprint() == cachedFingerprint
                 && normalsTexture != 0 && specularTexture != 0) {
-            syncAnimationFrames(atlas);
+            syncAnimationFrames(layout.animationFrames());
             return;
         }
         Map<Identifier, PbrSprite> nextSprites = loadPbrSprites(layout, resources);
@@ -118,7 +118,7 @@ public final class NvidiumPbrTextureAtlases {
         normalsTexture = nextNormals; specularTexture = nextSpecular;
         cachedAtlas = atlas; cachedResources = resources; cachedFingerprint = layout.fingerprint();
         cachedPbrSprites = Map.copyOf(nextSprites);
-        cachedAnimationFrames = readAnimationFrames(atlas);
+        cachedAnimationFrames = layout.animationFrames();
     }
 
     private static AtlasLayout readAtlasLayout(TextureAtlas atlas) {
@@ -127,19 +127,56 @@ public final class NvidiumPbrTextureAtlases {
         int height = accessor.caustiq$getHeight();
         Map<Identifier, TextureAtlasSprite> spriteMap = accessor.caustiq$getTexturesByName();
         if (spriteMap == null) throw new IllegalStateException("Minecraft block atlas does not expose its sprite map.");
-            List<Sprite> sprites = new ArrayList<>(spriteMap.size());
-            long fingerprint = 0xcbf29ce484222325L;
-            for (TextureAtlasSprite sprite : spriteMap.values()) {
-                Identifier name = sprite.contents().name();
-                int x = sprite.getX(), y = sprite.getY();
-                int sw = sprite.contents().width(), sh = sprite.contents().height();
-                if (x < 0 || y < 0 || sw <= 0 || sh <= 0 || x + sw > width || y + sh > height) continue;
-                sprites.add(new Sprite(name, x, y, sw, sh));
-                fingerprint = mix(fingerprint, name.toString().hashCode());
-                fingerprint = mix(fingerprint, x); fingerprint = mix(fingerprint, y);
-                fingerprint = mix(fingerprint, sw); fingerprint = mix(fingerprint, sh);
+        Map<Identifier, AnimationInfo> animationInfo = readAnimationInfo(atlas);
+        Map<Identifier, Integer> animationFrames = new HashMap<>();
+        List<Sprite> sprites = new ArrayList<>(spriteMap.size());
+        long fingerprint = 0xcbf29ce484222325L;
+        for (TextureAtlasSprite sprite : spriteMap.values()) {
+            Identifier name = sprite.contents().name();
+            int x = sprite.getX(), y = sprite.getY();
+            int sw = sprite.contents().width(), sh = sprite.contents().height();
+            if (x < 0 || y < 0 || sw <= 0 || sh <= 0 || x + sw > width || y + sh > height) continue;
+            AnimationInfo animation = animationInfo.getOrDefault(name, new AnimationInfo(1, 1, 0));
+            sprites.add(new Sprite(name, x, y, sw, sh, animation.columns(), animation.frameCount()));
+            if (animation.frameCount() > 1) animationFrames.put(name, animation.currentFrame());
+            fingerprint = mix(fingerprint, name.toString().hashCode());
+            fingerprint = mix(fingerprint, x); fingerprint = mix(fingerprint, y);
+            fingerprint = mix(fingerprint, sw); fingerprint = mix(fingerprint, sh);
+            fingerprint = mix(fingerprint, animation.columns());
+            fingerprint = mix(fingerprint, animation.frameCount());
+        }
+        return new AtlasLayout(width, height, List.copyOf(sprites), fingerprint, Map.copyOf(animationFrames));
+    }
+
+    private static Map<Identifier, AnimationInfo> readAnimationInfo(TextureAtlas atlas) {
+        TextureAtlasAccessorMixin accessor = (TextureAtlasAccessorMixin) (Object) atlas;
+        Iterator<?> states = accessor.caustiq$getAnimatedTextureStates().iterator();
+        Map<Identifier, AnimationInfo> animations = new HashMap<>();
+        for (TextureAtlasSprite sprite : accessor.caustiq$getSprites()) {
+            if (!sprite.contents().isAnimated()) continue;
+            if (!states.hasNext()) {
+                throw new IllegalStateException("Minecraft's animated block-sprite list and animation-state list are out of sync.");
             }
-            return new AtlasLayout(width, height, List.copyOf(sprites), fingerprint);
+            SpriteAnimationStateAccessorMixin state = (SpriteAnimationStateAccessorMixin) states.next();
+            Object animation = state.caustiq$getAnimationInfo();
+            SpriteAnimatedTextureAccessorMixin animated =
+                    (SpriteAnimatedTextureAccessorMixin) animation;
+            List<?> frameInfos = animated.caustiq$getFrames();
+            int maxFrame = -1;
+            for (Object frameInfo : frameInfos) {
+                maxFrame = Math.max(maxFrame,
+                        ((SpriteFrameInfoAccessorMixin) frameInfo).caustiq$getIndex());
+            }
+            int frame = state.caustiq$getFrame();
+            if (frame < 0 || frame >= frameInfos.size()) continue;
+            int sourceFrame = ((SpriteFrameInfoAccessorMixin) frameInfos.get(frame)).caustiq$getIndex();
+            animations.put(sprite.contents().name(), new AnimationInfo(
+                    Math.max(1, animated.caustiq$getFrameRowSize()), maxFrame + 1, sourceFrame));
+        }
+        if (states.hasNext()) {
+            throw new IllegalStateException("Minecraft's animated block-sprite list contains unmatched animation states.");
+        }
+        return Map.copyOf(animations);
     }
 
     private static Map<Identifier, PbrSprite> loadPbrSprites(AtlasLayout layout, ResourceManager resources) {
@@ -185,7 +222,7 @@ public final class NvidiumPbrTextureAtlases {
     }
 
     private static void blit(BufferedImage image, ByteBuffer atlas, int atlasWidth, Sprite sprite, int frameIndex) {
-        FrameRegion frame = frameRegion(image, sprite.width(), sprite.height(), frameIndex);
+        FrameRegion frame = frameRegion(image, sprite, frameIndex);
         for (int y = 0; y < sprite.height(); y++) {
             int sy = frame.y() + Math.min(frame.height() - 1, (int)((long)y * frame.height() / sprite.height()));
             for (int x = 0; x < sprite.width(); x++) {
@@ -198,16 +235,28 @@ public final class NvidiumPbrTextureAtlases {
         }
     }
 
-    private static FrameRegion frameRegion(BufferedImage image, int spriteWidth, int spriteHeight, int frameIndex) {
-        boolean grid = image.getWidth() >= spriteWidth && image.getHeight() >= spriteHeight
-                && image.getWidth() % spriteWidth == 0 && image.getHeight() % spriteHeight == 0;
-        if (!grid) return new FrameRegion(0, 0, image.getWidth(), image.getHeight());
-        int columns = image.getWidth() / spriteWidth;
-        int rows = image.getHeight() / spriteHeight;
-        int frameCount = Math.multiplyExact(columns, rows);
-        int frame = Math.max(0, Math.min(frameIndex, frameCount - 1));
-        return new FrameRegion((frame % columns) * spriteWidth,
-                (frame / columns) * spriteHeight, spriteWidth, spriteHeight);
+    private static FrameRegion frameRegion(BufferedImage image, Sprite sprite, int frameIndex) {
+        if (sprite.frameCount() <= 1) {
+            return new FrameRegion(0, 0, image.getWidth(), image.getHeight());
+        }
+        int columns = sprite.frameColumns();
+        if (columns <= 0 || image.getWidth() % columns != 0) {
+            return new FrameRegion(0, 0, image.getWidth(), image.getHeight());
+        }
+        int frameWidth = image.getWidth() / columns;
+        if (frameWidth < sprite.width() || frameWidth % sprite.width() != 0) {
+            return new FrameRegion(0, 0, image.getWidth(), image.getHeight());
+        }
+        int scale = frameWidth / sprite.width();
+        int frameHeight = Math.multiplyExact(sprite.height(), scale);
+        if (frameHeight <= 0 || image.getHeight() % frameHeight != 0) {
+            return new FrameRegion(0, 0, image.getWidth(), image.getHeight());
+        }
+        int rows = image.getHeight() / frameHeight;
+        int availableFrames = Math.multiplyExact(columns, rows);
+        int frame = Math.max(0, Math.min(frameIndex, Math.min(sprite.frameCount(), availableFrames) - 1));
+        return new FrameRegion((frame % columns) * frameWidth,
+                (frame / columns) * frameHeight, frameWidth, frameHeight);
     }
 
     private static void syncAnimationFrames(TextureAtlas atlas) {
@@ -234,31 +283,8 @@ public final class NvidiumPbrTextureAtlases {
         cachedAnimationFrames = Map.copyOf(current);
     }
 
-    private static Map<Identifier, Integer> readAnimationFrames(TextureAtlas atlas) {
-        TextureAtlasAccessorMixin accessor = (TextureAtlasAccessorMixin) (Object) atlas;
-        Iterator<?> states = accessor.caustiq$getAnimatedTextureStates().iterator();
-        Map<Identifier, Integer> frames = new HashMap<>();
-        for (TextureAtlasSprite sprite : accessor.caustiq$getSprites()) {
-            if (!sprite.contents().isAnimated()) continue;
-            if (!states.hasNext()) {
-                throw new IllegalStateException("Minecraft's animated block-sprite list and animation-state list are out of sync.");
-            }
-            SpriteAnimationStateAccessorMixin state = (SpriteAnimationStateAccessorMixin) states.next();
-            Object animation = state.caustiq$getAnimationInfo();
-            List<?> frameInfos = ((SpriteAnimatedTextureAccessorMixin) animation).caustiq$getFrames();
-            int frame = state.caustiq$getFrame();
-            if (frame < 0 || frame >= frameInfos.size()) continue;
-            int sourceFrame = ((SpriteFrameInfoAccessorMixin) frameInfos.get(frame)).caustiq$getIndex();
-            frames.put(sprite.contents().name(), sourceFrame);
-        }
-        if (states.hasNext()) {
-            throw new IllegalStateException("Minecraft's animated block-sprite list contains unmatched animation states.");
-        }
-        return Map.copyOf(frames);
-    }
-
     private static void uploadSpriteRegion(int texture, BufferedImage image, Sprite sprite, int frameIndex) {
-        FrameRegion frame = frameRegion(image, sprite.width(), sprite.height(), frameIndex);
+        FrameRegion frame = frameRegion(image, sprite, frameIndex);
         ByteBuffer pixels = ByteBuffer.allocateDirect(sprite.width() * sprite.height() * 4);
         for (int y = 0; y < sprite.height(); y++) {
             int sy = frame.y() + Math.min(frame.height() - 1, (int)((long)y * frame.height() / sprite.height()));
@@ -294,8 +320,11 @@ public final class NvidiumPbrTextureAtlases {
         }
     }
 
-    static int[] frameRegionForTests(BufferedImage image, int spriteWidth, int spriteHeight, int frameIndex) {
-        FrameRegion frame = frameRegion(image, spriteWidth, spriteHeight, frameIndex);
+    static int[] frameRegionForTests(BufferedImage image, int spriteWidth, int spriteHeight,
+                                     int frameIndex, int frameColumns, int frameCount) {
+        Sprite sprite = new Sprite(Identifier.withDefaultNamespace("test"), 0, 0,
+                spriteWidth, spriteHeight, frameColumns, frameCount);
+        FrameRegion frame = frameRegion(image, sprite, frameIndex);
         return new int[]{frame.x(), frame.y(), frame.width(), frame.height()};
     }
 
@@ -323,5 +352,6 @@ public final class NvidiumPbrTextureAtlases {
 
     private static long mix(long hash, int value) { return (hash ^ Integer.toUnsignedLong(value)) * 0x100000001b3L; }
     private record Sprite(Identifier name, int x, int y, int width, int height) { }
-    private record AtlasLayout(int width, int height, List<Sprite> sprites, long fingerprint) { }
+    private record AtlasLayout(int width, int height, List<Sprite> sprites, long fingerprint,
+                               Map<Identifier, Integer> animationFrames) { }
 }

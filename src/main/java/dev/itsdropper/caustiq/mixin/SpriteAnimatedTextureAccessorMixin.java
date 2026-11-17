@@ -9,4 +9,7 @@ import java.util.List;
 public interface SpriteAnimatedTextureAccessorMixin {
     @Accessor("frames")
     List<?> caustiq$getFrames();
+
+    @Accessor("frameRowSize")
+    int caustiq$getFrameRowSize();
 }
