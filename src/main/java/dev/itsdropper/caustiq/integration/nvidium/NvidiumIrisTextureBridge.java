@@ -105,7 +105,7 @@ public final class NvidiumIrisTextureBridge {
             for (int attachment = 1; attachment <= MAX_COLORTEX_SAMPLER; attachment++) {
                 int location = GL20C.glGetUniformLocation(program, "caustiqColortex" + attachment);
                 if (location < 0) continue;
-                if (unit >= 12 && unit <= 15) unit = 16;
+                unit = firstCustomTextureUnit(unit);
                 if (unit >= maximum) {
                     throw new IllegalStateException("Iris colortex samplers exceed the fragment texture-unit limit after reserving PBR and shadow textures.");
                 }
@@ -134,8 +134,13 @@ public final class NvidiumIrisTextureBridge {
                     previousBindings.stream().mapToInt(Integer::intValue).toArray(),
                     previousSamplers.stream().mapToInt(Integer::intValue).toArray()));
         }
+        unit = firstCustomTextureUnit(unit);
         GL13C.glActiveTexture(previousActive);
         return unit;
+    }
+
+    static int firstCustomTextureUnit(int nextUnit) {
+        return nextUnit >= 12 && nextUnit <= 15 ? 16 : nextUnit;
     }
 
     private static BindingState bindTextures(int previousActive, int[] units, int[] textures, int[] samplers) {

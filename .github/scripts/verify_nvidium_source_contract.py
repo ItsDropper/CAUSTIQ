@@ -203,6 +203,7 @@ assert "GL33C.glBindSampler" in texture_bridge
 assert "0x884C, 0x884E" in texture_bridge
 assert "if (program == 0) return 6;" in texture_bridge
 assert "return unit;" in texture_bridge
+assert "firstCustomTextureUnit(int nextUnit)" in texture_bridge
 assert "noiseTexture, noiseTexture" not in texture_bridge, "Unavailable Iris samplers must not receive dummy noise textures"
 vertex_encoder = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
 assert "STRIDE = 40" in vertex_encoder
