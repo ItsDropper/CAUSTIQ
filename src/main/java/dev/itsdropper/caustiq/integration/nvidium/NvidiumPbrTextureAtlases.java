@@ -3,6 +3,7 @@ package dev.itsdropper.caustiq.integration.nvidium;
 import dev.itsdropper.caustiq.CaustiqClient;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -10,13 +11,12 @@ import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL12C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL30C;
+import dev.itsdropper.caustiq.mixin.TextureAtlasAccessorMixin;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +25,7 @@ import java.util.Optional;
 
 /** Iris-compatible resource-pack normal/specular block atlases without an Iris dependency. */
 public final class NvidiumPbrTextureAtlases {
-    private static final int NORMAL_DEFAULT = 0x7F7FFFFF;
+    private static final int NORMAL_DEFAULT = 0x8080FFFF;
     private static final int SPECULAR_DEFAULT = 0x00000000;
     private static final long MAX_ATLAS_BYTES = 256L * 1024L * 1024L;
     private static Object cachedAtlas;
@@ -56,7 +56,7 @@ public final class NvidiumPbrTextureAtlases {
 
     private static void ensureCurrent() {
         Minecraft minecraft = Minecraft.getInstance();
-        Object atlas = minecraft.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
+        TextureAtlas atlas = (TextureAtlas) minecraft.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
         ResourceManager resources = minecraft.getResourceManager();
         AtlasLayout layout = readAtlasLayout(atlas);
         if (atlas == cachedAtlas && resources == cachedResources && layout.fingerprint() == cachedFingerprint
@@ -76,19 +76,18 @@ public final class NvidiumPbrTextureAtlases {
         cachedAtlas = atlas; cachedResources = resources; cachedFingerprint = layout.fingerprint();
     }
 
-    private static AtlasLayout readAtlasLayout(Object atlas) {
-        try {
-            int width = intField(atlas, "width"), height = intField(atlas, "height");
-            Object rawSprites = field(atlas, "texturesByName");
-            if (!(rawSprites instanceof Map<?, ?> spriteMap)) throw new IllegalStateException("Minecraft block atlas does not expose its sprite map.");
+    private static AtlasLayout readAtlasLayout(TextureAtlas atlas) {
+        TextureAtlasAccessorMixin accessor = (TextureAtlasAccessorMixin) (Object) atlas;
+        int width = accessor.caustiq$getWidth();
+        int height = accessor.caustiq$getHeight();
+        Map<Identifier, TextureAtlasSprite> spriteMap = accessor.caustiq$getTexturesByName();
+        if (spriteMap == null) throw new IllegalStateException("Minecraft block atlas does not expose its sprite map.");
             List<Sprite> sprites = new ArrayList<>(spriteMap.size());
             long fingerprint = 0xcbf29ce484222325L;
-            for (Object sprite : spriteMap.values()) {
-                Object contents = invoke(sprite, "contents");
-                Object id = invoke(contents, "name");
-                if (!(id instanceof Identifier name)) continue;
-                int x = intMethod(sprite, "getX"), y = intMethod(sprite, "getY");
-                int sw = intMethod(contents, "width"), sh = intMethod(contents, "height");
+            for (TextureAtlasSprite sprite : spriteMap.values()) {
+                Identifier name = sprite.contents().name();
+                int x = sprite.getX(), y = sprite.getY();
+                int sw = sprite.contents().width(), sh = sprite.contents().height();
                 if (x < 0 || y < 0 || sw <= 0 || sh <= 0 || x + sw > width || y + sh > height) continue;
                 sprites.add(new Sprite(name, x, y, sw, sh));
                 fingerprint = mix(fingerprint, name.toString().hashCode());
@@ -96,9 +95,6 @@ public final class NvidiumPbrTextureAtlases {
                 fingerprint = mix(fingerprint, sw); fingerprint = mix(fingerprint, sh);
             }
             return new AtlasLayout(width, height, List.copyOf(sprites), fingerprint);
-        } catch (ReflectiveOperationException exception) {
-            throw new IllegalStateException("Could not inspect Minecraft's block atlas for PBR sprite placement.", exception);
-        }
     }
 
     private static int buildAtlas(AtlasLayout layout, ResourceManager resources, boolean normal) {
@@ -161,27 +157,6 @@ public final class NvidiumPbrTextureAtlases {
         }
     }
 
-    private static Object field(Object target, String name) throws ReflectiveOperationException {
-        Class<?> type = target.getClass();
-        while (type != null) {
-            try { Field f = type.getDeclaredField(name); f.setAccessible(true); return f.get(target); }
-            catch (NoSuchFieldException ignored) { type = type.getSuperclass(); }
-        }
-        throw new NoSuchFieldException(name);
-    }
-    private static int intField(Object target, String name) throws ReflectiveOperationException {
-        Object value = field(target, name);
-        if (value instanceof Number n) return n.intValue();
-        throw new IllegalStateException("Minecraft atlas field '" + name + "' is not numeric.");
-    }
-    private static Object invoke(Object target, String name) throws ReflectiveOperationException {
-        return target.getClass().getMethod(name).invoke(target);
-    }
-    private static int intMethod(Object target, String name) throws ReflectiveOperationException {
-        Object value = invoke(target, name);
-        if (value instanceof Number n) return n.intValue();
-        throw new IllegalStateException("Minecraft sprite method '" + name + "' is not numeric.");
-    }
     private static long mix(long hash, int value) { return (hash ^ Integer.toUnsignedLong(value)) * 0x100000001b3L; }
     private record Sprite(Identifier name, int x, int y, int width, int height) { }
     private record AtlasLayout(int width, int height, List<Sprite> sprites, long fingerprint) { }

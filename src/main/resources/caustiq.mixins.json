@@ -18,7 +18,8 @@
     "NvidiumFluidRendererVertexContextMixin",
     "NvidiumPrimaryTerrainRasterizerMixin",
     "NvidiumTranslucentTerrainRasterizerMixin",
-    "MinecraftMixin"
+    "MinecraftMixin",
+    "TextureAtlasAccessorMixin"
   ],
   "injectors": {
     "defaultRequire": 1
