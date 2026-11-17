@@ -33,10 +33,10 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
 
         Button previous = Button.builder(Component.translatable("caustiq.diagnostics.previous"),
                 button -> changePage(-1))
-                .bounds(x, y, 58, 20).build();
+                .bounds(x, y, 64, 20).build();
         Button next = Button.builder(Component.translatable("caustiq.diagnostics.next"),
                 button -> changePage(1))
-                .bounds(x + 62, y, 58, 20).build();
+                .bounds(x + 68, y, 64, 20).build();
         previous.active = pages > 1;
         next.active = pages > 1;
         addRenderableWidget(previous);
@@ -44,10 +44,12 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         addRenderableWidget(Button.builder(Component.translatable("caustiq.diagnostics.copy"), button -> {
             Minecraft.getInstance().keyboardHandler.setClipboard(CaustiqDiagnostics.createReport());
             button.setMessage(Component.translatable("caustiq.diagnostics.copied"));
-        }).bounds(x + 124, y, 84, 20).build());
-        addRenderableWidget(Button.builder(Component.translatable("caustiq.diagnostics.retry"),
+        }).bounds(x + 136, y, 84, 20).build());
+        Button retry = Button.builder(Component.translatable("caustiq.diagnostics.retry"),
                 button -> CaustiqClient.refreshShaderPacks())
-                .bounds(x + 212, y, 86, 20).build());
+                .bounds(x + 224, y, 86, 20).build();
+        retry.active = !CaustiqClient.refreshStatus().isScanning();
+        addRenderableWidget(retry);
         addRenderableWidget(Button.builder(Component.translatable("caustiq.diagnostics.back"),
                 button -> Minecraft.getInstance().setScreen(parent))
                 .bounds(width / 2 - 100, height - 28, 200, 20).build());

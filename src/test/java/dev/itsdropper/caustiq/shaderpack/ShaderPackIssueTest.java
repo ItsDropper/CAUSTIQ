@@ -25,7 +25,7 @@ class ShaderPackIssueTest {
     @Test
     void sanitizesWindowsPathsAndControlCharacters() {
         String result = ShaderPackIssue.sanitizeDisplayText(
-                "Access denied at C:\\Users\\player name\\AppData\\Roaming\\.minecraft\\shaderpacks: Permission denied"
+                "Access denied at C:\\Users\\player name\\AppData\\Roaming\\.minecraft\\shaderpacks:\r\nPermission denied"
         );
 
         assertTrue(result.startsWith("Access denied at [path]"));

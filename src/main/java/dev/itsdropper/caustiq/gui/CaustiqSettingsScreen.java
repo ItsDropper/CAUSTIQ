@@ -182,13 +182,14 @@ public final class CaustiqSettingsScreen extends Screen {
     private void addOptionButtons(ShaderPackDescriptor pack, CaustiqConfig config) {
         ShaderPackMetadata metadata = readMetadata(pack);
         if (metadata == null || metadata.options().isEmpty()) return;
-        int pages = (metadata.options().size() + PAGE_SIZE - 1) / PAGE_SIZE;
-        int start = optionPage * PAGE_SIZE;
+        int pageSize = optionPageSize();
+        int pages = (metadata.options().size() + pageSize - 1) / pageSize;
+        int start = optionPage * pageSize;
         if (start >= metadata.options().size()) {
             optionPage = 0;
             start = 0;
         }
-        int end = Math.min(start + PAGE_SIZE, metadata.options().size());
+        int end = Math.min(start + pageSize, metadata.options().size());
         int y = 190;
         for (ShaderPackMetadata.Option option : metadata.options().subList(start, end)) {
             String value = config.option(pack.id(), option.name(), option.defaultValue());
@@ -209,8 +210,12 @@ public final class CaustiqSettingsScreen extends Screen {
                     button -> {
                         optionPage = (optionPage + 1) % pages;
                         init();
-                    }).bounds(width / 2 - 155, y, 310, 20).build());
+                    }).bounds(width / 2 - 155, height - 56, 310, 20).build());
         }
+    }
+
+    private int optionPageSize() {
+        return Math.max(1, Math.min(PAGE_SIZE, (height - 242) / 24));
     }
 
     private ShaderPackMetadata readMetadata(ShaderPackDescriptor pack) {

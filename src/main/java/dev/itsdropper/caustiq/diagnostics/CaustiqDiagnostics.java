@@ -7,6 +7,7 @@ import dev.itsdropper.caustiq.integration.nvidium.NvidiumCompatibility;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackDescriptor;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackRefreshStatus;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.SharedConstants;
 
@@ -26,6 +27,7 @@ public final class CaustiqDiagnostics {
                 NvidiumCompatibility.inspect(loader::isModLoaded);
         CaustiqConfig config = CaustiqConfig.get();
         ShaderPackScanResult scan = CaustiqClient.scanResult();
+        ShaderPackRefreshStatus refreshStatus = CaustiqClient.refreshStatus();
         String version = loader.getModContainer(CaustiqClient.MOD_ID)
                 .map(container -> container.getMetadata().getVersion().getFriendlyString())
                 .orElse("unknown");
@@ -61,7 +63,9 @@ public final class CaustiqDiagnostics {
                 packNames,
                 rejectedCandidates,
                 scan == null ? 0 : Math.max(0, scan.packs().size() - packNames.size()),
-                scan == null ? 0 : Math.max(0, scan.issues().size() - rejectedCandidates.size())
+                scan == null ? 0 : Math.max(0, scan.issues().size() - rejectedCandidates.size()),
+                refreshStatus.state().name(),
+                refreshStatus.failureMessage()
         ));
     }
 
@@ -108,6 +112,11 @@ public final class CaustiqDiagnostics {
                 }
             }
         }
+        report.append("Latest shader-pack refresh: ").append(snapshot.latestRefreshState());
+        if (!snapshot.latestRefreshFailureMessage().isBlank()) {
+            report.append(" - ").append(snapshot.latestRefreshFailureMessage());
+        }
+        report.append('\n');
         report.append("\nNo absolute game-directory paths or shader source contents are included. ")
                 .append("Candidate filenames and sanitized rejection reasons are included.");
         return report.toString();
@@ -139,11 +148,18 @@ public final class CaustiqDiagnostics {
             List<String> packNames,
             List<RejectedCandidate> rejectedCandidates,
             int omittedPackCount,
-            int omittedRejectedCount
+            int omittedRejectedCount,
+            String latestRefreshState,
+            String latestRefreshFailureMessage
     ) {
         Snapshot {
             packNames = List.copyOf(packNames);
             rejectedCandidates = List.copyOf(rejectedCandidates);
+            latestRefreshState = latestRefreshState == null || latestRefreshState.isBlank()
+                    ? "UNKNOWN" : latestRefreshState;
+            latestRefreshFailureMessage = latestRefreshFailureMessage == null
+                    || latestRefreshFailureMessage.isBlank()
+                    ? "" : ShaderPackIssue.sanitizeDisplayText(latestRefreshFailureMessage);
             if (candidateCount < 0 || packCount < 0 || rejectedCount < 0
                     || omittedPackCount < 0 || omittedRejectedCount < 0) {
                 throw new IllegalArgumentException("Diagnostic scan counts must not be negative");

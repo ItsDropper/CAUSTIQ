@@ -15,7 +15,7 @@ class CaustiqDiagnosticsTest {
                 "0.1.0-nvidium-dev", "1.21.11", "25.0.1", "Windows 11",
                 "SODIUM_WITH_NVIDIUM", true, true, "SODIUM_AND_NVIDIUM_PRESENT",
                 true, 3, "Lumina", true, 4, 2, 2, List.of("Lumina", "Stillwater"),
-                List.of(), 0, 0
+                List.of(), 0, 0, "COMPLETE", ""
         ));
 
         assertTrue(report.contains("Renderer stack: SODIUM_WITH_NVIDIUM"));
@@ -31,7 +31,7 @@ class CaustiqDiagnosticsTest {
         String report = CaustiqDiagnostics.format(new CaustiqDiagnostics.Snapshot(
                 "unknown", "1.21.11", "21", "Linux", "VANILLA",
                 false, false, "MISSING_SODIUM", false, 1, "Not available",
-                false, 0, 0, 0, List.of(), List.of(), 0, 0
+                false, 0, 0, 0, List.of(), List.of(), 0, 0, "IDLE", ""
         ));
 
         assertTrue(report.contains("Shader-pack scan: not completed"));
@@ -46,9 +46,11 @@ class CaustiqDiagnosticsTest {
                 true, 2, 1, 1, List.of("Example"),
                 List.of(new RejectedCandidate("Broken.zip",
                         "Unable to read /home/player/.minecraft/shaderpacks/Broken.zip: invalid ZIP")),
-                0, 0
+                0, 0, "FAILED",
+                "Unable to read /home/player/.minecraft/shaderpacks: Permission denied"
         ));
 
+        assertTrue(report.contains("Latest shader-pack refresh: FAILED - Unable to read [path]: Permission denied"));
         assertTrue(report.contains("Rejected candidates (candidate names and reasons; full paths omitted)"));
         assertTrue(report.contains("- Broken.zip: Unable to read [path]: invalid ZIP"));
         assertFalse(report.contains("/home/player"));
@@ -64,7 +66,7 @@ class CaustiqDiagnosticsTest {
         String report = CaustiqDiagnostics.format(new CaustiqDiagnostics.Snapshot(
                 "1", "1.21.11", "21", "Linux", "VANILLA",
                 false, false, "MISSING_SODIUM", false, 1, "None",
-                true, 30, 0, 30, List.of(), candidates, 0, 5
+                true, 30, 0, 30, List.of(), candidates, 0, 5, "COMPLETE", ""
         ));
 
         assertTrue(report.contains("5 additional rejection(s) omitted"));
