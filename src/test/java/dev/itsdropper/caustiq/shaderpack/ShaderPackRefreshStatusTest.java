@@ -19,6 +19,7 @@ class ShaderPackRefreshStatusTest {
         assertEquals(ShaderPackRefreshStatus.State.SCANNING, status.state());
         assertEquals(0, status.packCount());
         assertEquals(0, status.rejectedCandidateCount());
+        assertEquals("", status.failureMessage());
     }
 
     @Test
@@ -35,6 +36,7 @@ class ShaderPackRefreshStatusTest {
         assertEquals(ShaderPackRefreshStatus.State.COMPLETE, status.state());
         assertEquals(1, status.packCount());
         assertEquals(1, status.rejectedCandidateCount());
+        assertEquals("", status.failureMessage());
     }
 
     @Test
@@ -45,6 +47,21 @@ class ShaderPackRefreshStatusTest {
 
         assertEquals(ShaderPackRefreshStatus.State.FAILED, failed.state());
         assertEquals(ShaderPackRefreshStatus.State.COMPLETE, empty.state());
+    }
+
+    @Test
+    void preservesSanitizedFailureDetailsForTheUser() {
+        ShaderPackRefreshStatus failed = ShaderPackRefreshStatus.failed(
+                "Unable to access /home/player/.minecraft/shaderpacks: Permission denied");
+
+        assertEquals(ShaderPackRefreshStatus.State.FAILED, failed.state());
+        assertEquals("Unable to access [path]: Permission denied", failed.failureMessage());
+    }
+
+    @Test
+    void rejectsFailureDetailsForNonFailureStates() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new ShaderPackRefreshStatus(ShaderPackRefreshStatus.State.COMPLETE, 0, 0, "failure"));
     }
 
     @Test

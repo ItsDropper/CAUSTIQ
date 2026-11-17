@@ -50,6 +50,8 @@ The exact pins are enforced in `fabric.mod.json`: Nvidium-specific mixins target
 2. Copy a shader pack into `.minecraft/shaderpacks/` — the bundled **Lumina** pack (`build/distributions/caustiq-lumina-<version>.zip`) is written for this branch's terrain pipeline and shadow map ([details](examples/caustiq-lumina/README.md)); **Stillwater** (`caustiq-stillwater-<version>.zip`) is a lighter final-pass grade that works as a first test. *Don't extract either.*
 3. In-game: **Options → Video Settings → Caustiq Shaders**, pick a pack, enable Caustiq.
 
+Use **Scan details** on the settings screen to inspect rejected shader-pack candidates and their reasons. The screen supports paging, retrying a scan, and copying the bounded diagnostics report. Candidate filenames and sanitized reasons are included; absolute game-directory paths and shader source contents are omitted. If a refresh fails, the last completed results remain visible alongside the failure reason.
+
 > [!TIP]
 > **Taking artifacts from GitHub Actions?** GitHub wraps each one in an outer ZIP. Extract it first; the inner file is the one to use.
 

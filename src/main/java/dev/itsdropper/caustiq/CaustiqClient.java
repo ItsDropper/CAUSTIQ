@@ -1,6 +1,7 @@
 package dev.itsdropper.caustiq;
 
 import dev.itsdropper.caustiq.gui.CaustiqSettingsScreen;
+import dev.itsdropper.caustiq.gui.ShaderPackDiagnosticsScreen;
 import dev.itsdropper.caustiq.integration.RendererEnvironment;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumCompatibility;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumShaderProgramBridge;
@@ -39,6 +40,7 @@ public final class CaustiqClient implements ClientModInitializer {
             Files.createDirectories(shaderPackDirectory);
         } catch (IOException exception) {
             LOGGER.error("Unable to create shader-pack directory at {}", shaderPackDirectory, exception);
+            refreshStatus = ShaderPackRefreshStatus.failed(ShaderPackIssue.sanitizeDisplayText(exception.getMessage()));
             return;
         }
         RendererEnvironment renderer = RendererEnvironment.detect(FabricLoader.getInstance()::isModLoaded);
@@ -99,7 +101,7 @@ public final class CaustiqClient implements ClientModInitializer {
 
         Path directory = shaderPackDirectory;
         if (directory == null) {
-            refreshStatus = ShaderPackRefreshStatus.failed();
+            refreshStatus = ShaderPackRefreshStatus.failed("Shader-pack directory is not available.");
             refreshSettingsScreen();
             return;
         }
@@ -108,7 +110,7 @@ public final class CaustiqClient implements ClientModInitializer {
                     Minecraft.getInstance().execute(() -> {
                         if (failure != null) {
                             LOGGER.error("Shader-pack discovery failed for {}", directory.toAbsolutePath(), failure);
-                            refreshStatus = ShaderPackRefreshStatus.failed();
+                            refreshStatus = ShaderPackRefreshStatus.failed(failureSummary(failure));
                         } else {
                             ShaderRuntime.requestReload();
                             scanResult = result;
@@ -121,11 +123,24 @@ public final class CaustiqClient implements ClientModInitializer {
                 });
     }
 
+    private static String failureSummary(Throwable failure) {
+        Throwable cause = failure;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        String message = cause.getMessage();
+        return ShaderPackIssue.sanitizeDisplayText(
+                message == null || message.isBlank() ? cause.getClass().getSimpleName() : message
+        );
+    }
+
     private static void refreshSettingsScreen() {
         Minecraft client = Minecraft.getInstance();
         client.execute(() -> {
             if (client.screen instanceof CaustiqSettingsScreen settingsScreen) {
                 settingsScreen.refreshView();
+            } else if (client.screen instanceof ShaderPackDiagnosticsScreen diagnosticsScreen) {
+                diagnosticsScreen.refreshView();
             }
         });
     }

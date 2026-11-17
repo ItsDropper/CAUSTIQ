@@ -1,5 +1,6 @@
 package dev.itsdropper.caustiq.diagnostics;
 
+import dev.itsdropper.caustiq.diagnostics.CaustiqDiagnostics.RejectedCandidate;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -13,7 +14,8 @@ class CaustiqDiagnosticsTest {
         String report = CaustiqDiagnostics.format(new CaustiqDiagnostics.Snapshot(
                 "0.1.0-nvidium-dev", "1.21.11", "25.0.1", "Windows 11",
                 "SODIUM_WITH_NVIDIUM", true, true, "SODIUM_AND_NVIDIUM_PRESENT",
-                true, 3, "Lumina", true, 4, 2, 2, List.of("Lumina", "Stillwater")
+                true, 3, "Lumina", true, 4, 2, 2, List.of("Lumina", "Stillwater"),
+                List.of(), 0, 0
         ));
 
         assertTrue(report.contains("Renderer stack: SODIUM_WITH_NVIDIUM"));
@@ -29,7 +31,7 @@ class CaustiqDiagnosticsTest {
         String report = CaustiqDiagnostics.format(new CaustiqDiagnostics.Snapshot(
                 "unknown", "1.21.11", "21", "Linux", "VANILLA",
                 false, false, "MISSING_SODIUM", false, 1, "Not available",
-                false, 0, 0, 0, List.of()
+                false, 0, 0, 0, List.of(), List.of(), 0, 0
         ));
 
         assertTrue(report.contains("Shader-pack scan: not completed"));
@@ -37,14 +39,34 @@ class CaustiqDiagnosticsTest {
     }
 
     @Test
-    void explicitlyDocumentsPrivacyBoundary() {
+    void includesSanitizedRejectionDetailsWithoutAbsolutePaths() {
         String report = CaustiqDiagnostics.format(new CaustiqDiagnostics.Snapshot(
                 "1", "1.21.11", "21", "Linux", "VANILLA",
                 false, false, "MISSING_SODIUM", false, 1, "None",
-                true, 0, 0, 0, List.of()
+                true, 2, 1, 1, List.of("Example"),
+                List.of(new RejectedCandidate("Broken.zip",
+                        "Unable to read /home/player/.minecraft/shaderpacks/Broken.zip: invalid ZIP")),
+                0, 0
         ));
 
-        assertTrue(report.contains("No game-directory paths, usernames, or shader source contents"));
-        assertFalse(report.contains("C:\\Users\\"));
+        assertTrue(report.contains("Rejected candidates (candidate names and reasons; full paths omitted)"));
+        assertTrue(report.contains("- Broken.zip: Unable to read [path]: invalid ZIP"));
+        assertFalse(report.contains("/home/player"));
+        assertFalse(report.contains(".minecraft"));
+        assertTrue(report.contains("No absolute game-directory paths or shader source contents"));
+    }
+
+    @Test
+    void reportsOmittedEntriesWhenTheReportLimitIsReached() {
+        List<RejectedCandidate> candidates = java.util.stream.IntStream.range(0, 25)
+                .mapToObj(index -> new RejectedCandidate("Broken-" + index + ".zip", "Invalid ZIP"))
+                .toList();
+        String report = CaustiqDiagnostics.format(new CaustiqDiagnostics.Snapshot(
+                "1", "1.21.11", "21", "Linux", "VANILLA",
+                false, false, "MISSING_SODIUM", false, 1, "None",
+                true, 30, 0, 30, List.of(), candidates, 0, 5
+        ));
+
+        assertTrue(report.contains("5 additional rejection(s) omitted"));
     }
 }

@@ -22,7 +22,7 @@ import java.util.List;
 
 /** Renderer-independent shader-pack selection and option screen. */
 public final class CaustiqSettingsScreen extends Screen {
-    private static final int PAGE_SIZE = 7;
+    private static final int PAGE_SIZE = 5;
     private final Screen parent;
     private int optionPage;
     private String metadataCachePackId;
@@ -76,10 +76,12 @@ public final class CaustiqSettingsScreen extends Screen {
             config.setCompileBudget(nextBudget);
             button.setMessage(compileBudgetLabel(nextBudget));
         }).bounds(width / 2 + 55, 68, 100, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.scan_details",
+                scan == null ? 0 : scan.issues().size()), button ->
+                Minecraft.getInstance().setScreen(new ShaderPackDiagnosticsScreen(this)))
+                .bounds(width / 2 - 155, 164, 310, 20).build());
 
         if (selected != null) addOptionButtons(selected, config);
-        else addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.no_selection"),
-                button -> { }).bounds(width / 2 - 155, 176, 310, 20).build());
 
         addRenderableWidget(Button.builder(Component.translatable("gui.done"),
                 button -> Minecraft.getInstance().setScreen(parent))
@@ -116,6 +118,18 @@ public final class CaustiqSettingsScreen extends Screen {
                             : Integer.toString(metadataCache.options().size()))
                     : Component.translatable("caustiq.settings.pack_options_loading");
             graphics.drawCenteredString(font, metadataSummary, width / 2, 156, 0xFFAAAAAA);
+        } else {
+            graphics.drawCenteredString(font, Component.translatable("caustiq.settings.no_selection"),
+                    width / 2, 198, 0xFFAAAAAA);
+        }
+        if (selected != null && metadataLoaded && selected.id().equals(metadataCachePackId)) {
+            if (metadataCache == null) {
+                graphics.drawCenteredString(font, Component.translatable("caustiq.settings.pack_options_read_failed"),
+                        width / 2, 198, 0xFFFF7777);
+            } else if (metadataCache.options().isEmpty()) {
+                graphics.drawCenteredString(font, Component.translatable("caustiq.settings.no_options"),
+                        width / 2, 198, 0xFFAAAAAA);
+            }
         }
 
         ShaderPackRefreshStatus status = CaustiqClient.refreshStatus();
@@ -167,11 +181,7 @@ public final class CaustiqSettingsScreen extends Screen {
 
     private void addOptionButtons(ShaderPackDescriptor pack, CaustiqConfig config) {
         ShaderPackMetadata metadata = readMetadata(pack);
-        if (metadata == null || metadata.options().isEmpty()) {
-            addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.no_options"),
-                    button -> { }).bounds(width / 2 - 155, 176, 310, 20).build());
-            return;
-        }
+        if (metadata == null || metadata.options().isEmpty()) return;
         int pages = (metadata.options().size() + PAGE_SIZE - 1) / PAGE_SIZE;
         int start = optionPage * PAGE_SIZE;
         if (start >= metadata.options().size()) {
@@ -179,7 +189,7 @@ public final class CaustiqSettingsScreen extends Screen {
             start = 0;
         }
         int end = Math.min(start + PAGE_SIZE, metadata.options().size());
-        int y = 176;
+        int y = 190;
         for (ShaderPackMetadata.Option option : metadata.options().subList(start, end)) {
             String value = config.option(pack.id(), option.name(), option.defaultValue());
             int selectedIndex = option.values().indexOf(value);
@@ -195,7 +205,7 @@ public final class CaustiqSettingsScreen extends Screen {
             y += 24;
         }
         if (pages > 1) {
-            addRenderableWidget(Button.builder(Component.literal("Options page " + (optionPage + 1) + "/" + pages),
+            addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.options_page", optionPage + 1, pages),
                     button -> {
                         optionPage = (optionPage + 1) % pages;
                         init();

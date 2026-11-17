@@ -5,15 +5,18 @@ import dev.itsdropper.caustiq.CaustiqConfig;
 import dev.itsdropper.caustiq.integration.RendererEnvironment;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumCompatibility;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackDescriptor;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.SharedConstants;
 
 import java.util.List;
-import java.util.Locale;
 
 /** Builds a privacy-conscious report that can be attached to Caustiq bug reports. */
 public final class CaustiqDiagnostics {
+    private static final int MAX_REPORTED_PACKS = 50;
+    private static final int MAX_REPORTED_REJECTIONS = 25;
+
     private CaustiqDiagnostics() { }
 
     public static String createReport() {
@@ -30,8 +33,14 @@ public final class CaustiqDiagnostics {
                 .filter(pack -> pack.id().equals(config.selectedPackId()))
                 .map(ShaderPackDescriptor::displayName)
                 .findFirst().orElse("None");
-        List<String> packNames = scan == null ? List.of()
-                : scan.packs().stream().map(ShaderPackDescriptor::displayName).toList();
+        List<String> packNames = scan == null ? List.of() : scan.packs().stream()
+                .limit(MAX_REPORTED_PACKS)
+                .map(ShaderPackDescriptor::displayName)
+                .toList();
+        List<RejectedCandidate> rejectedCandidates = scan == null ? List.of() : scan.issues().stream()
+                .limit(MAX_REPORTED_REJECTIONS)
+                .map(issue -> new RejectedCandidate(issue.displayName(), issue.displayReason()))
+                .toList();
 
         return format(new Snapshot(
                 version,
@@ -49,12 +58,15 @@ public final class CaustiqDiagnostics {
                 scan == null ? 0 : scan.candidatesInspected(),
                 scan == null ? 0 : scan.packs().size(),
                 scan == null ? 0 : scan.issues().size(),
-                packNames
+                packNames,
+                rejectedCandidates,
+                scan == null ? 0 : Math.max(0, scan.packs().size() - packNames.size()),
+                scan == null ? 0 : Math.max(0, scan.issues().size() - rejectedCandidates.size())
         ));
     }
 
     static String format(Snapshot snapshot) {
-        StringBuilder report = new StringBuilder(512);
+        StringBuilder report = new StringBuilder(768);
         report.append("CAUSTIQ Diagnostics\n")
                 .append("CAUSTIQ: ").append(snapshot.caustiqVersion()).append('\n')
                 .append("Minecraft: ").append(snapshot.minecraftVersion()).append('\n')
@@ -79,10 +91,33 @@ public final class CaustiqDiagnostics {
             } else {
                 report.append("Discovered packs:\n");
                 snapshot.packNames().forEach(name -> report.append("- ").append(name).append('\n'));
+                if (snapshot.omittedPackCount() > 0) {
+                    report.append("- ... ").append(snapshot.omittedPackCount())
+                            .append(" additional pack name(s) omitted\n");
+                }
+            }
+            if (snapshot.rejectedCandidates().isEmpty()) {
+                report.append("Rejected candidates: none\n");
+            } else {
+                report.append("Rejected candidates (candidate names and reasons; full paths omitted):\n");
+                snapshot.rejectedCandidates().forEach(candidate -> report.append("- ")
+                        .append(candidate.name()).append(": ").append(candidate.reason()).append('\n'));
+                if (snapshot.omittedRejectedCount() > 0) {
+                    report.append("- ... ").append(snapshot.omittedRejectedCount())
+                            .append(" additional rejection(s) omitted\n");
+                }
             }
         }
-        report.append("\nNo game-directory paths, usernames, or shader source contents are included.");
+        report.append("\nNo absolute game-directory paths or shader source contents are included. ")
+                .append("Candidate filenames and sanitized rejection reasons are included.");
         return report.toString();
+    }
+
+    record RejectedCandidate(String name, String reason) {
+        RejectedCandidate {
+            name = ShaderPackIssue.sanitizeDisplayText(name);
+            reason = ShaderPackIssue.sanitizeDisplayText(reason);
+        }
     }
 
     record Snapshot(
@@ -101,10 +136,18 @@ public final class CaustiqDiagnostics {
             int candidateCount,
             int packCount,
             int rejectedCount,
-            List<String> packNames
+            List<String> packNames,
+            List<RejectedCandidate> rejectedCandidates,
+            int omittedPackCount,
+            int omittedRejectedCount
     ) {
         Snapshot {
             packNames = List.copyOf(packNames);
+            rejectedCandidates = List.copyOf(rejectedCandidates);
+            if (candidateCount < 0 || packCount < 0 || rejectedCount < 0
+                    || omittedPackCount < 0 || omittedRejectedCount < 0) {
+                throw new IllegalArgumentException("Diagnostic scan counts must not be negative");
+            }
         }
     }
 }
