@@ -20,6 +20,7 @@
     "NvidiumTranslucentTerrainRasterizerMixin",
     "MinecraftMixin",
     "TextureAtlasAccessorMixin",
+    "TextureAtlasMixin",
     "SpriteAnimationStateAccessorMixin",
     "SpriteAnimatedTextureAccessorMixin",
     "SpriteFrameInfoAccessorMixin"

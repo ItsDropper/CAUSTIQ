@@ -93,16 +93,34 @@ public final class NvidiumPbrTextureAtlases {
         cachedPbrSprites = Map.of(); cachedAnimationFrames = Map.of();
     }
 
+    /** Invalidates cached PBR textures before Minecraft replaces the block atlas contents. */
+    public static void onAtlasReload(TextureAtlas atlas) {
+        if (TextureAtlas.LOCATION_BLOCKS.equals(atlas.location())) destroy();
+    }
+
+    /** Mirrors Minecraft's animated block-sprite frame changes once per atlas tick. */
+    public static void onAtlasTick(TextureAtlas atlas) {
+        if (!TextureAtlas.LOCATION_BLOCKS.equals(atlas.location())) return;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (atlas != cachedAtlas || minecraft.getResourceManager() != cachedResources
+                || normalsTexture == 0 || specularTexture == 0) {
+            ensureCurrent();
+            return;
+        }
+        Map<Identifier, Integer> currentFrames = new HashMap<>();
+        readAnimationInfo(atlas).forEach((id, info) -> {
+            if (info.frameCount() > 1) currentFrames.put(id, info.currentFrame());
+        });
+        syncAnimationFrames(Map.copyOf(currentFrames));
+    }
+
     private static void ensureCurrent() {
         Minecraft minecraft = Minecraft.getInstance();
         TextureAtlas atlas = (TextureAtlas) minecraft.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
         ResourceManager resources = minecraft.getResourceManager();
+        if (atlas == cachedAtlas && resources == cachedResources
+                && normalsTexture != 0 && specularTexture != 0) return;
         AtlasLayout layout = readAtlasLayout(atlas);
-        if (atlas == cachedAtlas && resources == cachedResources && layout.fingerprint() == cachedFingerprint
-                && normalsTexture != 0 && specularTexture != 0) {
-            syncAnimationFrames(layout.animationFrames());
-            return;
-        }
         Map<Identifier, PbrSprite> nextSprites = loadPbrSprites(layout, resources);
         int nextNormals = 0, nextSpecular = 0;
         try {

@@ -149,11 +149,11 @@ jobs:
               raise SystemExit("Translated Photon terrain render smoke test was skipped.")
           if render_case.find("failure") is not None or render_case.find("error") is not None:
               raise SystemExit("Translated Photon terrain render smoke test failed.")
-          screenshot = "build/caustiq-photon-screenshots/photon-terrain-mesa.png"
+          screenshot = "build/caustiq-photon-screenshots/photon-terrain-gbuffer-mesa.png"
           import os
           if not os.path.isfile(screenshot) or os.path.getsize(screenshot) < 100:
               raise SystemExit(f"Translated Photon terrain framebuffer screenshot is missing or empty: {screenshot}")
-          print(f"Verified translated Photon terrain framebuffer screenshot: {screenshot}")
+          print(f"Verified translated Photon terrain G-buffer capture: {screenshot}")
           print("Verified pinned-source terrain/shadow audits, Photon LPV compute execution, and Mesa terrain framebuffer rendering.")
           PY
 
@@ -161,7 +161,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: caustiq-photon-terrain-framebuffer-${{ github.sha }}
+          name: caustiq-photon-terrain-gbuffer-${{ github.sha }}
           path: build/caustiq-photon-screenshots/photon-terrain-mesa.png
           if-no-files-found: warn
           retention-days: 14

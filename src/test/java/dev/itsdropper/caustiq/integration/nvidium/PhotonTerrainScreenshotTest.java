@@ -138,7 +138,7 @@ class PhotonTerrainScreenshotTest {
                 Path output = Path.of(System.getenv().getOrDefault(
                         "CAUSTIQ_SCREENSHOT_DIR", "build/caustiq-photon-screenshots"));
                 Files.createDirectories(output);
-                Path screenshot = output.resolve("photon-terrain-mesa.png");
+                Path screenshot = output.resolve("photon-terrain-gbuffer-mesa.png");
                 assertTrue(ImageIO.write(image, "png", screenshot.toFile()), "PNG writer unavailable.");
                 assertTrue(Files.size(screenshot) > 100, "Screenshot output is unexpectedly empty.");
                 System.out.println("CAUSTIQ_SCREENSHOT=" + screenshot.toAbsolutePath());
