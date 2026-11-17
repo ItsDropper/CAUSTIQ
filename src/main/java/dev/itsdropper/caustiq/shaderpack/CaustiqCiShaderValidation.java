@@ -1,6 +1,7 @@
 package dev.itsdropper.caustiq.shaderpack;
 
 import dev.itsdropper.caustiq.CaustiqClient;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumPbrTextureAtlases;
 import net.fabricmc.loader.api.FabricLoader;
 
 import javax.imageio.ImageIO;
@@ -44,6 +45,10 @@ public final class CaustiqCiShaderValidation {
             }
             CaustiqClient.LOGGER.info("Photon CI renderer isolation confirmed: Nvidium is absent.");
             int compiled = validate(Path.of(configuredPath));
+            // The CI validation runs from Minecraft's title-screen tick, after all
+            // texture atlases have been uploaded. renderLevel is not called there.
+            NvidiumPbrTextureAtlases.validateForTests();
+            CaustiqClient.LOGGER.info("CAUSTIQ_CI_PBR_ATLAS_PASS");
             captureMinecraftFrame();
             String result = "CAUSTIQ_CI_SHADER_VALIDATION_PASS programs=" + compiled;
             CaustiqClient.LOGGER.info(result);

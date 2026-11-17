@@ -81,7 +81,8 @@ jobs:
               result=pass
               break
             fi
-            if grep -q "CAUSTIQ_CI_SHADER_VALIDATION_FAIL" "$log"; then
+            if grep -q "CAUSTIQ_CI_SHADER_VALIDATION_FAIL" "$log" \
+              || grep -q "CAUSTIQ_CI_PBR_ATLAS_FAIL" "$log"; then
               result=fail
               break
             fi
