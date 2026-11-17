@@ -165,7 +165,11 @@ assert "layout(binding = 2) uniform sampler2D caustiqNoiseTexture;" in translato
 assert "NvidiumIrisTextureBridge.bindForTerrain(program)" in uniform_bridge
 assert "NvidiumIrisTextureBridge.bindForShadow(program)" in uniform_bridge
 assert "bindTerrainCustomTextures(program, firstCustomTextureUnit)" in uniform_bridge
-assert "resources.bindTerrainTextures(program, firstTextureUnit, 12)" in texture_bridge
+assert "resources.bindTerrainTextures(" in texture_bridge
+assert "firstTextureUnit, GL11C.glGetInteger(GL20C.GL_MAX_TEXTURE_IMAGE_UNITS)" in texture_bridge
+assert "MAX_COLORTEX_SAMPLER = 15" in texture_bridge
+assert "NvidiumPbrTextureAtlases.normalsTexture()" in texture_bridge
+assert "NvidiumPbrTextureAtlases.specularTexture()" in texture_bridge
 assert 'Map.entry("isElytraFlying", "caustiqIsElytraFlying")' in translator
 assert 'Map.entry("isEyeInWater", "caustiqIsEyeInWater")' in translator
 assert "uniform int caustiqIsEyeInWater;" in translator
@@ -196,7 +200,7 @@ assert 'Map.entry("colortex8", "caustiqColortex8")' in translator
 assert "sampler2DShadow caustiqShadowtex1" in translator
 assert "GL33C.glBindSampler" in texture_bridge
 assert "0x884C, 0x884E" in texture_bridge
-assert "bindTerrainTextures(program, firstTextureUnit, 12)" in texture_bridge
+assert "Math.max(unit, 16)" in texture_bridge
 assert "noiseTexture, noiseTexture" not in texture_bridge, "Unavailable Iris samplers must not receive dummy noise textures"
 vertex_encoder = (caustiq_root / "src/main/java/dev/itsdropper/caustiq/integration/nvidium/NvidiumIrisChunkVertex.java").read_text(encoding="utf-8")
 assert "STRIDE = 40" in vertex_encoder
