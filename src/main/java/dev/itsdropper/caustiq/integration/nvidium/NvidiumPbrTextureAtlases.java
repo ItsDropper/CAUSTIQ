@@ -153,7 +153,7 @@ public final class NvidiumPbrTextureAtlases {
             int x = sprite.getX(), y = sprite.getY();
             int sw = sprite.contents().width(), sh = sprite.contents().height();
             if (x < 0 || y < 0 || sw <= 0 || sh <= 0 || x + sw > width || y + sh > height) continue;
-            AnimationInfo animation = animationInfo.getOrDefault(name, new AnimationInfo(1, 1, 0));
+            AnimationInfo animation = animationInfo.getOrDefault(name, new AnimationInfo(1, 1, 0, List.of(0)));
             sprites.add(new Sprite(name, x, y, sw, sh, animation.columns(), animation.frameCount()));
             if (animation.frameCount() > 1) animationFrames.put(name, animation.currentFrame());
             fingerprint = mix(fingerprint, name.toString().hashCode());
