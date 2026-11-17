@@ -39,6 +39,7 @@ public final class NvidiumPbrTextureAtlases {
     private static long cachedFingerprint = Long.MIN_VALUE;
     private static int normalsTexture;
     private static int specularTexture;
+    private static int cachedAtlasScale = 1;
     private static boolean warnedResourceFailure;
     private static Map<Identifier, PbrSprite> cachedPbrSprites = Map.of();
     private static Map<Identifier, Integer> cachedAnimationFrames = Map.of();
@@ -92,6 +93,7 @@ public final class NvidiumPbrTextureAtlases {
         if (specularTexture != 0) GL11C.glDeleteTextures(specularTexture);
         normalsTexture = 0; specularTexture = 0;
         cachedAtlas = null; cachedResources = null; cachedFingerprint = Long.MIN_VALUE;
+        cachedAtlasScale = 1;
         cachedPbrSprites = Map.of(); cachedAnimationFrames = Map.of(); cachedAnimationInfo = Map.of();
     }
 
@@ -103,6 +105,10 @@ public final class NvidiumPbrTextureAtlases {
     /** Mirrors Minecraft's animated block-sprite frame changes once per atlas tick. */
     public static void onAtlasTick(TextureAtlas atlas) {
         if (!TextureAtlas.LOCATION_BLOCKS.equals(atlas.location())) return;
+        TextureAtlasAccessorMixin atlasAccessor = (TextureAtlasAccessorMixin) (Object) atlas;
+        // TextureAtlas.tick can run before the initial asynchronous stitch has
+        // published dimensions. Do not allocate (or crash) against a 0x0 atlas.
+        if (atlasAccessor.caustiq$getWidth() <= 0 || atlasAccessor.caustiq$getHeight() <= 0) return;
         Minecraft minecraft = Minecraft.getInstance();
         if (atlas != cachedAtlas || minecraft.getResourceManager() != cachedResources
                 || normalsTexture == 0 || specularTexture == 0) {
@@ -118,12 +124,15 @@ public final class NvidiumPbrTextureAtlases {
         ResourceManager resources = minecraft.getResourceManager();
         if (atlas == cachedAtlas && resources == cachedResources
                 && normalsTexture != 0 && specularTexture != 0) return;
+        TextureAtlasAccessorMixin atlasAccessor = (TextureAtlasAccessorMixin) (Object) atlas;
+        if (atlasAccessor.caustiq$getWidth() <= 0 || atlasAccessor.caustiq$getHeight() <= 0) return;
         AtlasLayout layout = readAtlasLayout(atlas, resources);
+        int atlasScale = atlasScale(layout.width(), layout.height());
         Map<Identifier, PbrSprite> nextSprites = loadPbrSprites(layout, resources);
         int nextNormals = 0, nextSpecular = 0;
         try {
-            nextNormals = buildAtlas(layout, nextSprites, true);
-            nextSpecular = buildAtlas(layout, nextSprites, false);
+            nextNormals = buildAtlas(layout, nextSprites, true, atlasScale);
+            nextSpecular = buildAtlas(layout, nextSprites, false, atlasScale);
         } catch (RuntimeException exception) {
             if (nextNormals != 0) GL11C.glDeleteTextures(nextNormals);
             if (nextSpecular != 0) GL11C.glDeleteTextures(nextSpecular);
@@ -133,6 +142,7 @@ public final class NvidiumPbrTextureAtlases {
         if (specularTexture != 0) GL11C.glDeleteTextures(specularTexture);
         normalsTexture = nextNormals; specularTexture = nextSpecular;
         cachedAtlas = atlas; cachedResources = resources; cachedFingerprint = layout.fingerprint();
+        cachedAtlasScale = atlasScale;
         cachedPbrSprites = Map.copyOf(nextSprites);
         cachedAnimationFrames = layout.animationFrames();
         cachedAnimationInfo = layout.animationInfo();
@@ -272,30 +282,35 @@ public final class NvidiumPbrTextureAtlases {
         }
     }
 
-    private static int buildAtlas(AtlasLayout layout, Map<Identifier, PbrSprite> sprites, boolean normal) {
-        long byteCount = (long) layout.width() * layout.height() * 4L;
-        if (layout.width() <= 0 || layout.height() <= 0 || byteCount > MAX_ATLAS_BYTES)
-            throw new IllegalStateException("Block atlas dimensions exceed CAUSTIQ's bounded PBR atlas allocation.");
+    private static int buildAtlas(AtlasLayout layout, Map<Identifier, PbrSprite> sprites,
+                                  boolean normal, int scale) {
+        int width = ceilDiv(layout.width(), scale);
+        int height = ceilDiv(layout.height(), scale);
+        long byteCount = (long) width * height * 4L;
+        if (byteCount > MAX_ATLAS_BYTES)
+            throw new IllegalStateException("Scaled block PBR atlas exceeds CAUSTIQ's bounded allocation: "
+                    + width + "x" + height + " (" + byteCount + " bytes).");
         ByteBuffer pixels = ByteBuffer.allocateDirect(Math.toIntExact(byteCount));
         int color = normal ? NORMAL_DEFAULT : SPECULAR_DEFAULT;
         byte r = (byte)(color >>> 24), g = (byte)(color >>> 16), b = (byte)(color >>> 8), a = (byte)color;
-        for (int i = 0; i < layout.width() * layout.height(); i++) pixels.put(r).put(g).put(b).put(a);
+        for (long i = 0, count = (long) width * height; i < count; i++) pixels.put(r).put(g).put(b).put(a);
         for (PbrSprite pbrSprite : sprites.values()) {
             BufferedImage image = normal ? pbrSprite.normal() : pbrSprite.specular();
-            if (image != null) blit(image, pixels, layout.width(), pbrSprite.sprite(), 0);
+            if (image != null) blit(image, pixels, width, scaledSprite(pbrSprite.sprite(), scale), pbrSprite.sprite(), 0);
         }
         pixels.flip();
-        return upload(layout.width(), layout.height(), pixels);
+        return upload(width, height, pixels);
     }
 
-    private static void blit(BufferedImage image, ByteBuffer atlas, int atlasWidth, Sprite sprite, int frameIndex) {
-        FrameRegion frame = frameRegion(image, sprite, frameIndex);
-        for (int y = 0; y < sprite.height(); y++) {
-            int sy = frame.y() + Math.min(frame.height() - 1, (int)((long)y * frame.height() / sprite.height()));
-            for (int x = 0; x < sprite.width(); x++) {
-                int sx = frame.x() + Math.min(frame.width() - 1, (int)((long)x * frame.width() / sprite.width()));
+    private static void blit(BufferedImage image, ByteBuffer atlas, int atlasWidth,
+                             Sprite targetSprite, Sprite sourceSprite, int frameIndex) {
+        FrameRegion frame = frameRegion(image, sourceSprite, frameIndex);
+        for (int y = 0; y < targetSprite.height(); y++) {
+            int sy = frame.y() + Math.min(frame.height() - 1, (int)((long)y * frame.height() / targetSprite.height()));
+            for (int x = 0; x < targetSprite.width(); x++) {
+                int sx = frame.x() + Math.min(frame.width() - 1, (int)((long)x * frame.width() / targetSprite.width()));
                 int argb = image.getRGB(sx, sy);
-                int dst = ((sprite.y() + y) * atlasWidth + sprite.x() + x) * 4;
+                int dst = ((targetSprite.y() + y) * atlasWidth + targetSprite.x() + x) * 4;
                 atlas.put(dst, (byte)(argb >>> 16)); atlas.put(dst + 1, (byte)(argb >>> 8));
                 atlas.put(dst + 2, (byte)argb); atlas.put(dst + 3, (byte)(argb >>> 24));
             }
@@ -336,11 +351,11 @@ public final class NvidiumPbrTextureAtlases {
             PbrSprite pbrSprite = cachedPbrSprites.get(entry.getKey());
             if (pbrSprite == null) continue;
             if (pbrSprite.normal() != null) {
-                uploadSpriteRegion(normalsTexture, pbrSprite.normal(), pbrSprite.sprite(), entry.getValue());
+                uploadSpriteRegion(normalsTexture, pbrSprite.normal(), pbrSprite.sprite(), cachedAtlasScale, entry.getValue());
                 normalsChanged = true;
             }
             if (pbrSprite.specular() != null) {
-                uploadSpriteRegion(specularTexture, pbrSprite.specular(), pbrSprite.sprite(), entry.getValue());
+                uploadSpriteRegion(specularTexture, pbrSprite.specular(), pbrSprite.sprite(), cachedAtlasScale, entry.getValue());
                 specularChanged = true;
             }
         }
@@ -349,13 +364,15 @@ public final class NvidiumPbrTextureAtlases {
         cachedAnimationFrames = Map.copyOf(current);
     }
 
-    private static void uploadSpriteRegion(int texture, BufferedImage image, Sprite sprite, int frameIndex) {
+    private static void uploadSpriteRegion(int texture, BufferedImage image, Sprite sprite,
+                                            int scale, int frameIndex) {
+        Sprite target = scaledSprite(sprite, scale);
         FrameRegion frame = frameRegion(image, sprite, frameIndex);
-        ByteBuffer pixels = ByteBuffer.allocateDirect(sprite.width() * sprite.height() * 4);
-        for (int y = 0; y < sprite.height(); y++) {
-            int sy = frame.y() + Math.min(frame.height() - 1, (int)((long)y * frame.height() / sprite.height()));
-            for (int x = 0; x < sprite.width(); x++) {
-                int sx = frame.x() + Math.min(frame.width() - 1, (int)((long)x * frame.width() / sprite.width()));
+        ByteBuffer pixels = ByteBuffer.allocateDirect(target.width() * target.height() * 4);
+        for (int y = 0; y < target.height(); y++) {
+            int sy = frame.y() + Math.min(frame.height() - 1, (int)((long)y * frame.height() / target.height()));
+            for (int x = 0; x < target.width(); x++) {
+                int sx = frame.x() + Math.min(frame.width() - 1, (int)((long)x * frame.width() / target.width()));
                 int argb = image.getRGB(sx, sy);
                 pixels.put((byte)(argb >>> 16)).put((byte)(argb >>> 8))
                         .put((byte)argb).put((byte)(argb >>> 24));
@@ -366,8 +383,8 @@ public final class NvidiumPbrTextureAtlases {
         int binding = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
         try {
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
-            GL11C.glTexSubImage2D(GL11C.GL_TEXTURE_2D, 0, sprite.x(), sprite.y(),
-                    sprite.width(), sprite.height(), GL11C.GL_RGBA, GL11C.GL_UNSIGNED_BYTE, pixels);
+            GL11C.glTexSubImage2D(GL11C.GL_TEXTURE_2D, 0, target.x(), target.y(),
+                    target.width(), target.height(), GL11C.GL_RGBA, GL11C.GL_UNSIGNED_BYTE, pixels);
         } finally {
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, binding);
             GL13C.glActiveTexture(active);
@@ -384,6 +401,31 @@ public final class NvidiumPbrTextureAtlases {
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, binding);
             GL13C.glActiveTexture(active);
         }
+    }
+
+    static int atlasScaleForTests(int width, int height) { return atlasScale(width, height); }
+
+    private static int atlasScale(int width, int height) {
+        if (width <= 0 || height <= 0) throw new IllegalArgumentException("Atlas dimensions must be positive.");
+        int scale = 1;
+        while ((long) ceilDiv(width, scale) * ceilDiv(height, scale) * 4L > MAX_ATLAS_BYTES) {
+            if (scale >= 1 << 15) throw new IllegalArgumentException("Atlas cannot fit the bounded PBR texture allocation.");
+            scale <<= 1;
+        }
+        return scale;
+    }
+
+    private static int ceilDiv(int value, int divisor) {
+        return (value + divisor - 1) / divisor;
+    }
+
+    private static Sprite scaledSprite(Sprite sprite, int scale) {
+        int x = sprite.x() / scale;
+        int y = sprite.y() / scale;
+        int right = ceilDiv(sprite.x() + sprite.width(), scale);
+        int bottom = ceilDiv(sprite.y() + sprite.height(), scale);
+        return new Sprite(sprite.name(), x, y, Math.max(1, right - x), Math.max(1, bottom - y),
+                sprite.frameColumns(), sprite.frameCount());
     }
 
     static int[] frameRegionForTests(BufferedImage image, int spriteWidth, int spriteHeight,

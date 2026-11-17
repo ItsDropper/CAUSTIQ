@@ -10,6 +10,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class NvidiumPbrTextureAtlasesTest {
     @Test
+    void defersLargeAtlasAllocationsByDownscalingWithinThePbrMemoryBudget() {
+        assertEquals(1, NvidiumPbrTextureAtlases.atlasScaleForTests(4096, 4096));
+        assertEquals(2, NvidiumPbrTextureAtlases.atlasScaleForTests(16384, 16384));
+        assertEquals(4, NvidiumPbrTextureAtlases.atlasScaleForTests(32768, 32768));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> NvidiumPbrTextureAtlases.atlasScaleForTests(0, 4096));
+    }
+
+    @Test
     void resolvesResourcePackNormalAndSpecularAtlasSpritePaths() {
         Identifier sprite = Identifier.fromNamespaceAndPath("minecraft", "block/stone");
         assertEquals("minecraft:textures/block/stone_n.png",

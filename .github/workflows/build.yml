@@ -162,7 +162,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: caustiq-photon-terrain-gbuffer-${{ github.sha }}
-          path: build/caustiq-photon-screenshots/photon-terrain-mesa.png
+          path: build/caustiq-photon-screenshots/photon-terrain-gbuffer-mesa.png
           if-no-files-found: warn
           retention-days: 14
 
