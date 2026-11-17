@@ -61,6 +61,7 @@ jobs:
         shell: bash
         env:
           CAUSTIQ_CI_SHADER_VALIDATION: "1"
+          CAUSTIQ_CI_VALIDATE_PBR_ATLAS: "1"
           CAUSTIQ_CI_SHADERPACK: ${{ github.workspace }}/run/shaderpacks/Photon
           LIBGL_ALWAYS_SOFTWARE: "1"
           MESA_GL_VERSION_OVERRIDE: "4.5"
@@ -71,12 +72,12 @@ jobs:
           mkdir -p build/caustiq-photon-minecraft
           log="$GITHUB_WORKSPACE/build/caustiq-photon-minecraft/minecraft.log"
           screenshot="$GITHUB_WORKSPACE/build/caustiq-photon-minecraft/minecraft-photon-validation.png"
-          export CAUSTIQ_CI_SHADER_VALIDATION CAUSTIQ_CI_SHADERPACK LIBGL_ALWAYS_SOFTWARE MESA_GL_VERSION_OVERRIDE MESA_GLSL_VERSION_OVERRIDE CAUSTIQ_CI_SCREENSHOT
+          export CAUSTIQ_CI_SHADER_VALIDATION CAUSTIQ_CI_VALIDATE_PBR_ATLAS CAUSTIQ_CI_SHADERPACK LIBGL_ALWAYS_SOFTWARE MESA_GL_VERSION_OVERRIDE MESA_GLSL_VERSION_OVERRIDE CAUSTIQ_CI_SCREENSHOT
           setsid ./gradlew runClient --stacktrace --info > "$log" 2>&1 &
           client_pid=$!
           result=timeout
           for second in $(seq 1 480); do
-            if grep -q "CAUSTIQ_CI_SHADER_VALIDATION_PASS" "$log"; then
+            if grep -q "CAUSTIQ_CI_SHADER_VALIDATION_PASS" "$log" && grep -q "CAUSTIQ_CI_PBR_ATLAS_PASS" "$log"; then
               result=pass
               break
             fi
@@ -105,6 +106,11 @@ jobs:
           test -s "$log"
           if ! grep -q "CAUSTIQ_CI_SHADER_VALIDATION_PASS" "$log"; then
             echo "Photon did not complete successfully inside Minecraft."
+            tail -n 160 "$log"
+            exit 1
+          fi
+          if ! grep -q "CAUSTIQ_CI_PBR_ATLAS_PASS" "$log"; then
+            echo "PBR atlas layout/upload validation did not complete successfully inside Minecraft."
             tail -n 160 "$log"
             exit 1
           fi

@@ -47,6 +47,37 @@ public final class NvidiumPbrTextureAtlases {
         return Identifier.fromNamespaceAndPath(sprite.getNamespace(), resourcePath);
     }
 
+    /** Runs the real atlas layout and GL upload path from the Minecraft CI client. */
+    public static void validateForTests() {
+        try {
+            int normal = normalsTexture();
+            int specular = specularTexture();
+            if (normal == 0 || specular == 0
+                    || !GL11C.glIsTexture(normal) || !GL11C.glIsTexture(specular)) {
+                throw new IllegalStateException("PBR atlas upload did not produce valid OpenGL textures.");
+            }
+            int active = GL11C.glGetInteger(0x84E0);
+            int binding = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
+            try {
+                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, normal);
+                int normalWidth = GL11C.glGetTexLevelParameteri(GL11C.GL_TEXTURE_2D, 0, GL11C.GL_TEXTURE_WIDTH);
+                int normalHeight = GL11C.glGetTexLevelParameteri(GL11C.GL_TEXTURE_2D, 0, GL11C.GL_TEXTURE_HEIGHT);
+                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, specular);
+                int specularWidth = GL11C.glGetTexLevelParameteri(GL11C.GL_TEXTURE_2D, 0, GL11C.GL_TEXTURE_WIDTH);
+                int specularHeight = GL11C.glGetTexLevelParameteri(GL11C.GL_TEXTURE_2D, 0, GL11C.GL_TEXTURE_HEIGHT);
+                if (normalWidth <= 0 || normalHeight <= 0
+                        || normalWidth != specularWidth || normalHeight != specularHeight) {
+                    throw new IllegalStateException("PBR atlas dimensions are invalid or inconsistent.");
+                }
+            } finally {
+                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, binding);
+                GL13C.glActiveTexture(active);
+            }
+        } finally {
+            destroy();
+        }
+    }
+
     public static void destroy() {
         if (normalsTexture != 0) GL11C.glDeleteTextures(normalsTexture);
         if (specularTexture != 0) GL11C.glDeleteTextures(specularTexture);
