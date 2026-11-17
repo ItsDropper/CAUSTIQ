@@ -8,6 +8,7 @@ import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL12C;
+import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL30C;
 
 import javax.imageio.ImageIO;
@@ -156,7 +157,7 @@ public final class NvidiumPbrTextureAtlases {
         } catch (RuntimeException exception) {
             GL11C.glDeleteTextures(texture); throw exception;
         } finally {
-            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, binding); GL11C.glActiveTexture(active);
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, binding); GL13C.glActiveTexture(active);
         }
     }
 
