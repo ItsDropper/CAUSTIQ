@@ -80,7 +80,15 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                     usedTargets.addAll(scheduled.pass().reads());
                 }
             }
+            usedTargets.addAll(terrainWrites);
             ensureResources(targetWidth, targetHeight, plan.targets(), usedTargets);
+            for (int index : terrainWrites) {
+                if (index > 0 && index <= MAX_COLOR_TARGET) {
+                    // Nvidium has already written this frame's terrain data to the primary target.
+                    hasWritten[index] = true;
+                    alternateCurrent[index] = false;
+                }
+            }
             for (int index = 1; index <= MAX_COLOR_TARGET; index++) {
                 IrisTerrainPassScheduler.RenderTarget target = plan.targets().get(index);
                 if (target != null && target.persistent() && persistentInitialized[index]) {

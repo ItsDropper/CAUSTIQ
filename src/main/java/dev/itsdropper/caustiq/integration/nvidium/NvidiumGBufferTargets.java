@@ -162,6 +162,7 @@ public final class NvidiumGBufferTargets {
         }
         if (viewportWidth <= 0 || viewportHeight <= 0) return false;
 
+        ShaderRuntime.prepareTerrainOutputs(viewportWidth, viewportHeight);
         ensureTargets(viewportWidth, viewportHeight);
         GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, framebuffer);
         int[] previousDrawBuffers = new int[drawBufferCount];
@@ -259,7 +260,7 @@ public final class NvidiumGBufferTargets {
     private static int outputTexture(int colortex) {
         return colortex <= MAX_ATTACHMENT
                 ? TEXTURES[colortex - 1]
-                : ShaderRuntime.irisColorTexture(colortex);
+                : ShaderRuntime.irisTerrainOutputTexture(colortex);
     }
 
     /** Returns the terrain-produced GL texture for an auxiliary color attachment (1 through 7). */
