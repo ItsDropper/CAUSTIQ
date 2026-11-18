@@ -294,8 +294,6 @@ public final class NvidiumIrisTextureBridge {
         boolean scissorWasEnabled = GL11C.glIsEnabled(GL11C.GL_SCISSOR_TEST);
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
         int sourceFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
-        int previousReadFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
-        int previousDrawFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
         GL13C.glActiveTexture(GL13C.GL_TEXTURE3);
         int previousTexture = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
         try {
@@ -324,21 +322,39 @@ public final class NvidiumIrisTextureBridge {
                 throw new IllegalStateException("Opaque-depth snapshot framebuffer is incomplete (0x"
                         + Integer.toHexString(status) + ").");
             }
-            // Blits obey GL_SCISSOR_TEST. Minecraft may leave a partial scissor active,
-            // which would otherwise preserve stale pixels outside that rectangle.
-            if (scissorWasEnabled) GL11C.glDisable(GL11C.GL_SCISSOR_TEST);
-            GL30C.glBlitFramebuffer(
-                    viewport[0], viewport[1], viewport[0] + width, viewport[1] + height,
-                    0, 0, width, height, GL11C.GL_DEPTH_BUFFER_BIT, GL11C.GL_NEAREST);
+            blitDepthSnapshot(sourceFramebuffer, depthSnapshotFramebuffer, viewport);
             depthSnapshotFrame = NvidiumIrisUniformBridge.currentFrameCounter();
         } finally {
-            if (scissorWasEnabled) GL11C.glEnable(GL11C.GL_SCISSOR_TEST);
-            GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
-            GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
             GL13C.glActiveTexture(previousActive);
         }
         return depthSnapshotTexture;
+    }
+
+    /**
+     * Copies the full depth region and restores the caller's framebuffer/scissor state.
+     * Framebuffer blits obey scissor testing, so leaving it enabled can produce a partial,
+     * mixed-frame snapshot when the caller has a smaller scissor rectangle active.
+     */
+    static void blitDepthSnapshot(int sourceFramebuffer, int destinationFramebuffer, int[] viewport) {
+        if (viewport == null || viewport.length < 4 || viewport[2] <= 0 || viewport[3] <= 0) {
+            throw new IllegalArgumentException("Depth snapshot viewport must contain a positive width and height.");
+        }
+        int previousReadFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
+        int previousDrawFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
+        boolean scissorWasEnabled = GL11C.glIsEnabled(GL11C.GL_SCISSOR_TEST);
+        try {
+            GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, sourceFramebuffer);
+            GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, destinationFramebuffer);
+            if (scissorWasEnabled) GL11C.glDisable(GL11C.GL_SCISSOR_TEST);
+            GL30C.glBlitFramebuffer(
+                    viewport[0], viewport[1], viewport[0] + viewport[2], viewport[1] + viewport[3],
+                    0, 0, viewport[2], viewport[3], GL11C.GL_DEPTH_BUFFER_BIT, GL11C.GL_NEAREST);
+        } finally {
+            if (scissorWasEnabled) GL11C.glEnable(GL11C.GL_SCISSOR_TEST);
+            GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+            GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
+        }
     }
 
     private static int createShadowComparisonSampler() {
