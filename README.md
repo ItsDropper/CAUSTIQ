@@ -54,6 +54,8 @@ Use **Scan details** on the settings screen to inspect rejected shader-pack cand
 
 Use **Browse packs** to search installed packs by display name, ZIP/folder filename, stable pack ID, or source type. Search terms are case-insensitive and all terms must match; results are paginated and the currently selected pack is marked in the list. Search is metadata-only and does not open or compile shader source. Select a result to apply it and return to settings.
 
+Open **Details** beside any browser result, or use **Inspect pack** for the selected pack in settings, to inspect its relative file inventory, shader-stage and pipeline counts, declared size, and parsed pack-option count. Inspection runs off the render thread, reads bounded metadata without extracting ZIPs, and can copy a bounded report containing relative filenames only—never absolute game-directory paths or shader source contents.
+
 > [!TIP]
 > **Taking artifacts from GitHub Actions?** GitHub wraps each one in an outer ZIP. Extract it first; the inner file is the one to use.
 

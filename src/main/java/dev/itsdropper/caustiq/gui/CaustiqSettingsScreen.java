@@ -68,10 +68,16 @@ public final class CaustiqSettingsScreen extends Screen {
             config.setCompileBudget(nextBudget);
             button.setMessage(compileBudgetLabel(nextBudget));
         }).bounds(width / 2 + 55, 68, 100, 20).build());
+        int actionLeft = width / 2 - 155;
         addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.scan_details",
                 scan == null ? 0 : scan.issues().size()), button ->
                 Minecraft.getInstance().setScreen(new ShaderPackDiagnosticsScreen(this)))
-                .bounds(width / 2 - 155, 164, 310, 20).build());
+                .bounds(actionLeft, 164, 150, 20).build());
+        Button inspectPack = Button.builder(Component.translatable("caustiq.settings.inspect_pack"), button ->
+                Minecraft.getInstance().setScreen(new ShaderPackInspectorScreen(this, selected)))
+                .bounds(actionLeft + 160, 164, 150, 20).build();
+        inspectPack.active = selected != null;
+        addRenderableWidget(inspectPack);
 
         if (selected != null) addOptionButtons(selected, config);
 

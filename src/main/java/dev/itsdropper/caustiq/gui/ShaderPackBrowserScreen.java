@@ -69,8 +69,12 @@ public final class ShaderPackBrowserScreen extends Screen {
                     ? "caustiq.settings.pack_source_archive" : "caustiq.settings.pack_source_directory");
             Component label = Component.translatable("caustiq.browser.pack_entry",
                     selected ? "✓ " : "", pack.displayName(), source, pack.shaderFileCount());
+            int rowY = 98 + (index - first) * ROW_HEIGHT;
             addRenderableWidget(Button.builder(label, button -> select(pack))
-                    .bounds(left, 98 + (index - first) * ROW_HEIGHT, 310, 20).build());
+                    .bounds(left, rowY, 248, 20).build());
+            addRenderableWidget(Button.builder(Component.translatable("caustiq.browser.inspect"),
+                    button -> Minecraft.getInstance().setScreen(new ShaderPackInspectorScreen(this, pack)))
+                    .bounds(left + 252, rowY, 58, 20).build());
         }
 
         int navY = height - 56;
