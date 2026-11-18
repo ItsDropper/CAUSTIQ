@@ -30,6 +30,13 @@ public abstract class NvidiumTranslucentTerrainRasterizerMixin {
             @Coerce Object pass, int regionCount, long commandAddress,
             @Coerce Object terrainSampler, CallbackInfo callbackInfo) {
         if (NvidiumShadowRenderer.isShadowRasterization()) return;
+        try {
+            NvidiumIrisTextureBridge.captureOpaqueDepthSnapshot();
+        } catch (RuntimeException exception) {
+            dev.itsdropper.caustiq.CaustiqClient.LOGGER.warn(
+                    "Could not capture opaque depth for Iris depthtex1; packs requiring it will report an unavailable sampler.",
+                    exception);
+        }
         NvidiumGBufferTargets.configureOutputRouting(
                 NvidiumShaderProgramBridge.outputRoutingFor(NvidiumShaderProgramBridge.PipelineKind.TRANSLUCENT));
         NvidiumGBufferTargets.begin(false);

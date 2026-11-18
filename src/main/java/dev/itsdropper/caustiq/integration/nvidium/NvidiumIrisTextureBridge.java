@@ -19,6 +19,8 @@ public final class NvidiumIrisTextureBridge {
     private static int noiseTexture;
     private static int fallbackDepthTexture;
     private static int depthSnapshotTexture;
+    private static int depthSnapshotFramebuffer;
+    private static int depthSnapshotFrame = Integer.MIN_VALUE;
     private static int depthSnapshotWidth;
     private static int depthSnapshotHeight;
     private static int fallbackColorTexture;
@@ -219,12 +221,15 @@ public final class NvidiumIrisTextureBridge {
         if (noiseTexture != 0) GL11C.glDeleteTextures(noiseTexture);
         if (fallbackDepthTexture != 0) GL11C.glDeleteTextures(fallbackDepthTexture);
         if (depthSnapshotTexture != 0) GL11C.glDeleteTextures(depthSnapshotTexture);
+        if (depthSnapshotFramebuffer != 0) GL30C.glDeleteFramebuffers(depthSnapshotFramebuffer);
         if (fallbackColorTexture != 0) GL11C.glDeleteTextures(fallbackColorTexture);
         if (shadowComparisonSampler != 0) GL33C.glDeleteSamplers(shadowComparisonSampler);
         NvidiumPbrTextureAtlases.destroy();
         noiseTexture = 0;
         fallbackDepthTexture = 0;
         depthSnapshotTexture = 0;
+        depthSnapshotFramebuffer = 0;
+        depthSnapshotFrame = Integer.MIN_VALUE;
         depthSnapshotWidth = 0;
         depthSnapshotHeight = 0;
         fallbackColorTexture = 0;
@@ -250,6 +255,21 @@ public final class NvidiumIrisTextureBridge {
         return texture == 0 ? fallbackColorTexture : texture;
     }
 
+    /** Captures opaque scene depth after Nvidium's solid pass and before translucent terrain. */
+    public static void captureOpaqueDepthSnapshot() {
+        captureDepthSnapshot();
+    }
+
+    /** Returns opaque depth only while the snapshot belongs to the active Nvidium frame. */
+    public static int depthTexture1() {
+        int frame = NvidiumIrisUniformBridge.currentFrameCounter();
+        return isDepthSnapshotCurrent(depthSnapshotFrame, frame) ? depthSnapshotTexture : 0;
+    }
+
+    static boolean isDepthSnapshotCurrent(int snapshotFrame, int currentFrame) {
+        return currentFrame > 0 && snapshotFrame == currentFrame;
+    }
+
     /**
      * Copies the currently bound scene depth buffer before Nvidium's translucent
      * terrain pass. Iris depthtex1 represents opaque depth, so sampling the live
@@ -266,16 +286,18 @@ public final class NvidiumIrisTextureBridge {
         int width = viewport[2];
         int height = viewport[3];
         if (width <= 0 || height <= 0) {
-            throw new IllegalStateException("Cannot bind Iris depthtex1 without a non-empty Nvidium viewport.");
+            throw new IllegalStateException("Cannot capture Iris depthtex1 without a non-empty Nvidium viewport.");
         }
 
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
         int sourceFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
         int previousReadFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
+        int previousDrawFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
         GL13C.glActiveTexture(GL13C.GL_TEXTURE3);
         int previousTexture = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
         try {
             if (depthSnapshotTexture == 0) depthSnapshotTexture = GL11C.glGenTextures();
+            if (depthSnapshotFramebuffer == 0) depthSnapshotFramebuffer = GL30C.glGenFramebuffers();
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, depthSnapshotTexture);
             GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_NEAREST);
             GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_NEAREST);
@@ -288,11 +310,24 @@ public final class NvidiumIrisTextureBridge {
                 depthSnapshotWidth = width;
                 depthSnapshotHeight = height;
             }
+
             GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, sourceFramebuffer);
-            GL11C.glCopyTexSubImage2D(GL11C.GL_TEXTURE_2D, 0, 0, 0,
-                    viewport[0], viewport[1], width, height);
+            GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, depthSnapshotFramebuffer);
+            GL30C.glFramebufferTexture2D(GL30C.GL_DRAW_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
+                    GL11C.GL_TEXTURE_2D, depthSnapshotTexture, 0);
+            GL11C.glDrawBuffer(GL11C.GL_NONE);
+            int status = GL30C.glCheckFramebufferStatus(GL30C.GL_DRAW_FRAMEBUFFER);
+            if (status != GL30C.GL_FRAMEBUFFER_COMPLETE) {
+                throw new IllegalStateException("Opaque-depth snapshot framebuffer is incomplete (0x"
+                        + Integer.toHexString(status) + ").");
+            }
+            GL30C.glBlitFramebuffer(
+                    viewport[0], viewport[1], viewport[0] + width, viewport[1] + height,
+                    0, 0, width, height, GL11C.GL_DEPTH_BUFFER_BIT, GL11C.GL_NEAREST);
+            depthSnapshotFrame = NvidiumIrisUniformBridge.currentFrameCounter();
         } finally {
             GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+            GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
             GL13C.glActiveTexture(previousActive);
         }

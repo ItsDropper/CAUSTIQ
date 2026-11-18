@@ -7,6 +7,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumGBufferTargets;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTextureBridge;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumPbrTextureAtlases;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL12C;
 import org.lwjgl.opengl.GL13C;
@@ -206,28 +207,28 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 unit++;
                 continue;
             }
-            int texture;
-            if (sampler.equals("shadowtex0") || sampler.equals("shadow")) {
+            int texture = builtinSamplerTexture(sampler, mainTarget, program.name());
+            if (texture == 0 && (sampler.equals("shadowtex0") || sampler.equals("shadow"))) {
                 texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowTexture();
-            } else if (sampler.equals("shadowtex1")) {
+            } else if (texture == 0 && sampler.equals("shadowtex1")) {
                 texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowTexture1();
                 if (texture == 0) {
                     throw new IllegalStateException("Iris compute pass '" + program.name()
                             + "' samples shadowtex1 before a valid translucent shadow map has been rendered.");
                 }
-            } else if (sampler.matches("shadowcolor[0-6]")) {
+            } else if (texture == 0 && sampler.matches("shadowcolor[0-6]")) {
                 int index = Integer.parseInt(sampler.substring("shadowcolor".length()));
                 texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowColorTexture(index);
                 if (texture == 0) {
                     throw new IllegalStateException("Iris compute pass '" + program.name()
                             + "' samples " + sampler + " before a valid shadow color map has been rendered.");
                 }
-            } else if (sampler.equals("noisetex")) {
+            } else if (texture == 0 && sampler.equals("noisetex")) {
                 texture = NvidiumIrisTextureBridge.noiseTexture();
-            } else if (sampler.equals("gcolor") || sampler.equals("DiffuseSampler")
-                    || sampler.equals("texture") || sampler.equals("tex") || sampler.equals("colortex0")) {
+            } else if (texture == 0 && (sampler.equals("gcolor") || sampler.equals("DiffuseSampler")
+                    || sampler.equals("texture") || sampler.equals("tex") || sampler.equals("colortex0"))) {
                 texture = currentTexture(0, mainTarget, alternateCurrent, hasWritten);
-            } else if (sampler.startsWith("colortex")) {
+            } else if (texture == 0 && sampler.startsWith("colortex")) {
                 int index;
                 try {
                     index = Integer.parseInt(sampler.substring("colortex".length()));
@@ -239,7 +240,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                             + "' is outside the supported colortex0-colortex31 range.");
                 }
                 texture = currentTexture(index, mainTarget, alternateCurrent, hasWritten);
-            } else {
+            } else if (texture == 0) {
                 throw new IllegalStateException("Iris compute sampler '" + sampler
                         + "' has no CAUSTIQ texture binding.");
             }
@@ -437,6 +438,38 @@ public final class IrisGlPassExecutor implements AutoCloseable {
         return result;
     }
 
+    enum BuiltinSamplerKind { NONE, DEPTH0, DEPTH1, NORMALS, SPECULAR }
+
+    static BuiltinSamplerKind builtinSamplerKind(String sampler) {
+        return switch (sampler) {
+            case "depthtex0" -> BuiltinSamplerKind.DEPTH0;
+            case "depthtex1" -> BuiltinSamplerKind.DEPTH1;
+            case "normals" -> BuiltinSamplerKind.NORMALS;
+            case "specular" -> BuiltinSamplerKind.SPECULAR;
+            default -> BuiltinSamplerKind.NONE;
+        };
+    }
+
+    private static int builtinSamplerTexture(String sampler, RenderTarget mainTarget, String programName) {
+        return switch (builtinSamplerKind(sampler)) {
+            case DEPTH0 -> requireSamplerTexture(textureId(mainTarget.getDepthTexture()), sampler, programName,
+                    "the active main render target has no OpenGL depth attachment");
+            case DEPTH1 -> requireSamplerTexture(NvidiumIrisTextureBridge.depthTexture1(), sampler, programName,
+                    "the opaque-depth snapshot was not captured for the current Nvidium frame");
+            case NORMALS -> NvidiumPbrTextureAtlases.normalsTexture();
+            case SPECULAR -> NvidiumPbrTextureAtlases.specularTexture();
+            case NONE -> 0;
+        };
+    }
+
+    private static int requireSamplerTexture(int texture, String sampler, String programName, String reason) {
+        if (texture == 0) {
+            throw new IllegalStateException("Iris pass '" + programName + "' samples " + sampler
+                    + ", but " + reason + ".");
+        }
+        return texture;
+    }
+
     private void bindSamplers(IrisGlProgram program, RenderTarget mainTarget,
                               boolean[] alternateCurrent, boolean[] hasWritten,
                               IrisShaderResources resources) {
@@ -453,29 +486,28 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 unit++;
                 continue;
             }
-            int texture;
-            if (sampler.equals("shadowtex0") || sampler.equals("shadow")) {
+            int texture = builtinSamplerTexture(sampler, mainTarget, program.name());
+            if (texture == 0 && (sampler.equals("shadowtex0") || sampler.equals("shadow"))) {
                 texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowTexture();
-            } else if (sampler.equals("shadowtex1")) {
+            } else if (texture == 0 && sampler.equals("shadowtex1")) {
                 texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowTexture1();
                 if (texture == 0) {
                     throw new IllegalStateException("Iris pass '" + program.name()
-                            + "' samples " + sampler + " before a valid shadow depth map has been rendered.");
+                            + "' samples shadowtex1 before a valid translucent shadow map has been rendered.");
                 }
-            } else if (sampler.matches("shadowcolor[0-6]")) {
-                int colorIndex = Integer.parseInt(sampler.substring("shadowcolor".length()));
-                texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowColorTexture(colorIndex);
+            } else if (texture == 0 && sampler.matches("shadowcolor[0-6]")) {
+                int index = Integer.parseInt(sampler.substring("shadowcolor".length()));
+                texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowColorTexture(index);
                 if (texture == 0) {
                     throw new IllegalStateException("Iris pass '" + program.name()
                             + "' samples " + sampler + " before a valid shadow color map has been rendered.");
                 }
-            } else if (sampler.equals("noisetex")) {
+            } else if (texture == 0 && sampler.equals("noisetex")) {
                 texture = NvidiumIrisTextureBridge.noiseTexture();
-            } else if (sampler.equals("gcolor") || sampler.equals("DiffuseSampler")
-                    || sampler.equals("texture") || sampler.equals("tex")
-                    || sampler.equals("colortex0")) {
+            } else if (texture == 0 && (sampler.equals("gcolor") || sampler.equals("DiffuseSampler")
+                    || sampler.equals("texture") || sampler.equals("tex") || sampler.equals("colortex0"))) {
                 texture = currentTexture(0, mainTarget, alternateCurrent, hasWritten);
-            } else if (sampler.startsWith("colortex")) {
+            } else if (texture == 0 && sampler.startsWith("colortex")) {
                 int index;
                 try {
                     index = Integer.parseInt(sampler.substring("colortex".length()));
@@ -487,7 +519,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                             + "' is outside the supported colortex0-colortex31 range.");
                 }
                 texture = currentTexture(index, mainTarget, alternateCurrent, hasWritten);
-            } else {
+            } else if (texture == 0) {
                 throw new IllegalStateException("Iris sampler '" + sampler
                         + "' has no CAUSTIQ texture binding.");
             }

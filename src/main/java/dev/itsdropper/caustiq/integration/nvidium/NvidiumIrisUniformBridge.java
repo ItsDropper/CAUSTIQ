@@ -53,6 +53,12 @@ public final class NvidiumIrisUniformBridge {
 
     private NvidiumIrisUniformBridge() { }
 
+    /** Current Nvidium frame identifier used to reject stale frame-scoped textures. */
+    public static int currentFrameCounter() {
+        Snapshot snapshot = CURRENT.get();
+        return snapshot == null ? FRAME_COUNTER.get() : snapshot.frameCounter();
+    }
+
     /** Called at NvidiumWorldRenderer.renderFrame HEAD, before its GPU draw phases. */
     public static void capture(Object chunkRenderMatrices, double cameraX, double cameraY, double cameraZ) {
         if (chunkRenderMatrices == null) return;

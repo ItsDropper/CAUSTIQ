@@ -6,6 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class NvidiumIrisTextureBridgeTest {
     @Test
+    void rejectsOpaqueDepthSnapshotsFromPreviousFrames() {
+        assertEquals(true, NvidiumIrisTextureBridge.isDepthSnapshotCurrent(12, 12));
+        assertEquals(false, NvidiumIrisTextureBridge.isDepthSnapshotCurrent(11, 12));
+        assertEquals(false, NvidiumIrisTextureBridge.isDepthSnapshotCurrent(0, 0));
+    }
+
+    @Test
     void skipsReservedShadowTextureUnitsWhenAllocatingCustomSamplers() {
         assertEquals(6, NvidiumIrisTextureBridge.firstCustomTextureUnit(6));
         assertEquals(11, NvidiumIrisTextureBridge.firstCustomTextureUnit(11));

@@ -169,7 +169,8 @@ The light matrices are orthographic and centred on the camera, without texel sna
 | Compute passes | 🟡 | Dispatched by the fullscreen executor; exercised by a Mesa smoke test |
 | Bundled packs | ✅ | **Lumina** (terrain lighting + shadows) and **Stillwater** (final-pass grade) |
 | **In-game verification** | ⬜ | **Not done** — build success ≠ working renderer |
-| Depth textures (`depthtex1`), geometry/tessellation passes | ⬜ | |
+| Scene depth (`depthtex0`/`depthtex1`) and labPBR normal/specular samplers | 🟡 | OpenGL bindings implemented; visual parity still needs in-game validation |
+| Geometry/tessellation passes | ⬜ | |
 | Full Iris expression VM, temporal `smooth()` | ⬜ | |
 | Validation against real packs & benchmarks | ⬜ | |
 
@@ -183,7 +184,10 @@ CAUSTIQ describes this honestly in `NvidiumIrisTerrainAbi`: a *capability* contr
 | `lmcoord`, `gl_MultiTexCoord1` / `vaUV2`, `gtexture`, `lightmap`, `gbufferModelView`, `gbufferProjection`, `cameraPosition`, `frameCounter`, `fogColor` | ✅ exact |
 | `gl_Vertex` / `vaPosition`, `gl_MultiTexCoord0` / `vaUV0`, `gl_Color` / `vaColor`, matrix inverses, `viewWidth` / `viewHeight`, `frameTimeCounter` | 🟡 derived |
 | `viewSpacePosition` | ❌ unavailable — Nvidium's position is region-transformed and camera-relative, not Iris view space |
-| `normals`, `specular`, `depthtex1`, Distant Horizons / Voxy depth textures, `taa_offset` | ❌ rejected at translation |
+| `depthtex0` | 🟡 bound to the active Minecraft scene depth attachment for fullscreen and compute passes |
+| `depthtex1` | 🟡 copied from opaque scene depth before Nvidium's translucent terrain pass; frame-scoped to prevent stale history |
+| `normals`, `specular` | 🟡 resource-pack labPBR atlases are bound to terrain, fullscreen and compute programs |
+| Distant Horizons / Voxy depth textures | ❌ unavailable without their external renderer integrations |
 | `shadowtex0/1`, `shadowcolor0/1`, `shadowModelView` / `shadowProjection` and inverses | 🟡 provided by the isolated shadow pass when the pack ships a `shadow` program |
 | `sunPosition`, `temperature`, `rainfall`, previous-frame matrices (as custom-uniform inputs) | 🟡 derived from the level and camera |
 | `colortex15` | 🟡 available to fullscreen passes; not a Nvidium terrain attachment |
