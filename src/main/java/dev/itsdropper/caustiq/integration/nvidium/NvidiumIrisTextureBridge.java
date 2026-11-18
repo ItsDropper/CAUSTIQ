@@ -289,6 +289,9 @@ public final class NvidiumIrisTextureBridge {
             throw new IllegalStateException("Cannot capture Iris depthtex1 without a non-empty Nvidium viewport.");
         }
 
+        // Invalidate first: a failed copy must never leave a prior snapshot looking current.
+        depthSnapshotFrame = Integer.MIN_VALUE;
+        boolean scissorWasEnabled = GL11C.glIsEnabled(GL11C.GL_SCISSOR_TEST);
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
         int sourceFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
         int previousReadFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
@@ -321,11 +324,15 @@ public final class NvidiumIrisTextureBridge {
                 throw new IllegalStateException("Opaque-depth snapshot framebuffer is incomplete (0x"
                         + Integer.toHexString(status) + ").");
             }
+            // Blits obey GL_SCISSOR_TEST. Minecraft may leave a partial scissor active,
+            // which would otherwise preserve stale pixels outside that rectangle.
+            if (scissorWasEnabled) GL11C.glDisable(GL11C.GL_SCISSOR_TEST);
             GL30C.glBlitFramebuffer(
                     viewport[0], viewport[1], viewport[0] + width, viewport[1] + height,
                     0, 0, width, height, GL11C.GL_DEPTH_BUFFER_BIT, GL11C.GL_NEAREST);
             depthSnapshotFrame = NvidiumIrisUniformBridge.currentFrameCounter();
         } finally {
+            if (scissorWasEnabled) GL11C.glEnable(GL11C.GL_SCISSOR_TEST);
             GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
             GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
