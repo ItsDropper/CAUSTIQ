@@ -291,7 +291,6 @@ public final class NvidiumIrisTextureBridge {
 
         // Invalidate first: a failed copy must never leave a prior snapshot looking current.
         depthSnapshotFrame = Integer.MIN_VALUE;
-        boolean scissorWasEnabled = GL11C.glIsEnabled(GL11C.GL_SCISSOR_TEST);
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
         int sourceFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
         GL13C.glActiveTexture(GL13C.GL_TEXTURE3);
