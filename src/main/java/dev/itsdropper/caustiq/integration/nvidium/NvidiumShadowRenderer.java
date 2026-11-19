@@ -59,6 +59,7 @@ public final class NvidiumShadowRenderer {
     private static volatile int requestedResolution = DEFAULT_RESOLUTION;
     private static volatile float requestedDistance = DEFAULT_DISTANCE;
     private static volatile State activeState;
+    private static volatile String lastRenderStatus = "not started";
     private static boolean failureLogged;
 
     private NvidiumShadowRenderer() { }
@@ -70,6 +71,7 @@ public final class NvidiumShadowRenderer {
         requestedDistance = Float.isFinite(distance) ? Math.max(16.0f, Math.min(512.0f, distance))
                 : DEFAULT_DISTANCE;
         failureLogged = false;
+        lastRenderStatus = shouldRender ? "enabled; awaiting first frame" : "disabled by configuration";
         if (!shouldRender) {
             for (State state : STATES.values()) state.close();
             STATES.clear();
@@ -86,20 +88,37 @@ public final class NvidiumShadowRenderer {
     /** Called at the tail of NvidiumWorldRenderer.renderFrame, after camera terrain submission. */
     public static void render(Object worldRenderer, Object terrainPass, Object fogParameters,
                               double cameraX, double cameraY, double cameraZ, Object terrainSampler) {
-        if (!enabled || worldRenderer == null || terrainPass == null || terrainSampler == null) return;
+        if (!enabled) {
+            lastRenderStatus = "render skipped: disabled";
+            return;
+        }
+        if (worldRenderer == null || terrainPass == null) {
+            lastRenderStatus = "render skipped: missing world renderer or terrain pass";
+            return;
+        }
         try {
             State state = stateFor(worldRenderer);
             state.ensureResolution(requestedResolution);
+            if (terrainSampler == null) {
+                state.clearDepth();
+                state.clearTranslucentDepth();
+                state.depthValid = true;
+                activeState = state;
+                lastRenderStatus = "terrain sampler unavailable; published cleared shadow maps";
+                return;
+            }
             int regionCount = state.uploadScene(terrainPass, fogParameters, cameraX, cameraY, cameraZ,
                     requestedDistance);
             NvidiumIrisUniformBridge.clearShadowVoxelImageForCurrentFrame();
             if (regionCount == 0) {
-                if (NvidiumTerrainPassBridge.shouldClearAttachments(terrainPass)) {
-                    state.clearDepth();
-                    state.clearTranslucentDepth();
-                    state.depthValid = true;
-                    activeState = state;
-                }
+                // A zero-region frame still has valid, fully initialized shadow
+                // maps. Do not make availability depend on which terrain layer
+                // Nvidium happened to submit first this frame.
+                state.clearDepth();
+                state.clearTranslucentDepth();
+                state.depthValid = true;
+                activeState = state;
+                lastRenderStatus = "no visible regions; published cleared shadow maps";
                 return;
             }
             boolean clear = NvidiumTerrainPassBridge.shouldClearAttachments(terrainPass) || !state.depthValid;
@@ -107,6 +126,7 @@ public final class NvidiumShadowRenderer {
             renderShadowPass(state, terrainPass, terrainSampler, regionCount, clear);
             state.depthValid = true;
             activeState = state;
+            lastRenderStatus = "shadow terrain rendered " + regionCount + " region(s)";
             failureLogged = false;
         } catch (ReflectiveOperationException | RuntimeException exception) {
             if (!failureLogged) {
@@ -123,6 +143,8 @@ public final class NvidiumShadowRenderer {
                     CaustiqClient.LOGGER.warn("Unable to release the failed Nvidium shadow pipeline.", cleanupFailure);
                 }
             }
+            lastRenderStatus = "render failed: " + exception.getClass().getSimpleName()
+                    + ": " + exception.getMessage();
             enabled = false;
         }
     }
@@ -169,6 +191,16 @@ public final class NvidiumShadowRenderer {
         return state != null && state.depthTexture != 0 && state.depthValid;
     }
 
+    /** Diagnostic state included when an Iris pass requests an unavailable shadow map. */
+    public static String shadowMapStatus() {
+        State state = activeState;
+        if (!enabled) return "shadow renderer disabled; last state: " + lastRenderStatus;
+        if (state == null) return "no active shadow renderer state; last state: " + lastRenderStatus;
+        return "shadow renderer state present (valid=" + state.depthValid
+                + ", resolution=" + state.resolution + ", frame=" + state.frameId
+                + "); last state: " + lastRenderStatus;
+    }
+
     /** Nvidium reloads its native rasterizer objects when its shader settings change. */
     public static void reload(Object worldRenderer) {
         State state = STATES.get(worldRenderer);
@@ -191,6 +223,7 @@ public final class NvidiumShadowRenderer {
         requestedDistance = DEFAULT_DISTANCE;
         failureLogged = false;
         activeState = null;
+        lastRenderStatus = "reset";
         SHADOW_RASTERIZATION.remove();
         for (State state : STATES.values()) state.close();
         STATES.clear();
@@ -201,6 +234,9 @@ public final class NvidiumShadowRenderer {
         if (existing != null) return existing;
         State created = new State(worldRenderer);
         STATES.put(worldRenderer, created);
+        // State construction clears every attachment before publishing it, so
+        // shader passes never observe uninitialized texture storage.
+        activeState = created;
         return created;
     }
 
@@ -504,6 +540,9 @@ public final class NvidiumShadowRenderer {
             this.translucentDepthTexture = translucentTargets[0];
             this.translucentFramebuffer = translucentTargets[1];
             this.resolution = DEFAULT_RESOLUTION;
+            clearDepth();
+            clearTranslucentDepth();
+            depthValid = true;
             createShadowRasterizer();
         }
 
