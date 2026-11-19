@@ -49,7 +49,7 @@ class IrisShadowProgramSelectorTest {
         Path shaders = Files.createDirectories(temporaryDirectory.resolve("Isolated/shaders/world0"));
         writeShadowProgram(shaders, "shadow_solid");
         Files.writeString(shaders.getParent().resolve("dimension.properties"),
-                "dimension.world0=minecraft:overworld\\n");
+                "dimension.world0=minecraft:overworld\n");
 
         ShaderPackDescriptor descriptor = new ShaderPackDescriptor("isolated", "Isolated",
                 temporaryDirectory.resolve("Isolated"), "", ShaderPackSourceType.DIRECTORY,
@@ -64,8 +64,8 @@ class IrisShadowProgramSelectorTest {
     private static void writeShadowProgram(Path directory, String name) throws IOException {
         Files.createDirectories(directory);
         Files.writeString(directory.resolve(name + ".vsh"),
-                "#version 150\\nvoid main(){ gl_Position=vec4(0.0); }");
+                "#version 150\nvoid main(){ gl_Position=vec4(0.0); }");
         Files.writeString(directory.resolve(name + ".fsh"),
-                "#version 150\\nout vec4 color; void main(){ color=vec4(1.0); }");
+                "#version 150\nout vec4 color; void main(){ color=vec4(1.0); }");
     }
 }
