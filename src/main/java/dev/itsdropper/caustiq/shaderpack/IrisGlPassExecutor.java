@@ -214,7 +214,8 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowTexture1();
                 if (texture == 0) {
                     throw new IllegalStateException("Iris compute pass '" + program.name()
-                            + "' samples shadowtex1 before a valid translucent shadow map has been rendered.");
+                            + "' samples shadowtex1 before a valid translucent shadow map has been rendered ("
+                            + dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowMapStatus() + ").");
                 }
             } else if (texture == 0 && sampler.matches("shadowcolor[0-6]")) {
                 int index = Integer.parseInt(sampler.substring("shadowcolor".length()));
@@ -493,7 +494,8 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowTexture1();
                 if (texture == 0) {
                     throw new IllegalStateException("Iris pass '" + program.name()
-                            + "' samples shadowtex1 before a valid translucent shadow map has been rendered.");
+                            + "' samples shadowtex1 before a valid translucent shadow map has been rendered ("
+                            + dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowMapStatus() + ").");
                 }
             } else if (texture == 0 && sampler.matches("shadowcolor[0-6]")) {
                 int index = Integer.parseInt(sampler.substring("shadowcolor".length()));
