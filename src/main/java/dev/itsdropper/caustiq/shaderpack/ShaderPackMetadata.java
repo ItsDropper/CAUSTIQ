@@ -94,9 +94,17 @@ public record ShaderPackMetadata(Map<String, String> properties, List<Option> op
 
     /** Reads only bounded shader source files, without extracting archives. */
     public static ShaderPackMetadata parse(String properties, ShaderPackSources sources) throws IOException {
+        return parse(properties, sources, sources.listShaderFiles());
+    }
+
+    static ShaderPackMetadata parse(
+            String properties,
+            ShaderPackSources sources,
+            List<String> shaderPaths
+    ) throws IOException {
         Map<String, String> shaderSources = new LinkedHashMap<>();
         int totalChars = 0;
-        for (String path : sources.listShaderFiles()) {
+        for (String path : shaderPaths) {
             String lower = path.toLowerCase(Locale.ROOT);
             if (!(lower.endsWith(".vsh") || lower.endsWith(".fsh") || lower.endsWith(".gsh")
                     || lower.endsWith(".csh") || lower.endsWith(".tcs") || lower.endsWith(".tes")

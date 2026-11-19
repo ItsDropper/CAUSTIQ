@@ -52,6 +52,8 @@ The exact pins are enforced in `fabric.mod.json`: Nvidium-specific mixins target
 
 Use **Scan details** on the settings screen to inspect rejected shader-pack candidates and their reasons. The screen supports paging, retrying a scan, and copying the bounded diagnostics report. Candidate filenames and sanitized reasons are included; absolute game-directory paths and shader source contents are omitted. If a refresh fails, the last completed results remain visible alongside the failure reason, and copied reports include the latest refresh state and sanitized error.
 
+Pack-defined option metadata is read asynchronously off the render thread, so opening a large shader pack does not block the game UI. The settings screen shows a loading state, displays a sanitized reason if metadata cannot be read, and offers a retry action. A successful rescan invalidates the cached metadata so changed pack files are picked up.
+
 Use **Browse packs** to search installed packs by display name, ZIP/folder filename, stable pack ID, or source type. Search terms are case-insensitive and all terms must match; results are paginated and the currently selected pack is marked in the list. Search is metadata-only and does not open or compile shader source. Select a result to apply it and return to settings.
 
 Open **Details** beside any browser result, or use **Inspect pack** for the selected pack in settings, to inspect its relative file inventory, shader-stage and pipeline counts, declared size, and parsed pack-option count. Inspection runs off the render thread, reads bounded metadata without extracting ZIPs, and can copy a bounded report containing relative filenames only—never absolute game-directory paths or shader source contents.

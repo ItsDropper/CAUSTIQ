@@ -39,7 +39,7 @@ public record ShaderPackInspection(
             try {
                 String properties = files.contains("shaders.properties")
                         ? sources.read("shaders.properties") : "";
-                optionCount = ShaderPackMetadata.parse(properties, sources).options().size();
+                optionCount = ShaderPackMetadata.parse(properties, sources, files).options().size();
             } catch (IOException | IllegalArgumentException exception) {
                 metadataFailure = ShaderPackIssue.sanitizeDisplayText(exception.getMessage());
             }

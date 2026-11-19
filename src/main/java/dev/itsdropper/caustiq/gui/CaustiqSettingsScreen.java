@@ -5,10 +5,11 @@ import dev.itsdropper.caustiq.CaustiqConfig;
 import dev.itsdropper.caustiq.CompileBudget;
 import dev.itsdropper.caustiq.diagnostics.CaustiqDiagnostics;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackDescriptor;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackMetadata;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackMetadataLoader;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackRefreshStatus;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
-import dev.itsdropper.caustiq.shaderpack.ShaderPackSources;
 import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -16,8 +17,9 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /** Renderer-independent shader-pack selection and option screen. */
 public final class CaustiqSettingsScreen extends Screen {
@@ -25,8 +27,18 @@ public final class CaustiqSettingsScreen extends Screen {
     private final Screen parent;
     private int optionPage;
     private String metadataCachePackId;
+    private ShaderPackScanResult metadataScanResult;
     private ShaderPackMetadata metadataCache;
-    private boolean metadataLoaded;
+    private MetadataState metadataState = MetadataState.IDLE;
+    private String metadataFailureMessage = "";
+    private long metadataRequest;
+
+    private enum MetadataState {
+        IDLE,
+        LOADING,
+        LOADED,
+        FAILED
+    }
 
     public CaustiqSettingsScreen(Screen parent) {
         super(Component.translatable("caustiq.settings.title"));
@@ -48,6 +60,9 @@ public final class CaustiqSettingsScreen extends Screen {
         ShaderPackDescriptor selected = packs.stream()
                 .filter(pack -> pack.id().equals(config.selectedPackId()))
                 .findFirst().orElse(null);
+        if (selected == null) clearMetadata();
+        else ensureMetadataLoaded(selected, scan);
+
         addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.browse_packs", packs.size()),
                 button -> Minecraft.getInstance().setScreen(new ShaderPackBrowserScreen(this)))
                 .bounds(width / 2 + 5, 42, 150, 20).build());
@@ -79,7 +94,15 @@ public final class CaustiqSettingsScreen extends Screen {
         inspectPack.active = selected != null;
         addRenderableWidget(inspectPack);
 
-        if (selected != null) addOptionButtons(selected, config);
+        if (selected != null) {
+            if (metadataState == MetadataState.FAILED) {
+                addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.retry_pack_options"),
+                        button -> retryMetadata(selected, scan))
+                        .bounds(width / 2 - 75, height - 56, 150, 20).build());
+            } else if (metadataState == MetadataState.LOADED) {
+                addOptionButtons(selected, metadataCache, config);
+            }
+        }
 
         addRenderableWidget(Button.builder(Component.translatable("gui.done"),
                 button -> Minecraft.getInstance().setScreen(parent))
@@ -110,21 +133,23 @@ public final class CaustiqSettingsScreen extends Screen {
                     width / 2, 132, 0xFFAAAAAA);
             graphics.drawCenteredString(font, Component.translatable("caustiq.settings.structural_only"),
                     width / 2, 144, 0xFF888888);
-            Component metadataSummary = metadataLoaded && selected.id().equals(metadataCachePackId)
-                    ? Component.translatable("caustiq.settings.pack_options_count", metadataCache == null
-                            ? Component.translatable("caustiq.settings.pack_options_unavailable")
-                            : Integer.toString(metadataCache.options().size()))
-                    : Component.translatable("caustiq.settings.pack_options_loading");
+            Component metadataSummary = switch (metadataState) {
+                case LOADING, IDLE -> Component.translatable("caustiq.settings.pack_options_loading");
+                case LOADED -> Component.translatable("caustiq.settings.pack_options_count",
+                        Integer.toString(metadataCache.options().size()));
+                case FAILED -> Component.translatable("caustiq.settings.pack_options_unavailable");
+            };
             graphics.drawCenteredString(font, metadataSummary, width / 2, 156, 0xFFAAAAAA);
         } else {
             graphics.drawCenteredString(font, Component.translatable("caustiq.settings.no_selection"),
                     width / 2, 198, 0xFFAAAAAA);
         }
-        if (selected != null && metadataLoaded && selected.id().equals(metadataCachePackId)) {
-            if (metadataCache == null) {
-                graphics.drawCenteredString(font, Component.translatable("caustiq.settings.pack_options_read_failed"),
-                        width / 2, 198, 0xFFFF7777);
-            } else if (metadataCache.options().isEmpty()) {
+        if (selected != null) {
+            if (metadataState == MetadataState.FAILED) {
+                drawCenteredWrapped(graphics,
+                        Component.translatable("caustiq.settings.pack_options_load_failed", metadataFailureMessage),
+                        174, width - 32, 0xFFFF7777);
+            } else if (metadataState == MetadataState.LOADED && metadataCache.options().isEmpty()) {
                 graphics.drawCenteredString(font, Component.translatable("caustiq.settings.no_options"),
                         width / 2, 198, 0xFFAAAAAA);
             }
@@ -140,6 +165,20 @@ public final class CaustiqSettingsScreen extends Screen {
                 case IDLE -> 0xFFFFFFFF;
             };
             graphics.drawCenteredString(font, message, width / 2, 92, color);
+        }
+    }
+
+    private void drawCenteredWrapped(
+            GuiGraphics graphics,
+            Component message,
+            int startY,
+            int maxWidth,
+            int color
+    ) {
+        int y = startY;
+        for (var line : font.split(message, maxWidth)) {
+            graphics.drawCenteredString(font, line, width / 2, y, color);
+            y += 10;
         }
     }
 
@@ -168,9 +207,12 @@ public final class CaustiqSettingsScreen extends Screen {
         return String.format(java.util.Locale.ROOT, "%.1f MiB", bytes / (1024.0 * 1024.0));
     }
 
-    private void addOptionButtons(ShaderPackDescriptor pack, CaustiqConfig config) {
-        ShaderPackMetadata metadata = readMetadata(pack);
-        if (metadata == null || metadata.options().isEmpty()) return;
+    private void addOptionButtons(
+            ShaderPackDescriptor pack,
+            ShaderPackMetadata metadata,
+            CaustiqConfig config
+    ) {
+        if (metadata.options().isEmpty()) return;
         int pageSize = optionPageSize();
         int pages = (metadata.options().size() + pageSize - 1) / pageSize;
         int start = optionPage * pageSize;
@@ -207,24 +249,74 @@ public final class CaustiqSettingsScreen extends Screen {
         return Math.max(1, Math.min(PAGE_SIZE, (height - 242) / 24));
     }
 
-    private ShaderPackMetadata readMetadata(ShaderPackDescriptor pack) {
-        if (metadataLoaded && pack.id().equals(metadataCachePackId)) return metadataCache;
-        metadataLoaded = true;
-        metadataCachePackId = pack.id();
-        metadataCache = null;
-        try (ShaderPackSources sources = ShaderPackSources.open(pack)) {
-            String properties;
-            try {
-                properties = sources.read("shaders.properties");
-            } catch (IOException missingProperties) {
-                properties = "";
-            }
-            metadataCache = ShaderPackMetadata.parse(properties, sources);
-        } catch (IOException | IllegalArgumentException exception) {
-            CaustiqClient.LOGGER.warn("Unable to read options for shader pack '{}': {}",
-                    pack.displayName(), exception.getMessage());
+    private void ensureMetadataLoaded(ShaderPackDescriptor pack, ShaderPackScanResult scan) {
+        if (metadataState != MetadataState.IDLE
+                && pack.id().equals(metadataCachePackId)
+                && metadataScanResult == scan) {
+            return;
         }
-        return metadataCache;
+
+        long request = ++metadataRequest;
+        metadataCachePackId = pack.id();
+        metadataScanResult = scan;
+        metadataCache = null;
+        metadataFailureMessage = "";
+        metadataState = MetadataState.LOADING;
+        optionPage = 0;
+
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                return ShaderPackMetadataLoader.load(pack);
+            } catch (IOException | IllegalArgumentException exception) {
+                throw new CompletionException(exception);
+            }
+        }).whenComplete((metadata, failure) -> Minecraft.getInstance().execute(() -> {
+            if (request != metadataRequest
+                    || !pack.id().equals(metadataCachePackId)
+                    || metadataScanResult != scan) {
+                return;
+            }
+
+            if (failure == null) {
+                metadataCache = metadata;
+                metadataState = MetadataState.LOADED;
+            } else {
+                metadataFailureMessage = summarizeFailure(failure);
+                metadataState = MetadataState.FAILED;
+                CaustiqClient.LOGGER.warn("Unable to read options for shader pack '{}': {}",
+                        pack.displayName(), metadataFailureMessage);
+            }
+
+            if (Minecraft.getInstance().screen == this) {
+                init();
+            }
+        }));
+    }
+
+    private void retryMetadata(ShaderPackDescriptor pack, ShaderPackScanResult scan) {
+        metadataState = MetadataState.IDLE;
+        metadataCachePackId = null;
+        ensureMetadataLoaded(pack, scan);
+        init();
+    }
+
+    private void clearMetadata() {
+        metadataRequest++;
+        metadataCachePackId = null;
+        metadataScanResult = null;
+        metadataCache = null;
+        metadataFailureMessage = "";
+        metadataState = MetadataState.IDLE;
+    }
+
+    private static String summarizeFailure(Throwable failure) {
+        Throwable cause = failure;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        String message = cause.getMessage();
+        return ShaderPackIssue.sanitizeDisplayText(
+                message == null || message.isBlank() ? cause.getClass().getSimpleName() : message);
     }
 
     private static Component enabledLabel(boolean enabled) {
