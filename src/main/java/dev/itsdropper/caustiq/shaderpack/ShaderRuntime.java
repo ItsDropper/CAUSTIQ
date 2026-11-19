@@ -21,6 +21,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -34,6 +36,9 @@ public final class ShaderRuntime {
     private static IrisShaderResources irisShaderResources = IrisShaderResources.empty();
     private static final Map<String, IrisGlProgram> IRIS_GL_PROGRAMS = new LinkedHashMap<>();
     private static boolean discoveryStarted, discoveryFinished;
+    private static volatile String preloadedPackId = "";
+    private static volatile ShaderPackScanResult preloadedScanResult;
+    private static volatile CompletableFuture<ParsedShaderPack> preloadedPack;
     private static ShaderPackSources sources;
     private static IrisShaderPackModel preparedPackModel;
     private static String preparedPackId = "";
@@ -60,6 +65,7 @@ public final class ShaderRuntime {
         discoveryStarted = false;
         discoveryFinished = false;
         SCAN_RESULT.set(result);
+        preloadSelectedPackModel(result);
         prepareSelectedNvidiumTerrainAdapter();
     }
 
@@ -201,8 +207,13 @@ public final class ShaderRuntime {
                 .findFirst().orElse(null);
         if (selected == null) return;
 
-        try (ShaderPackSources selectedSources = ShaderPackSources.open(selected)) {
-            IrisShaderPackModel model = new IrisShaderPackParser().parse(selectedSources);
+        try {
+            long parseWaitStarted = System.nanoTime();
+            ParsedShaderPack parsedPack = preloadSelectedPackModel(result).join();
+            long parseWaitMillis = (System.nanoTime() - parseWaitStarted) / 1_000_000L;
+            IrisShaderPackModel model = parsedPack.model();
+            long resourceLoadStarted = System.nanoTime();
+            try (ShaderPackSources selectedSources = ShaderPackSources.open(selected)) {
             warnUnsupportedShadowGeometry(model, selected.displayName());
             Map<String, String> optionDefines = new LinkedHashMap<>();
             for (ShaderPackMetadata.Option option : model.options().options()) {
@@ -214,6 +225,10 @@ public final class ShaderRuntime {
                     model.properties(), selectedSources, optionDefines);
             irisShaderResources.close();
             irisShaderResources = loadedResources;
+            long resourceLoadMillis = (System.nanoTime() - resourceLoadStarted) / 1_000_000L;
+            CaustiqClient.LOGGER.info(
+                    "Nvidium shader-pack preparation timings for '{}': background parse={}ms, render-thread parse wait={}ms, GL resource load/upload={}ms.",
+                    selected.displayName(), parsedPack.parseMillis(), parseWaitMillis, resourceLoadMillis);
             Set<String> unsupportedRequiredFeatures = unsupportedRequiredFeatures(model);
             if (!unsupportedRequiredFeatures.isEmpty()) {
                 CaustiqClient.LOGGER.warn(
@@ -277,6 +292,7 @@ public final class ShaderRuntime {
                     "Prepared {} separate Iris translucent terrain program(s) for Nvidium.",
                     translucentTranslators.size());
             activateTerrainAdapterForCurrentWorld();
+            }
         } catch (IOException | RuntimeException exception) {
             irisShaderResources.close();
             irisShaderResources = IrisShaderResources.empty();
@@ -297,6 +313,46 @@ public final class ShaderRuntime {
         }
     }
 
+
+    /**
+     * Parses the selected pack's CPU-only Iris model while the client is at the
+     * title screen. Nvidium asks for its compatibility decision during world
+     * renderer construction, so doing ZIP traversal, GLSL preprocessing and
+     * program analysis there needlessly stalls the Loading Terrain screen.
+     * OpenGL-backed image/texture creation remains on the render thread.
+     */
+    private static synchronized CompletableFuture<ParsedShaderPack> preloadSelectedPackModel(
+            ShaderPackScanResult result) {
+        String selectedId = CaustiqConfig.get().selectedPackId();
+        ShaderPackDescriptor selected = result.packs().stream()
+                .filter(pack -> pack.id().equals(selectedId))
+                .findFirst().orElse(null);
+        if (selected == null) {
+            preloadedPackId = "";
+            preloadedScanResult = result;
+            preloadedPack = null;
+            return null;
+        }
+        if (preloadedPack != null && selected.id().equals(preloadedPackId)
+                && preloadedScanResult == result) {
+            return preloadedPack;
+        }
+
+        preloadedPackId = selected.id();
+        preloadedScanResult = result;
+        preloadedPack = CompletableFuture.supplyAsync(() -> {
+            long started = System.nanoTime();
+            try (ShaderPackSources packSources = ShaderPackSources.open(selected)) {
+                IrisShaderPackModel model = new IrisShaderPackParser().parse(packSources);
+                return new ParsedShaderPack(model, (System.nanoTime() - started) / 1_000_000L);
+            } catch (IOException exception) {
+                throw new CompletionException(exception);
+            }
+        });
+        return preloadedPack;
+    }
+
+    private record ParsedShaderPack(IrisShaderPackModel model, long parseMillis) { }
 
     private static void warnUnsupportedShadowGeometry(IrisShaderPackModel model, String packName) {
         Set<String> programs = new LinkedHashSet<>(model.base().programs().keySet());
