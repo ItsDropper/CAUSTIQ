@@ -23,6 +23,7 @@ public final class NvidiumIrisTextureBridge {
     private static int depthSnapshotFrame = Integer.MIN_VALUE;
     private static int depthSnapshotWidth;
     private static int depthSnapshotHeight;
+    private static int depthSnapshotInternalFormat;
     private static int fallbackColorTexture;
     private static int shadowComparisonSampler;
     private static BindingState bindingState;
@@ -232,6 +233,7 @@ public final class NvidiumIrisTextureBridge {
         depthSnapshotFrame = Integer.MIN_VALUE;
         depthSnapshotWidth = 0;
         depthSnapshotHeight = 0;
+        depthSnapshotInternalFormat = 0;
         fallbackColorTexture = 0;
         shadowComparisonSampler = 0;
     }
@@ -292,10 +294,14 @@ public final class NvidiumIrisTextureBridge {
         // Invalidate first: a failed copy must never leave a prior snapshot looking current.
         depthSnapshotFrame = Integer.MIN_VALUE;
         int previousActive = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
-        int sourceFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
+        int previousReadFramebuffer = GL11C.glGetInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
+        int previousDrawFramebuffer = GL11C.glGetInteger(GL30C.GL_DRAW_FRAMEBUFFER_BINDING);
+        int sourceFramebuffer = previousDrawFramebuffer;
         GL13C.glActiveTexture(GL13C.GL_TEXTURE3);
         int previousTexture = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
         try {
+            GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, sourceFramebuffer);
+            int sourceDepthFormat = depthAttachmentInternalFormat(sourceFramebuffer);
             if (depthSnapshotTexture == 0) depthSnapshotTexture = GL11C.glGenTextures();
             if (depthSnapshotFramebuffer == 0) depthSnapshotFramebuffer = GL30C.glGenFramebuffers();
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, depthSnapshotTexture);
@@ -303,12 +309,14 @@ public final class NvidiumIrisTextureBridge {
             GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_NEAREST);
             GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, 0x812F);
             GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, 0x812F);
-            if (depthSnapshotWidth != width || depthSnapshotHeight != height) {
-                GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_DEPTH_COMPONENT32F,
+            if (depthSnapshotWidth != width || depthSnapshotHeight != height
+                    || depthSnapshotInternalFormat != sourceDepthFormat) {
+                GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, sourceDepthFormat,
                         width, height, 0, GL11C.GL_DEPTH_COMPONENT, GL11C.GL_FLOAT,
                         (ByteBuffer) null);
                 depthSnapshotWidth = width;
                 depthSnapshotHeight = height;
+                depthSnapshotInternalFormat = sourceDepthFormat;
             }
 
             GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, sourceFramebuffer);
@@ -325,9 +333,53 @@ public final class NvidiumIrisTextureBridge {
             depthSnapshotFrame = NvidiumIrisUniformBridge.currentFrameCounter();
         } finally {
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
+            GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+            GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
             GL13C.glActiveTexture(previousActive);
         }
         return depthSnapshotTexture;
+    }
+
+    /**
+     * Reads the exact internal format of the source depth attachment. OpenGL depth blits
+     * require identical source and destination depth formats; matching only bit depth is
+     * insufficient (for example, DEPTH_COMPONENT24 and DEPTH_COMPONENT32F are incompatible).
+     */
+    static int depthAttachmentInternalFormat(int framebuffer) {
+        int objectType = GL30C.glGetFramebufferAttachmentParameteri(
+                GL30C.GL_READ_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
+                GL30C.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE);
+        int objectName = GL30C.glGetFramebufferAttachmentParameteri(
+                GL30C.GL_READ_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
+                GL30C.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+        if (objectType == GL11C.GL_TEXTURE) {
+            int level = GL30C.glGetFramebufferAttachmentParameteri(
+                    GL30C.GL_READ_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
+                    GL30C.GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL);
+            int cubeFace = GL30C.glGetFramebufferAttachmentParameteri(
+                    GL30C.GL_READ_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
+                    GL30C.GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE);
+            int previousTexture = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
+            int target = cubeFace == 0 ? GL11C.GL_TEXTURE_2D : cubeFace;
+            try {
+                GL11C.glBindTexture(target, objectName);
+                return GL11C.glGetTexLevelParameteri(target, level, GL11C.GL_TEXTURE_INTERNAL_FORMAT);
+            } finally {
+                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
+            }
+        }
+        if (objectType == GL30C.GL_RENDERBUFFER) {
+            int previousRenderbuffer = GL11C.glGetInteger(GL30C.GL_RENDERBUFFER_BINDING);
+            try {
+                GL30C.glBindRenderbuffer(GL30C.GL_RENDERBUFFER, objectName);
+                return GL30C.glGetRenderbufferParameteri(
+                        GL30C.GL_RENDERBUFFER, GL30C.GL_RENDERBUFFER_INTERNAL_FORMAT);
+            } finally {
+                GL30C.glBindRenderbuffer(GL30C.GL_RENDERBUFFER, previousRenderbuffer);
+            }
+        }
+        throw new IllegalStateException("Nvidium's source framebuffer " + framebuffer
+                + " has no queryable depth attachment (object type " + objectType + ").");
     }
 
     /**
