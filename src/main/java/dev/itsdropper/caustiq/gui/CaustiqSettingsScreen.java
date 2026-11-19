@@ -149,7 +149,7 @@ public final class CaustiqSettingsScreen extends Screen {
             if (metadataState == MetadataState.FAILED) {
                 drawCenteredWrapped(graphics,
                         Component.translatable("caustiq.settings.pack_options_load_failed", metadataFailureMessage),
-                        174, width - 32, 0xFFFF7777);
+                        190, width - 32, 0xFFFF7777);
             } else if (metadataState == MetadataState.LOADED && metadataCache.options().isEmpty()) {
                 graphics.drawCenteredString(font, Component.translatable("caustiq.settings.no_options"),
                         width / 2, 198, 0xFFAAAAAA);
