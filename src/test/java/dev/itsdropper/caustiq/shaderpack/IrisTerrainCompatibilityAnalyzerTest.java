@@ -181,7 +181,7 @@ class IrisTerrainCompatibilityAnalyzerTest {
             assertTrue(model.diagnostics().isEmpty(),
                     "Pinned Photon must not be rejected by CAUSTIQ's parser audit: " + model.diagnostics());
             IrisNvidiumTerrainTranslator translator = assertDoesNotThrow(
-                    () -> IrisNvidiumTerrainTranslator.from(model, null, "gbuffers_terrain",
+                    () -> IrisNvidiumTerrainTranslator.from(model, "minecraft:overworld", "gbuffers_terrain",
                             java.util.Map.of("TAA", "false", "NORMAL_MAPPING", "false", "SPECULAR_MAPPING", "false")),
                     "The pinned Photon gbuffers_terrain pair must translate into the Nvidium mesh/fragment ABI");
             assertNotNull(translator);
