@@ -161,7 +161,20 @@ public final class ShaderRuntime {
      * during renderer construction, so waiting for the first world-render
      * callback is too late.
      */
-    private static void prepareSelectedNvidiumTerrainAdapter() {
+    public static void prepareSelectedNvidiumTerrainAdapter() {
+        // Startup shader-pack discovery runs from onInitializeClient(), before
+        // Minecraft has installed its resource manager or created the GL context.
+        // This method also allocates Iris images and resolves pack textures, so it
+        // must only run once the client resources are ready. Nvidium calls its Iris
+        // safety check during RenderSectionManager construction; the mixin retries
+        // preparation there, before Nvidium decides whether to disable itself.
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.getResourceManager() == null) {
+            CaustiqClient.LOGGER.debug(
+                    "Deferring Nvidium shader-pack preparation until Minecraft resources are initialized.");
+            return;
+        }
+
         NvidiumShaderProgramBridge.unregisterTerrainAdapter();
         NvidiumGBufferTargets.destroy();
         preparedPackModel = null;

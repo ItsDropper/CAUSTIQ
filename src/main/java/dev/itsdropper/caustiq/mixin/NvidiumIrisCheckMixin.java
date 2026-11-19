@@ -13,6 +13,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class NvidiumIrisCheckMixin {
     @Inject(method = "checkIrisShouldDisable", at = @At("HEAD"), cancellable = true, remap = false)
     private static void caustiq$allowAdaptedIrisTerrain(CallbackInfoReturnable<Boolean> callbackInfo) {
+        // This is the first safe lifecycle point for resource-backed shader
+        // preparation and is still before Nvidium applies its Iris opt-out.
+        ShaderRuntime.prepareSelectedNvidiumTerrainAdapter();
         if (ShaderRuntime.activateTerrainAdapterForCurrentWorld()) callbackInfo.setReturnValue(true);
     }
 }
