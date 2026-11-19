@@ -359,13 +359,15 @@ public final class NvidiumIrisTextureBridge {
             int cubeFace = GL30C.glGetFramebufferAttachmentParameteri(
                     GL30C.GL_READ_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
                     GL30C.GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE);
-            int previousTexture = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
-            int target = cubeFace == 0 ? GL11C.GL_TEXTURE_2D : cubeFace;
+            int target = cubeFace == 0 ? GL11C.GL_TEXTURE_2D : GL13C.GL_TEXTURE_CUBE_MAP;
+            int bindingParameter = cubeFace == 0
+                    ? GL11C.GL_TEXTURE_BINDING_2D : GL13C.GL_TEXTURE_BINDING_CUBE_MAP;
+            int previousTexture = GL11C.glGetInteger(bindingParameter);
             try {
                 GL11C.glBindTexture(target, objectName);
                 return GL11C.glGetTexLevelParameteri(target, level, GL11C.GL_TEXTURE_INTERNAL_FORMAT);
             } finally {
-                GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
+                GL11C.glBindTexture(target, previousTexture);
             }
         }
         if (objectType == GL30C.GL_RENDERBUFFER) {
