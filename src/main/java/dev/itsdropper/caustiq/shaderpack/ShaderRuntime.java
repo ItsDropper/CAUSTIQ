@@ -457,7 +457,7 @@ public final class ShaderRuntime {
     private static IrisNvidiumTerrainTranslator translateOptionalShadowProgram(
             IrisShaderPackModel model, String dimensionId, String programName,
             IrisNvidiumTerrainTranslator fallback, Map<String, String> optionDefines, String passKind) {
-        if (programName == null || programName.equals(fallback.programName())) return fallback;
+        if (programName == null) return fallback;
         try {
             return IrisNvidiumTerrainTranslator.from(model, dimensionId, programName, optionDefines);
         } catch (RuntimeException exception) {
