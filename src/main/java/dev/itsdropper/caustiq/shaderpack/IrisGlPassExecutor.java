@@ -500,7 +500,9 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                 texture = dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowColorTexture(index);
                 if (texture == 0) {
                     throw new IllegalStateException("Iris pass '" + program.name()
-                            + "' samples " + sampler + " before a valid shadow color map has been rendered.");
+                            + "' samples " + sampler + " before a valid shadow color map has been rendered ("
+                            + dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer.shadowMapStatus()
+                            + ").");
                 }
             } else if (texture == 0 && sampler.equals("noisetex")) {
                 texture = NvidiumIrisTextureBridge.noiseTexture();
