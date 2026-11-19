@@ -72,6 +72,25 @@ class NvidiumShaderProgramBridgeTest {
         assertThrows(IllegalStateException.class,
                 () -> NvidiumShaderProgramBridge.transformBeforeCompile(sources));
     }
+    @Test void translucentAdapterMayNoOpOnPrimaryMeshSourceShape() {
+        NvidiumShaderProgramBridge.registerTranslucentTerrainAdapter(
+                Map::copyOf, java.util.List.of(0, 1, 2, 3, 4, 5, 6, 7));
+        NvidiumShaderProgramBridge.beginPipelineCompile(
+                NvidiumShaderProgramBridge.PipelineKind.TRANSLUCENT);
+        Map<Object, String> sources = new LinkedHashMap<>();
+        sources.put(Stage.TASK, "task source");
+        sources.put(Stage.MESH,
+                "#version 460\\nlayout(triangles, max_vertices=64, max_primitives=32) out;");
+        sources.put(Stage.FRAGMENT, "fragment source");
+        try {
+            assertDoesNotThrow(() -> NvidiumShaderProgramBridge.transformBeforeCompile(sources));
+            assertEquals("#version 460\\nlayout(triangles, max_vertices=64, max_primitives=32) out;",
+                    sources.get(Stage.MESH));
+        } finally {
+            NvidiumShaderProgramBridge.endPipelineCompile();
+        }
+    }
+
 
     @Test void resetClearsCapturedProgramAndAdapter() {
         NvidiumShaderProgramBridge.registerTerrainAdapter(sources -> Map.of(
