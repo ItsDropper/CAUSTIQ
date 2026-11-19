@@ -410,9 +410,16 @@ public final class ShaderRuntime {
         String translucentProgram = selectShadowProgram(
                 model, dimensionId, "shadow_water", "shadow", "shadow_solid", "shadow_cutout");
         if (solidProgram == null) {
-            NvidiumShadowRenderer.configure(false, 2048, 128.0f);
-            CaustiqClient.LOGGER.info(
-                    "Shader pack has no translatable Iris shadow terrain program; Nvidium shadow rendering remains disabled.");
+            String reason = "no solid shadow program in active dimension '" + dimensionId
+                    + "' (mapped directory: " + model.dimensionMappings().getOrDefault(
+                            dimensionId == null ? "" : dimensionId,
+                            dimensionId == null ? "" : dimensionId)
+                    + "; overrides: " + model.dimensionOverrides().keySet() + ")";
+            NvidiumShadowRenderer.configure(false, 2048, 128.0f, reason);
+            CaustiqClient.LOGGER.warn(
+                    "Shader pack has no translatable Iris shadow terrain program for dimension '{}'; "
+                            + "Nvidium shadow rendering remains disabled. Dimension mappings: {}, overrides: {}",
+                    dimensionId, model.dimensionMappings(), model.dimensionOverrides().keySet());
             return;
         }
 
