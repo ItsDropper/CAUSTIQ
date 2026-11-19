@@ -38,9 +38,9 @@ class NvidiumDepthSnapshotGlTest {
             GLFW.glfwMakeContextCurrent(window);
             GL.createCapabilities();
 
-            sourceFramebuffer = createDepthFramebuffer();
+            sourceFramebuffer = createDepthFramebuffer(GL30C.GL_DEPTH_COMPONENT24);
             sourceTexture = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
-            destinationFramebuffer = createDepthFramebuffer();
+            destinationFramebuffer = createDepthFramebuffer(GL30C.GL_DEPTH_COMPONENT24);
             destinationTexture = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
 
             GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, sourceFramebuffer);
@@ -50,6 +50,10 @@ class NvidiumDepthSnapshotGlTest {
             GL11C.glClearDepth(1.0);
             GL11C.glClear(GL11C.GL_DEPTH_BUFFER_BIT);
 
+            GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, sourceFramebuffer);
+            assertEquals(GL30C.GL_DEPTH_COMPONENT24,
+                    NvidiumIrisTextureBridge.depthAttachmentInternalFormat(sourceFramebuffer),
+                    "Depth snapshot must detect the source attachment's exact internal format.");
             GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, 0);
             GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, 0);
             GL11C.glEnable(GL11C.GL_SCISSOR_TEST);
@@ -91,12 +95,16 @@ class NvidiumDepthSnapshotGlTest {
     }
 
     private static int createDepthFramebuffer() {
+        return createDepthFramebuffer(GL30C.GL_DEPTH_COMPONENT32F);
+    }
+
+    private static int createDepthFramebuffer(int internalFormat) {
         int framebuffer = GL30C.glGenFramebuffers();
         int texture = GL11C.glGenTextures();
         GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
         GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_NEAREST);
         GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_NEAREST);
-        GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, GL30C.GL_DEPTH_COMPONENT32F,
+        GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, internalFormat,
                 8, 8, 0, GL11C.GL_DEPTH_COMPONENT, GL11C.GL_FLOAT, (java.nio.ByteBuffer) null);
         GL30C.glBindFramebuffer(GL30C.GL_FRAMEBUFFER, framebuffer);
         GL30C.glFramebufferTexture2D(GL30C.GL_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT,
