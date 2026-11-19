@@ -222,8 +222,6 @@ public final class ShaderRuntime {
                 return;
             }
 
-            configureShadowRenderer(model, null);
-
             Map<String, IrisNvidiumTerrainTranslator> translators = new LinkedHashMap<>();
             Map<String, IrisNvidiumTerrainTranslator> translucentTranslators = new LinkedHashMap<>();
             Set<String> unsupportedDimensions = new LinkedHashSet<>();
@@ -269,7 +267,7 @@ public final class ShaderRuntime {
             preparedTerrainTranslators = Map.copyOf(translators);
             preparedTranslucentTerrainTranslators = Map.copyOf(translucentTranslators);
             preparedUnsupportedTerrainDimensions = Set.copyOf(unsupportedDimensions);
-            preparedTerrainPlan = new IrisTerrainPassScheduler().schedule(model, null);
+            preparedTerrainPlan = new IrisTerrainPassScheduler().schedule(model, "minecraft:overworld");
             preparedDimensionMappings = model.dimensionMappings();
 
             CaustiqClient.LOGGER.info(
@@ -324,8 +322,8 @@ public final class ShaderRuntime {
         if (preparedTerrainTranslators.isEmpty()) return false;
 
         Minecraft minecraft = Minecraft.getInstance();
-        String dimensionId = minecraft.level == null
-                ? "" : minecraft.level.dimension().identifier().toString();
+        String dimensionId = resolveDimensionId(minecraft.level == null
+                ? null : minecraft.level.dimension().identifier().toString());
         String directory = dimensionId.isEmpty() ? ""
                 : preparedDimensionMappings.getOrDefault(
                         dimensionId, builtInDimensionDirectory(dimensionId));
@@ -400,6 +398,11 @@ public final class ShaderRuntime {
             }
         }
         return true;
+    }
+
+    /** Nvidium may construct its renderer before ClientLevel is attached; use Overworld as the initial pack context. */
+    static String resolveDimensionId(String dimensionId) {
+        return dimensionId == null || dimensionId.isBlank() ? "minecraft:overworld" : dimensionId;
     }
 
     private static void deactivateTerrainAdapter(String reason) {
