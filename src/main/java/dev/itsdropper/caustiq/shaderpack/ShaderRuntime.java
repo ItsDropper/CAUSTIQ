@@ -416,23 +416,30 @@ public final class ShaderRuntime {
             return;
         }
 
+        final IrisNvidiumTerrainTranslator solid;
         try {
-            IrisNvidiumTerrainTranslator solid = IrisNvidiumTerrainTranslator.from(
-                    model, dimensionId, solidProgram, optionDefines);
-            IrisNvidiumTerrainTranslator cutout = IrisNvidiumTerrainTranslator.from(
-                    model, dimensionId, cutoutProgram == null ? solidProgram : cutoutProgram, optionDefines);
-            IrisNvidiumTerrainTranslator translucent = IrisNvidiumTerrainTranslator.from(
-                    model, dimensionId, translucentProgram == null ? solidProgram : translucentProgram, optionDefines);
-            NvidiumShaderProgramBridge.registerShadowTerrainAdapter(solid::adapt);
-            NvidiumShaderProgramBridge.registerShadowCutoutTerrainAdapter(cutout::adapt);
-            NvidiumShaderProgramBridge.registerShadowTranslucentTerrainAdapter(translucent::adapt);
+            solid = IrisNvidiumTerrainTranslator.from(model, dimensionId, solidProgram, optionDefines);
         } catch (RuntimeException exception) {
-            NvidiumShadowRenderer.configure(false, 2048, 128.0f);
+            String reason = "solid shadow program '" + solidProgram + "' failed translation in dimension '"
+                    + dimensionId + "': " + exception.getMessage();
+            NvidiumShadowRenderer.configure(false, 2048, 128.0f, reason);
             CaustiqClient.LOGGER.warn(
-                    "Selected Iris shadow terrain program set ({}, {}, {}) cannot be translated for Nvidium: {}",
-                    solidProgram, cutoutProgram, translucentProgram, exception.getMessage());
+                    "CAUSTIQ cannot translate the required Iris solid shadow program '{}' for dimension '{}'; "
+                            + "Nvidium shadow rendering is disabled. Available overrides: {}",
+                    solidProgram, dimensionId, model.dimensionOverrides().keySet(), exception);
             return;
         }
+
+        // Cutout and translucent shadow programs are optional specializations.
+        // A failure in either must not disable the valid solid shadow pipeline:
+        // reuse the translated solid program for that pass instead.
+        IrisNvidiumTerrainTranslator cutout = translateOptionalShadowProgram(
+                model, dimensionId, cutoutProgram, solid, optionDefines, "cutout");
+        IrisNvidiumTerrainTranslator translucent = translateOptionalShadowProgram(
+                model, dimensionId, translucentProgram, solid, optionDefines, "translucent");
+        NvidiumShaderProgramBridge.registerShadowTerrainAdapter(solid::adapt);
+        NvidiumShaderProgramBridge.registerShadowCutoutTerrainAdapter(cutout::adapt);
+        NvidiumShaderProgramBridge.registerShadowTranslucentTerrainAdapter(translucent::adapt);
 
         int resolution = parseIntegerProperty(model.properties().get("shadowMapResolution"), 2048);
         float distance = parseFloatProperty(model.properties().get("shadowDistance"), 128.0f);
@@ -445,6 +452,21 @@ public final class ShaderRuntime {
                 translucentProgram == null ? solidProgram : translucentProgram,
                 Integer.highestOneBit(Math.max(256, Math.min(8192, resolution))),
                 distance * distanceMultiplier);
+    }
+
+    private static IrisNvidiumTerrainTranslator translateOptionalShadowProgram(
+            IrisShaderPackModel model, String dimensionId, String programName,
+            IrisNvidiumTerrainTranslator fallback, Map<String, String> optionDefines, String passKind) {
+        if (programName == null || programName.equals(fallback.programName())) return fallback;
+        try {
+            return IrisNvidiumTerrainTranslator.from(model, dimensionId, programName, optionDefines);
+        } catch (RuntimeException exception) {
+            CaustiqClient.LOGGER.warn(
+                    "Iris {} shadow program '{}' could not be translated for dimension '{}'; "
+                            + "using the valid solid shadow program for this pass: {}",
+                    passKind, programName, dimensionId, exception.getMessage());
+            return fallback;
+        }
     }
 
     private static String selectShadowProgram(
