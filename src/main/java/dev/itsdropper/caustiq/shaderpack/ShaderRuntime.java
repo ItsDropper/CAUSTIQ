@@ -318,7 +318,8 @@ public final class ShaderRuntime {
                         dimensionId, builtInDimensionDirectory(dimensionId));
 
         if (preparedUnsupportedTerrainDimensions.contains(directory)) {
-            deactivateTerrainAdapter();
+            deactivateTerrainAdapter("active dimension '" + dimensionId
+                    + "' is marked unsupported for Nvidium terrain translation");
             return false;
         }
 
@@ -326,14 +327,17 @@ public final class ShaderRuntime {
         String adapterKey = directory;
         if (translator == null) {
             if (preparedUnsupportedTerrainDimensions.contains("")) {
-                deactivateTerrainAdapter();
+                deactivateTerrainAdapter("active dimension '" + dimensionId
+                        + "' has no supported terrain translator and the base terrain translator is unsupported");
                 return false;
             }
             translator = preparedTerrainTranslators.get("");
             adapterKey = "";
         }
         if (translator == null) {
-            deactivateTerrainAdapter();
+            deactivateTerrainAdapter("no terrain translator for active dimension '" + dimensionId
+                    + "' (mapped directory '" + directory + "'); available translator directories: "
+                    + preparedTerrainTranslators.keySet());
             return false;
         }
         IrisNvidiumTerrainTranslator translucentTranslator =
@@ -354,6 +358,9 @@ public final class ShaderRuntime {
                     ? null : new IrisTerrainPassScheduler().schedule(
                             preparedPackModel, dimensionId.isEmpty() ? null : dimensionId);
             if (dimensionPlan != null && dimensionPlan.hasScaledTerrainWrites()) {
+                String reason = "active dimension '" + dimensionId
+                        + "' writes scaled terrain colortex targets unsupported by Nvidium MRT";
+                NvidiumShadowRenderer.configure(false, 2048, 128.0f, reason);
                 CaustiqClient.LOGGER.warn(
                         "Shader pack terrain program writes a scaled colortex target. Nvidium terrain MRT remains full-resolution; refusing to install this terrain adapter.");
                 return false;
@@ -382,9 +389,9 @@ public final class ShaderRuntime {
         return true;
     }
 
-    private static void deactivateTerrainAdapter() {
+    private static void deactivateTerrainAdapter(String reason) {
+        NvidiumShadowRenderer.configure(false, 2048, 128.0f, reason);
         if (!preparedTerrainAdapterRegistered) {
-            NvidiumShadowRenderer.configure(false, 2048, 128.0f);
             return;
         }
         NvidiumShaderProgramBridge.unregisterTerrainAdapter();
@@ -392,7 +399,6 @@ public final class ShaderRuntime {
         NvidiumGBufferTargets.destroy();
         preparedTerrainAdapterRegistered = false;
         activeTerrainDimensionKey = "";
-        NvidiumShadowRenderer.configure(false, 2048, 128.0f);
         NvidiumRenderBridge.reloadShaders();
     }
 
