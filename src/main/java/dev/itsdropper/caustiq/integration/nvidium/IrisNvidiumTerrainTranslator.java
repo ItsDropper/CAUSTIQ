@@ -307,24 +307,10 @@ public final class IrisNvidiumTerrainTranslator {
             Map<String, String> optionDefines) {
         Objects.requireNonNull(model, "model");
         Objects.requireNonNull(programName, "programName");
-        IrisShaderPackModel.ProgramSet programSet = model.base();
-        if (dimensionKey != null && !dimensionKey.isBlank()) {
-            String directory = model.dimensionMappings().getOrDefault(dimensionKey, dimensionKey);
-            IrisShaderPackModel.ProgramSet override = model.dimensionOverrides().get(directory);
-            if (override != null && override.programs().containsKey(programName)) {
-                programSet = override;
-            }
-        }
-        if (!programSet.programs().containsKey(programName)) {
-            IrisShaderPackModel.ProgramSet overworld = model.dimensionOverrides().get("world0");
-            if (overworld != null && overworld.programs().containsKey(programName)) {
-                programSet = overworld;
-            } else {
-                programSet = model.dimensionOverrides().values().stream()
-                        .filter(candidate -> candidate.programs().containsKey(programName))
-                        .findFirst().orElse(programSet);
-            }
-        }
+        // Keep translation on the exact active Iris ProgramSet. Falling back to
+        // world0 or an arbitrary override can silently compile another dimension's
+        // shader into the current renderer.
+        IrisShaderPackModel.ProgramSet programSet = model.programSetForDimension(dimensionKey);
         IrisShaderPackModel.Program program = programSet.programs().get(programName);
         if (program == null) {
             throw new IllegalArgumentException("The shader pack has no " + programName
