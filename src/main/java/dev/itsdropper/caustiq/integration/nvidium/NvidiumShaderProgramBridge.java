@@ -208,7 +208,13 @@ public final class NvidiumShaderProgramBridge {
             throw new IllegalStateException(label + " adapter must preserve shader stages. Expected "
                     + input.keySet() + " but received " + transformed.keySet());
         }
-        if (rejectNoOp && transformed.equals(input) && NvidiumTerrainVaryingAdapter.isPrimary(input)) {
+        // Only the primary opaque/cutout compile is required to rewrite the primary
+        // mesh ABI. Nvidium's translucent rasterizer can compile the primary mesh
+        // source shape too; its dedicated Iris adapter intentionally leaves that
+        // pipeline untouched when the source is not the translucent ABI.
+        if (rejectNoOp && transformed.equals(input)
+                && ACTIVE_PIPELINE.get() == PipelineKind.PRIMARY
+                && NvidiumTerrainVaryingAdapter.isPrimaryMesh(input)) {
             throw new IllegalStateException(label + " adapter did not transform the primary terrain shader stages.");
         }
         for (Map.Entry<String, String> entry : transformed.entrySet()) {
