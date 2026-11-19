@@ -34,6 +34,23 @@ public record IrisShaderPackModel(
         diagnostics = List.copyOf(diagnostics);
     }
 
+    /** Resolves the exact Iris ProgramSet for a Minecraft dimension identifier or pack directory. */
+    public ProgramSet programSetForDimension(String dimensionId) {
+        if (dimensionId == null || dimensionId.isBlank()) return base;
+        String directory = dimensionMappings.getOrDefault(dimensionId, builtInDimensionDirectory(dimensionId));
+        ProgramSet override = dimensionOverrides.get(directory);
+        return override == null ? base : override;
+    }
+
+    private static String builtInDimensionDirectory(String dimensionId) {
+        return switch (dimensionId) {
+            case "minecraft:overworld" -> "world0";
+            case "minecraft:the_nether" -> "world-1";
+            case "minecraft:the_end" -> "world1";
+            default -> dimensionId;
+        };
+    }
+
     public record Program(String name, Map<ShaderPackProgramCatalog.Stage, String> stages) {
         public Program {
             stages = Map.copyOf(stages);
