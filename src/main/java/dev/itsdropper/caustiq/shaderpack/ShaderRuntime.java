@@ -209,7 +209,11 @@ public final class ShaderRuntime {
 
         try {
             long parseWaitStarted = System.nanoTime();
-            ParsedShaderPack parsedPack = preloadSelectedPackModel(result).join();
+            CompletableFuture<ParsedShaderPack> parseFuture = preloadSelectedPackModel(result);
+            if (parseFuture == null) {
+                throw new IllegalStateException("Selected shader pack changed while Nvidium preparation was starting.");
+            }
+            ParsedShaderPack parsedPack = parseFuture.join();
             long parseWaitMillis = (System.nanoTime() - parseWaitStarted) / 1_000_000L;
             IrisShaderPackModel model = parsedPack.model();
             long resourceLoadStarted = System.nanoTime();
@@ -323,6 +327,11 @@ public final class ShaderRuntime {
      */
     private static synchronized CompletableFuture<ParsedShaderPack> preloadSelectedPackModel(
             ShaderPackScanResult result) {
+        if (!CaustiqConfig.get().enabled()
+                || !FabricLoader.getInstance().isModLoaded("nvidium")
+                || !NvidiumShaderProgramBridge.hasNativeSourceAdapter()) {
+            return null;
+        }
         String selectedId = CaustiqConfig.get().selectedPackId();
         ShaderPackDescriptor selected = result.packs().stream()
                 .filter(pack -> pack.id().equals(selectedId))
