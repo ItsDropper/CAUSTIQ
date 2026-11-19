@@ -9,13 +9,7 @@ final class IrisShadowProgramSelector {
     private IrisShadowProgramSelector() { }
 
     static String select(IrisShaderPackModel model, String dimensionId, String... candidates) {
-        IrisShaderPackModel.ProgramSet activeSet = model.base();
-        if (dimensionId != null && !dimensionId.isBlank()) {
-            String directory = model.dimensionMappings().getOrDefault(
-                    dimensionId, builtInDimensionDirectory(dimensionId));
-            IrisShaderPackModel.ProgramSet override = model.dimensionOverrides().get(directory);
-            if (override != null) activeSet = override;
-        }
+        IrisShaderPackModel.ProgramSet activeSet = model.programSetForDimension(dimensionId);
 
         for (String candidate : candidates) {
             if (activeSet.programs().containsKey(candidate)) return candidate;
@@ -23,12 +17,4 @@ final class IrisShadowProgramSelector {
         return null;
     }
 
-    private static String builtInDimensionDirectory(String dimensionId) {
-        return switch (dimensionId) {
-            case "minecraft:overworld" -> "world0";
-            case "minecraft:the_nether" -> "world-1";
-            case "minecraft:the_end" -> "world1";
-            default -> dimensionId;
-        };
-    }
 }
