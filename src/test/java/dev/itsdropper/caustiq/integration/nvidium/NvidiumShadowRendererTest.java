@@ -44,4 +44,13 @@ class NvidiumShadowRendererTest {
 
         assertFalse(NvidiumShadowRenderer.enabledForTests());
     }
+
+    @Test
+    void disabledRenderFramesDoNotEraseTheOriginalDisableReason() {
+        NvidiumShadowRenderer.configure(false, 2048, 128.0f, "solid shadow translator rejected dimension world0");
+        NvidiumShadowRenderer.render(null, null, null, 0.0, 0.0, 0.0, null);
+
+        assertTrue(NvidiumShadowRenderer.shadowMapStatus()
+                .contains("solid shadow translator rejected dimension world0"));
+    }
 }
