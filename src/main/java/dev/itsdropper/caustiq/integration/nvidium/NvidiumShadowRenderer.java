@@ -650,6 +650,7 @@ public final class NvidiumShadowRenderer {
                 GL11C.glViewport(0, 0, resolution, resolution);
                 GL11C.glDisable(GL11C.GL_SCISSOR_TEST);
                 GL11C.glDepthMask(true);
+                GL11C.glColorMask(true, true, true, true);
                 GL11C.glClearDepth(1.0);
                 GL11C.glClear(GL11C.GL_DEPTH_BUFFER_BIT);
                 try (MemoryStack stack = MemoryStack.stackPush()) {
