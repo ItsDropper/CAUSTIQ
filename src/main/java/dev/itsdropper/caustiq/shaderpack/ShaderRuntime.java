@@ -449,24 +449,7 @@ public final class ShaderRuntime {
 
     private static String selectShadowProgram(
             IrisShaderPackModel model, String dimensionId, String... candidates) {
-        String directory = dimensionId == null || dimensionId.isBlank()
-                ? "" : builtInDimensionDirectory(dimensionId);
-        IrisShaderPackModel.ProgramSet dimensionSet = model.dimensionOverrides().get(directory);
-        // Prefer any matching variant in the active dimension before falling
-        // back to the base pack or another dimension's program inventory.
-        if (dimensionSet != null) {
-            for (String candidate : candidates) {
-                if (dimensionSet.programs().containsKey(candidate)) return candidate;
-            }
-        }
-        for (String candidate : candidates) {
-            if (model.base().programs().containsKey(candidate)) return candidate;
-        }
-        for (String candidate : candidates) {
-            if (model.dimensionOverrides().values().stream()
-                    .anyMatch(programSet -> programSet.programs().containsKey(candidate))) return candidate;
-        }
-        return null;
+        return IrisShadowProgramSelector.select(model, dimensionId, candidates);
     }
 
     private static void prepareTranslucentTerrainTranslators(
