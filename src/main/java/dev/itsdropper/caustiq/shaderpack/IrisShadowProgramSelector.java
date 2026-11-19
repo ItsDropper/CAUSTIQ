@@ -1,7 +1,5 @@
 package dev.itsdropper.caustiq.shaderpack;
 
-import java.util.Map;
-
 /**
  * Resolves shadow programs from the active Iris program set. Dimension
  * overrides are independent program sets; programs from another dimension
