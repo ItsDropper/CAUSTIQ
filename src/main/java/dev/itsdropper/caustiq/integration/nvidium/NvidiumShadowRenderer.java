@@ -66,12 +66,19 @@ public final class NvidiumShadowRenderer {
 
     /** Enables the isolated shadow path only when the selected shader pack needs it. */
     public static void configure(boolean shouldRender, int resolution, float distance) {
+        configure(shouldRender, resolution, distance, shouldRender
+                ? "enabled; awaiting first frame" : "disabled by configuration");
+    }
+
+    public static void configure(boolean shouldRender, int resolution, float distance, String reason) {
         enabled = shouldRender;
         requestedResolution = Math.max(256, Math.min(8192, Integer.highestOneBit(Math.max(256, resolution))));
         requestedDistance = Float.isFinite(distance) ? Math.max(16.0f, Math.min(512.0f, distance))
                 : DEFAULT_DISTANCE;
         failureLogged = false;
-        lastRenderStatus = shouldRender ? "enabled; awaiting first frame" : "disabled by configuration";
+        lastRenderStatus = reason == null || reason.isBlank()
+                ? (shouldRender ? "enabled; awaiting first frame" : "disabled by configuration")
+                : reason;
         if (!shouldRender) {
             for (State state : STATES.values()) state.close();
             STATES.clear();
@@ -88,10 +95,9 @@ public final class NvidiumShadowRenderer {
     /** Called at the tail of NvidiumWorldRenderer.renderFrame, after camera terrain submission. */
     public static void render(Object worldRenderer, Object terrainPass, Object fogParameters,
                               double cameraX, double cameraY, double cameraZ, Object terrainSampler) {
-        if (!enabled) {
-            lastRenderStatus = "render skipped: disabled";
-            return;
-        }
+        // Preserve the transition reason (including the original render exception).
+        // Overwriting it here made every later frame hide why the renderer stopped.
+        if (!enabled) return;
         if (worldRenderer == null || terrainPass == null) {
             lastRenderStatus = "render skipped: missing world renderer or terrain pass";
             return;
