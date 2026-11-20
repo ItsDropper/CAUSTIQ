@@ -59,6 +59,22 @@ class LuminaShaderPackTest {
     }
 
     @Test
+    void exposesNumericOptionsAsSlidersAndLeavesBinaryTogglesAsCycleControls() throws IOException {
+        try (ShaderPackSources sources = open()) {
+            IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);
+            Map<String, ShaderPackMetadata.Option> options = new LinkedHashMap<>();
+            model.options().options().forEach(option -> options.put(option.name(), option));
+
+            assertTrue(options.get("EXPOSURE").slider());
+            assertTrue(options.get("SHADOW_SAMPLES").slider());
+            assertEquals(List.of("8", "12", "16", "24"), options.get("SHADOW_SAMPLES").values());
+            assertTrue(options.get("SATURATION").slider());
+            assertFalse(options.get("CONTACT_SHADOWS").slider());
+            assertFalse(options.get("FXAA").slider());
+        }
+    }
+
+    @Test
     void declaresTheShadowMapAndEveryGBufferFormat() throws IOException {
         try (ShaderPackSources sources = open()) {
             IrisShaderPackModel model = new IrisShaderPackParser().parse(sources);

@@ -23,6 +23,8 @@
 
 ## Options
 
+Numeric options are discrete sliders, with values kept in the order declared by the shader source. Drag to preview a value, release to apply it, or focus the slider and use the arrow keys; Home and End select the first and last values. Binary options remain cycling controls.
+
 | Option | Default | What it does |
 |---|:-:|---|
 | `EXPOSURE` | 1.0 | Overall brightness before tone mapping |

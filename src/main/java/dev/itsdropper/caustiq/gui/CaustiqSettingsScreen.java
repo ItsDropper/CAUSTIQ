@@ -229,6 +229,7 @@ public final class CaustiqSettingsScreen extends Screen {
         }
         int end = Math.min(start + pageSize, metadata.options().size());
         int y = 190;
+        boolean normalizedOptions = false;
         for (ShaderPackMetadata.Option option : metadata.options().subList(start, end)) {
             if (option.values().isEmpty()) {
                 CaustiqClient.LOGGER.warn("Ignoring shader option '{}' in pack '{}': it has no allowed values.",
@@ -242,7 +243,7 @@ public final class CaustiqSettingsScreen extends Screen {
             String value = option.values().get(selectedIndex);
             if (!value.equals(configuredValue)) {
                 config.setOption(pack.id(), option.name(), value);
-                ShaderRuntime.requestReload();
+                normalizedOptions = true;
             }
 
             if (option.slider() && option.values().size() > 1) {
@@ -269,6 +270,7 @@ public final class CaustiqSettingsScreen extends Screen {
             }
             y += 24;
         }
+        if (normalizedOptions) ShaderRuntime.requestReload();
         if (pages > 1) {
             addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.options_page", optionPage + 1, pages),
                     button -> {
