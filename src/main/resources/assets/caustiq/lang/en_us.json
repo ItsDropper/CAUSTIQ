@@ -46,6 +46,7 @@
   "caustiq.settings.pack_options_loading": "Reading shader-pack settings...",
   "caustiq.settings.scan_details": "Scan details (%s)",
   "caustiq.settings.options_page": "Options page %s/%s",
+  "caustiq.settings.options_hint": "Drag sliders or use the arrow keys; activate other options to cycle.",
   "caustiq.settings.pack_options_load_failed": "Could not read shader-pack settings: %s",
   "caustiq.settings.retry_pack_options": "Retry options",
   "caustiq.diagnostics.title": "Shader-pack Scan Details",

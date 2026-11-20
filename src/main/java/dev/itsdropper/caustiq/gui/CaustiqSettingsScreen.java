@@ -8,6 +8,7 @@ import dev.itsdropper.caustiq.shaderpack.ShaderPackDescriptor;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackMetadata;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackMetadataLoader;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackOptionRange;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackRefreshStatus;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
 import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
@@ -141,6 +142,11 @@ public final class CaustiqSettingsScreen extends Screen {
                 case FAILED -> Component.translatable("caustiq.settings.pack_options_unavailable");
             };
             graphics.drawCenteredString(font, metadataSummary, width / 2, 156, 0xFFAAAAAA);
+            if (metadataState == MetadataState.LOADED
+                    && metadataCache.options().stream().anyMatch(ShaderPackMetadata.Option::slider)) {
+                graphics.drawCenteredString(font, Component.translatable("caustiq.settings.options_hint"),
+                        width / 2, 176, 0xFF888888);
+            }
         } else {
             graphics.drawCenteredString(font, Component.translatable("caustiq.settings.no_selection"),
                     width / 2, 198, 0xFFAAAAAA);
@@ -224,17 +230,43 @@ public final class CaustiqSettingsScreen extends Screen {
         int end = Math.min(start + pageSize, metadata.options().size());
         int y = 190;
         for (ShaderPackMetadata.Option option : metadata.options().subList(start, end)) {
-            String value = config.option(pack.id(), option.name(), option.defaultValue());
-            int selectedIndex = option.values().indexOf(value);
-            if (selectedIndex < 0) selectedIndex = option.values().indexOf(option.defaultValue());
-            if (selectedIndex < 0) selectedIndex = 0;
-            final int currentIndex = selectedIndex;
-            addRenderableWidget(Button.builder(Component.literal(option.label() + ": " + value), button -> {
-                int nextIndex = (currentIndex + 1) % option.values().size();
-                config.setOption(pack.id(), option.name(), option.values().get(nextIndex));
+            if (option.values().isEmpty()) {
+                CaustiqClient.LOGGER.warn("Ignoring shader option '{}' in pack '{}': it has no allowed values.",
+                        option.name(), pack.displayName());
+                continue;
+            }
+
+            String configuredValue = config.option(pack.id(), option.name(), option.defaultValue());
+            int selectedIndex = ShaderPackOptionRange.indexForValue(
+                    option.values(), configuredValue, option.defaultValue());
+            String value = option.values().get(selectedIndex);
+            if (!value.equals(configuredValue)) {
+                config.setOption(pack.id(), option.name(), value);
                 ShaderRuntime.requestReload();
-                init();
-            }).bounds(width / 2 - 155, y, 310, 20).build());
+            }
+
+            if (option.slider() && option.values().size() > 1) {
+                addRenderableWidget(new ShaderPackOptionSlider(
+                        width / 2 - 155, y, 310, 20, option.label(), option.values(), selectedIndex,
+                        nextIndex -> {
+                            String nextValue = option.values().get(nextIndex);
+                            if (nextValue.equals(config.option(pack.id(), option.name(), option.defaultValue()))) {
+                                return;
+                            }
+                            config.setOption(pack.id(), option.name(), nextValue);
+                            ShaderRuntime.requestReload();
+                        }));
+            } else {
+                int currentIndex = selectedIndex;
+                Button optionButton = Button.builder(Component.literal(option.label() + ": " + value), button -> {
+                    int nextIndex = (currentIndex + 1) % option.values().size();
+                    config.setOption(pack.id(), option.name(), option.values().get(nextIndex));
+                    ShaderRuntime.requestReload();
+                    init();
+                }).bounds(width / 2 - 155, y, 310, 20).build();
+                optionButton.active = option.values().size() > 1;
+                addRenderableWidget(optionButton);
+            }
             y += 24;
         }
         if (pages > 1) {
