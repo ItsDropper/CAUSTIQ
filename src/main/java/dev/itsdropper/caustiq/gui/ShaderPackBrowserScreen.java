@@ -61,7 +61,7 @@ public final class ShaderPackBrowserScreen extends Screen {
         addRenderableWidget(Button.builder(Component.translatable("caustiq.browser.clear"),
                 button -> {
                     searchField.setValue("");
-                    searchField.setFocused(true);
+                    setFocused(searchField);
                 }).bounds(left + 262, 44, 48, 20).build());
 
         addRenderableWidget(Button.builder(sourceFilterLabel(), button -> {
@@ -91,7 +91,7 @@ public final class ShaderPackBrowserScreen extends Screen {
                 .bounds(width / 2 - 100, height - 28, 200, 20).build();
 
         rebuildResults();
-        searchField.setFocused(true);
+        setFocused(searchField);
     }
 
     @Override
