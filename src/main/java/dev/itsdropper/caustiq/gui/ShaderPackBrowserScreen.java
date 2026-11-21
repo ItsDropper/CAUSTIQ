@@ -196,15 +196,10 @@ public final class ShaderPackBrowserScreen extends Screen {
     }
 
     private void changePage(int direction) {
-        boolean previousFocused = previousPageButton.isFocused();
-        boolean nextFocused = nextPageButton.isFocused();
         page = Math.clamp(page + direction, 0, pageCount(filteredPacks().size()) - 1);
         rebuildResults();
-        if (previousFocused && previousPageButton.active) {
-            setFocused(previousPageButton);
-        } else if (nextFocused && nextPageButton.active) {
-            setFocused(nextPageButton);
-        }
+        Button navigationTarget = direction < 0 ? previousPageButton : nextPageButton;
+        setFocused(navigationTarget.active ? navigationTarget : searchField);
     }
 
     private Component sourceFilterLabel() {
