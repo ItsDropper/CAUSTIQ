@@ -85,6 +85,7 @@ public final class ShaderPackBrowserScreen extends Screen {
                 button -> changePage(-1)).bounds(left, height - 56, 100, 20).build();
         nextPageButton = Button.builder(Component.translatable("caustiq.browser.next"),
                 button -> changePage(1)).bounds(left + 210, height - 56, 100, 20).build();
+        rebuildResults();
         addRenderableWidget(previousPageButton);
         addRenderableWidget(nextPageButton);
         addRenderableWidget(Button.builder(Component.translatable("caustiq.browser.back"),
@@ -92,7 +93,6 @@ public final class ShaderPackBrowserScreen extends Screen {
                 .bounds(width / 2 - 100, height - 28, 200, 20).build());
 
         searchField.setFocused(true);
-        rebuildResults();
     }
 
     @Override
