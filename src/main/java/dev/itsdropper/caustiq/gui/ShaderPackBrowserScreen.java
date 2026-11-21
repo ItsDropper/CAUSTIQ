@@ -34,6 +34,7 @@ public final class ShaderPackBrowserScreen extends Screen {
     private EditBox searchField;
     private Button previousPageButton;
     private Button nextPageButton;
+    private Button backButton;
 
     public ShaderPackBrowserScreen(Screen parent) {
         super(Component.translatable("caustiq.browser.title"));
@@ -85,13 +86,11 @@ public final class ShaderPackBrowserScreen extends Screen {
                 button -> changePage(-1)).bounds(left, height - 56, 100, 20).build();
         nextPageButton = Button.builder(Component.translatable("caustiq.browser.next"),
                 button -> changePage(1)).bounds(left + 210, height - 56, 100, 20).build();
-        rebuildResults();
-        addRenderableWidget(previousPageButton);
-        addRenderableWidget(nextPageButton);
-        addRenderableWidget(Button.builder(Component.translatable("caustiq.browser.back"),
+        backButton = Button.builder(Component.translatable("caustiq.browser.back"),
                 button -> Minecraft.getInstance().setScreen(parent))
-                .bounds(width / 2 - 100, height - 28, 200, 20).build());
+                .bounds(width / 2 - 100, height - 28, 200, 20).build();
 
+        rebuildResults();
         searchField.setFocused(true);
     }
 
@@ -145,6 +144,9 @@ public final class ShaderPackBrowserScreen extends Screen {
     }
 
     private void rebuildResults() {
+        if (previousPageButton != null) removeWidget(previousPageButton);
+        if (nextPageButton != null) removeWidget(nextPageButton);
+        if (backButton != null) removeWidget(backButton);
         for (Button button : resultButtons) {
             removeWidget(button);
         }
@@ -173,8 +175,15 @@ public final class ShaderPackBrowserScreen extends Screen {
                     .bounds(left + 252, rowY, 58, 20).build()));
         }
 
-        if (previousPageButton != null) previousPageButton.active = page > 0;
-        if (nextPageButton != null) nextPageButton.active = page + 1 < pages;
+        if (previousPageButton != null) {
+            previousPageButton.active = page > 0;
+            addRenderableWidget(previousPageButton);
+        }
+        if (nextPageButton != null) {
+            nextPageButton.active = page + 1 < pages;
+            addRenderableWidget(nextPageButton);
+        }
+        if (backButton != null) addRenderableWidget(backButton);
     }
 
     private int pageSize() {
@@ -187,8 +196,15 @@ public final class ShaderPackBrowserScreen extends Screen {
     }
 
     private void changePage(int direction) {
+        boolean previousFocused = previousPageButton.isFocused();
+        boolean nextFocused = nextPageButton.isFocused();
         page = Math.clamp(page + direction, 0, pageCount(filteredPacks().size()) - 1);
         rebuildResults();
+        if (previousFocused && previousPageButton.active) {
+            setFocused(previousPageButton);
+        } else if (nextFocused && nextPageButton.active) {
+            setFocused(nextPageButton);
+        }
     }
 
     private Component sourceFilterLabel() {
