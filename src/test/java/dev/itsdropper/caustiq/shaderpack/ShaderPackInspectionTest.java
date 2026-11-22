@@ -97,6 +97,46 @@ class ShaderPackInspectionTest {
         assertTrue(report.contains("No absolute game-directory paths"));
     }
 
+
+    @Test
+    void filteredPathReportIncludesOnlyKnownRelativeEntriesAndRemovesDuplicates() {
+        ShaderPackDescriptor pack = new ShaderPackDescriptor(
+                "test-pack", "Test Pack", temporaryDirectory.resolve("private/game/shaderpacks/Test Pack"),
+                "", ShaderPackSourceType.DIRECTORY, ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        ShaderPackInspection inspection = new ShaderPackInspection(
+                pack, List.of("final.fsh", "textures/noise.png"), 0, "");
+
+        String report = inspection.createFileListReport(List.of(
+                "textures/noise.png", "/home/player/private.txt", "../escape", "textures/noise.png"));
+
+        assertTrue(report.startsWith("CAUSTIQ Shader Pack File Paths\nPack: Test Pack\n"));
+        assertTrue(report.contains("Matching files: 1"));
+        assertTrue(report.contains("- textures/noise.png"));
+        assertFalse(report.contains("/home/player"));
+        assertFalse(report.contains("../escape"));
+        assertFalse(report.contains("final.fsh"));
+        assertTrue(report.contains("Paths are relative to shaders/"));
+    }
+
+    @Test
+    void filteredPathReportBoundsLargeInventories() {
+        ShaderPackDescriptor pack = new ShaderPackDescriptor(
+                "test-pack", "Test Pack", temporaryDirectory.resolve("private/game/shaderpacks/Test Pack"),
+                "", ShaderPackSourceType.DIRECTORY, ShaderPackLayout.OPTIFINE_STYLE, 1, 1, 0);
+        List<String> files = new ArrayList<>();
+        for (int index = 0; index < 205; index++) {
+            files.add("file-" + index + ".glsl");
+        }
+        ShaderPackInspection inspection = new ShaderPackInspection(pack, files, 0, "");
+
+        String report = inspection.createFileListReport(files);
+
+        assertTrue(report.contains("file-199.glsl"));
+        assertFalse(report.contains("file-200.glsl"));
+        assertTrue(report.contains("5 additional file(s) omitted"));
+        assertFalse(report.contains(temporaryDirectory.toString()));
+    }
+
     private ShaderPackDescriptor discoverOnlyPack(Path packs) throws IOException {
         ShaderPackScanResult result = new ShaderPackScanner().scan(packs);
         assertEquals(1, result.packs().size(), () -> "Unexpected scan issues: " + result.issues());

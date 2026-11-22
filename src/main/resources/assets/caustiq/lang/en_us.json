@@ -110,5 +110,17 @@
   "caustiq.browser.sort_order": "Sort: %s",
   "caustiq.browser.sort_name": "Name",
   "caustiq.browser.sort_shader_count": "Most shaders",
-  "caustiq.browser.sort_size": "Largest"
+  "caustiq.browser.sort_size": "Largest",
+  "caustiq.inspector.search_label": "Search shader-pack files",
+  "caustiq.inspector.search_hint": "Search paths or extensions...",
+  "caustiq.inspector.clear": "Clear",
+  "caustiq.inspector.filter": "Type: %s",
+  "caustiq.inspector.filter_all": "All",
+  "caustiq.inspector.filter_shaders": "Shaders",
+  "caustiq.inspector.filter_properties": "Properties",
+  "caustiq.inspector.filter_assets": "Assets",
+  "caustiq.inspector.file_count_filtered": "Showing %s of %s file(s)",
+  "caustiq.inspector.no_matches": "No files match this search and type filter. Clear the search or choose All.",
+  "caustiq.inspector.copy_paths": "Copy paths",
+  "caustiq.inspector.paths_copied": "Paths copied"
 }

@@ -82,4 +82,36 @@ public record ShaderPackInspection(
         report.append("\nNo absolute game-directory paths or shader source contents are included.");
         return report.toString();
     }
+
+    /**
+     * Creates a bounded path-only report for the current inspector search and filter.
+     * Only entries from this inspection are accepted; caller-supplied paths are ignored.
+     */
+    public String createFileListReport(List<String> selectedFiles) {
+        Objects.requireNonNull(selectedFiles, "selectedFiles");
+        java.util.Set<String> knownFiles = new java.util.HashSet<>(files);
+        List<String> matchingFiles = selectedFiles.stream()
+                .filter(Objects::nonNull)
+                .filter(knownFiles::contains)
+                .distinct()
+                .toList();
+
+        StringBuilder report = new StringBuilder(512);
+        report.append("CAUSTIQ Shader Pack File Paths\n")
+                .append("Pack: ").append(ShaderPackIssue.sanitizeDisplayText(pack.displayName())).append('\n')
+                .append("Matching files: ").append(matchingFiles.size()).append('\n');
+        int reported = Math.min(MAX_REPORTED_FILES, matchingFiles.size());
+        for (int index = 0; index < reported; index++) {
+            report.append("- ")
+                    .append(ShaderPackIssue.sanitizeDisplayText(matchingFiles.get(index)))
+                    .append('\n');
+        }
+        if (matchingFiles.size() > reported) {
+            report.append("- ... ").append(matchingFiles.size() - reported)
+                    .append(" additional file(s) omitted\n");
+        }
+        report.append("\nPaths are relative to shaders/. No absolute game-directory paths or shader source contents are included.");
+        return report.toString();
+    }
+
 }

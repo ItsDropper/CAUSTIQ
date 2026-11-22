@@ -1,12 +1,14 @@
 package dev.itsdropper.caustiq.gui;
 
 import dev.itsdropper.caustiq.shaderpack.ShaderPackDescriptor;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackFileBrowserModel;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackInspection;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackSourceType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
@@ -16,17 +18,25 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-/** Asynchronous, path-safe file inventory and metadata view for one discovered shader pack. */
+/** Searchable, filterable and path-safe file inventory for one discovered shader pack. */
 public final class ShaderPackInspectorScreen extends Screen {
     private static final int FILE_ROW_HEIGHT = 12;
     private static final int MAX_PAGE_SIZE = 14;
+    private static final int HEADER_TOP = 72;
 
     private final Screen parent;
     private final ShaderPackDescriptor pack;
     private ShaderPackInspection inspection;
     private boolean loading;
     private String failureMessage = "";
+    private String query = "";
     private int page;
+    private ShaderPackFileBrowserModel.FileFilter fileFilter =
+            ShaderPackFileBrowserModel.FileFilter.ALL;
+    private EditBox searchField;
+    private Button previousPageButton;
+    private Button nextPageButton;
+    private Button copyPathsButton;
 
     public ShaderPackInspectorScreen(Screen parent, ShaderPackDescriptor pack) {
         super(Component.translatable("caustiq.inspector.title"));
@@ -37,39 +47,72 @@ public final class ShaderPackInspectorScreen extends Screen {
     @Override
     protected void init() {
         clearWidgets();
+        previousPageButton = null;
+        nextPageButton = null;
+        copyPathsButton = null;
+        searchField = null;
+
         if (inspection == null && !loading && failureMessage.isEmpty()) {
             startInspection();
         }
 
         int left = width / 2 - 155;
-        int footerY = height - 56;
         if (inspection != null) {
-            int pages = pageCount();
-            page = Math.clamp(page, 0, pages - 1);
-            Button previous = Button.builder(Component.translatable("caustiq.inspector.previous"),
-                    button -> changePage(-1)).bounds(left, footerY, 72, 20).build();
-            Button next = Button.builder(Component.translatable("caustiq.inspector.next"),
-                    button -> changePage(1)).bounds(left + 76, footerY, 72, 20).build();
-            previous.active = page > 0;
-            next.active = page + 1 < pages;
-            addRenderableWidget(previous);
-            addRenderableWidget(next);
+            searchField = new EditBox(font, left, 42, 168, 20,
+                    Component.translatable("caustiq.inspector.search_label"));
+            searchField.setMaxLength(100);
+            searchField.setHint(Component.translatable("caustiq.inspector.search_hint"));
+            searchField.setValue(query);
+            searchField.setResponder(value -> {
+                query = value;
+                page = 0;
+                updateNavigationButtons();
+            });
+            addRenderableWidget(searchField);
+            addRenderableWidget(Button.builder(Component.translatable("caustiq.inspector.clear"),
+                    button -> {
+                        searchField.setValue("");
+                        setFocused(searchField);
+                    }).bounds(left + 172, 42, 36, 20).build());
+            addRenderableWidget(Button.builder(fileFilterLabel(), button -> {
+                fileFilter = fileFilter.next();
+                page = 0;
+                button.setMessage(fileFilterLabel());
+                updateNavigationButtons();
+            }).bounds(left + 212, 42, 98, 20).build());
+
+            previousPageButton = Button.builder(Component.translatable("caustiq.inspector.previous"),
+                    button -> changePage(-1)).bounds(left, height - 56, 58, 20).build();
+            nextPageButton = Button.builder(Component.translatable("caustiq.inspector.next"),
+                    button -> changePage(1)).bounds(left + 62, height - 56, 58, 20).build();
+            copyPathsButton = Button.builder(Component.translatable("caustiq.inspector.copy_paths"), button -> {
+                Minecraft.getInstance().keyboardHandler.setClipboard(
+                        inspection.createFileListReport(filteredFiles()));
+                button.setMessage(Component.translatable("caustiq.inspector.paths_copied"));
+            }).bounds(left + 124, height - 56, 82, 20).build();
+            addRenderableWidget(previousPageButton);
+            addRenderableWidget(nextPageButton);
+            addRenderableWidget(copyPathsButton);
             addRenderableWidget(Button.builder(Component.translatable("caustiq.inspector.copy"), button -> {
                 Minecraft.getInstance().keyboardHandler.setClipboard(inspection.createReport());
                 button.setMessage(Component.translatable("caustiq.inspector.copied"));
-            }).bounds(left + 152, footerY, 158, 20).build());
+            }).bounds(left + 210, height - 56, 100, 20).build());
+            updateNavigationButtons();
         } else if (!loading) {
             addRenderableWidget(Button.builder(Component.translatable("caustiq.inspector.retry"),
                     button -> {
                         failureMessage = "";
                         startInspection();
                         init();
-                    }).bounds(width / 2 - 50, footerY, 100, 20).build());
+                    }).bounds(width / 2 - 50, height - 56, 100, 20).build());
         }
 
         addRenderableWidget(Button.builder(Component.translatable("caustiq.inspector.back"),
                 button -> Minecraft.getInstance().setScreen(parent))
                 .bounds(width / 2 - 100, height - 28, 200, 20).build());
+        if (searchField != null) {
+            setFocused(searchField);
+        }
     }
 
     private void startInspection() {
@@ -122,43 +165,32 @@ public final class ShaderPackInspectorScreen extends Screen {
         }
         if (inspection == null) return;
 
-        ShaderPackDescriptor descriptor = inspection.pack();
-        int y = 42;
-        y = drawWrapped(graphics, Component.literal(ShaderPackIssue.sanitizeDisplayText(descriptor.displayName())),
-                16, y, width - 32, 0xFFFFFFFF);
-        Component sourceType = Component.translatable(descriptor.sourceType() == ShaderPackSourceType.DIRECTORY
-                ? "caustiq.settings.pack_source_directory" : "caustiq.settings.pack_source_archive");
-        String sourceName = descriptor.source().getFileName() == null
-                ? "unknown" : ShaderPackIssue.sanitizeDisplayText(descriptor.source().getFileName().toString());
-        y = drawWrapped(graphics, Component.translatable("caustiq.inspector.source",
-                sourceType, Component.literal(sourceName)), 16, y, width - 32, 0xFFCCCCCC);
-        y = drawWrapped(graphics, Component.translatable("caustiq.inspector.layout",
-                Component.translatable("caustiq.inspector.layout_optifine")),
-                16, y, width - 32, 0xFFAAAAAA);
-        y = drawWrapped(graphics, Component.translatable("caustiq.inspector.summary",
-                descriptor.shaderFileCount(), descriptor.pipelineEntryPointCount(),
-                formatSize(descriptor.declaredUncompressedBytes())),
-                16, y, width - 32, 0xFFAAAAAA);
-        Component metadata = inspection.metadataOptionCount() >= 0
-                ? Component.translatable("caustiq.inspector.metadata_options", inspection.metadataOptionCount())
-                : Component.translatable("caustiq.inspector.metadata_unavailable", inspection.metadataFailure());
-        y = drawWrapped(graphics, metadata, 16, y, width - 32,
-                inspection.metadataOptionCount() >= 0 ? 0xFFAAAAAA : 0xFFFFAA00);
-        y = drawWrapped(graphics, Component.translatable("caustiq.inspector.file_count",
-                inspection.files().size()), 16, y + 2, width - 32, 0xFFCCCCCC);
-        y = drawWrapped(graphics, Component.translatable("caustiq.inspector.file_heading"),
-                16, y + 2, width - 32, 0xFFFFFFFF);
+        int y = HEADER_TOP;
+        List<Component> header = headerComponents();
+        for (int index = 0; index < header.size(); index++) {
+            int color = switch (index) {
+                case 0 -> 0xFFFFFFFF;
+                case 4 -> inspection.metadataOptionCount() >= 0 ? 0xFFAAAAAA : 0xFFFFAA00;
+                case 6 -> 0xFFFFFFFF;
+                default -> 0xFFCCCCCC;
+            };
+            y = drawWrapped(graphics, header.get(index), 16, y, width - 32, color);
+        }
 
-        if (inspection.files().isEmpty()) {
-            drawWrapped(graphics, Component.translatable("caustiq.inspector.empty"),
-                    16, y + 8, width - 32, 0xFFAAAAAA);
+        List<String> files = filteredFiles();
+        if (files.isEmpty()) {
+            Component empty = inspection.files().isEmpty()
+                    ? Component.translatable("caustiq.inspector.empty")
+                    : Component.translatable("caustiq.inspector.no_matches");
+            drawWrapped(graphics, empty, 16, y + 8, width - 32, 0xFFAAAAAA);
             return;
         }
 
-        int first = page * pageSize();
-        int last = Math.min(first + pageSize(), inspection.files().size());
+        int pageSize = pageSize();
+        int first = page * pageSize;
+        int last = Math.min(first + pageSize, files.size());
         for (int index = first; index < last; index++) {
-            String path = "shaders/" + inspection.files().get(index);
+            String path = "shaders/" + files.get(index);
             List<FormattedCharSequence> lines = font.split(Component.literal(path), width - 32);
             int rowY = y + 8 + (index - first) * FILE_ROW_HEIGHT;
             if (!lines.isEmpty()) {
@@ -169,27 +201,93 @@ public final class ShaderPackInspectorScreen extends Screen {
                         width - 16 - font.width("…"), rowY, 0xFF888888);
             }
         }
-        graphics.drawCenteredString(font, Component.translatable("caustiq.inspector.page",
-                page + 1, pageCount()), width / 2, height - 70, 0xFFAAAAAA);
+        int listBottom = y + 8 + (last - first) * FILE_ROW_HEIGHT;
+        int pageLabelY = height - 70;
+        if (pageLabelY >= listBottom + 4) {
+            graphics.drawCenteredString(font, Component.translatable("caustiq.inspector.page",
+                    page + 1, pageCount()), width / 2, pageLabelY, 0xFFAAAAAA);
+        }
+    }
+
+    private List<Component> headerComponents() {
+        ShaderPackDescriptor descriptor = inspection.pack();
+        Component sourceType = Component.translatable(descriptor.sourceType() == ShaderPackSourceType.DIRECTORY
+                ? "caustiq.settings.pack_source_directory" : "caustiq.settings.pack_source_archive");
+        String sourceName = descriptor.source().getFileName() == null
+                ? "unknown" : ShaderPackIssue.sanitizeDisplayText(descriptor.source().getFileName().toString());
+        Component metadata = inspection.metadataOptionCount() >= 0
+                ? Component.translatable("caustiq.inspector.metadata_options", inspection.metadataOptionCount())
+                : Component.translatable("caustiq.inspector.metadata_unavailable", inspection.metadataFailure());
+        return List.of(
+                Component.literal(ShaderPackIssue.sanitizeDisplayText(descriptor.displayName())),
+                Component.translatable("caustiq.inspector.source", sourceType, Component.literal(sourceName)),
+                Component.translatable("caustiq.inspector.layout",
+                        Component.translatable("caustiq.inspector.layout_optifine")),
+                Component.translatable("caustiq.inspector.summary",
+                        descriptor.shaderFileCount(), descriptor.pipelineEntryPointCount(),
+                        formatSize(descriptor.declaredUncompressedBytes())),
+                metadata,
+                Component.translatable("caustiq.inspector.file_count_filtered",
+                        filteredFiles().size(), inspection.files().size()),
+                Component.translatable("caustiq.inspector.file_heading")
+        );
+    }
+
+    private int pageSize() {
+        int availableRows = (height - 80 - (inventoryTop() + 8)) / FILE_ROW_HEIGHT;
+        return Math.max(1, Math.min(MAX_PAGE_SIZE, availableRows));
+    }
+
+    private int inventoryTop() {
+        int y = HEADER_TOP;
+        for (Component component : headerComponents()) {
+            y += Math.max(1, font.split(component, Math.max(1, width - 32)).size()) * 10;
+        }
+        return y;
+    }
+
+    private int pageCount() {
+        int fileCount = filteredFiles().size();
+        return Math.max(1, (fileCount + pageSize() - 1) / pageSize());
+    }
+
+    private List<String> filteredFiles() {
+        return inspection == null ? List.of()
+                : ShaderPackFileBrowserModel.apply(inspection.files(), query, fileFilter);
+    }
+
+    private Component fileFilterLabel() {
+        Component value = Component.translatable(switch (fileFilter) {
+            case ALL -> "caustiq.inspector.filter_all";
+            case SHADER_SOURCES -> "caustiq.inspector.filter_shaders";
+            case PROPERTIES -> "caustiq.inspector.filter_properties";
+            case ASSETS -> "caustiq.inspector.filter_assets";
+        });
+        return Component.translatable("caustiq.inspector.filter", value);
+    }
+
+    private void updateNavigationButtons() {
+        int pages = pageCount();
+        page = Math.clamp(page, 0, pages - 1);
+        if (previousPageButton != null) previousPageButton.active = page > 0;
+        if (nextPageButton != null) nextPageButton.active = page + 1 < pages;
+        if (copyPathsButton != null) copyPathsButton.active = !filteredFiles().isEmpty();
+    }
+
+    private void changePage(int direction) {
+        page = Math.clamp(page + direction, 0, pageCount() - 1);
+        updateNavigationButtons();
+        Button target = direction < 0 ? previousPageButton : nextPageButton;
+        if (target != null && target.active) {
+            setFocused(target);
+        } else if (searchField != null) {
+            setFocused(searchField);
+        }
     }
 
     @Override
     public void onClose() {
         Minecraft.getInstance().setScreen(parent);
-    }
-
-    private int pageSize() {
-        return Math.max(1, Math.min(MAX_PAGE_SIZE, (height - 178) / FILE_ROW_HEIGHT));
-    }
-
-    private int pageCount() {
-        int fileCount = inspection == null ? 0 : inspection.files().size();
-        return Math.max(1, (fileCount + pageSize() - 1) / pageSize());
-    }
-
-    private void changePage(int direction) {
-        page = Math.clamp(page + direction, 0, pageCount() - 1);
-        init();
     }
 
     private int drawWrapped(
