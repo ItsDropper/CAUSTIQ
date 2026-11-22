@@ -11,7 +11,7 @@ base { archivesName.set(property("archives_base_name") as String) }
 
 loom {
     runs {
-        server {
+        named("server") {
             server()
             runDirectory = file("run/server")
         }
