@@ -27,6 +27,8 @@ public final class ShaderPackInspectorScreen extends Screen {
     private final Screen parent;
     private final ShaderPackDescriptor pack;
     private ShaderPackInspection inspection;
+    private ShaderPackFileBrowserModel fileBrowser;
+    private List<String> filteredFiles = List.of();
     private boolean loading;
     private String failureMessage = "";
     private String query = "";
@@ -55,6 +57,10 @@ public final class ShaderPackInspectorScreen extends Screen {
         if (inspection == null && !loading && failureMessage.isEmpty()) {
             startInspection();
         }
+        if (inspection != null && fileBrowser == null) {
+            fileBrowser = new ShaderPackFileBrowserModel(inspection.files());
+            filteredFiles = fileBrowser.apply(query, fileFilter);
+        }
 
         int left = width / 2 - 155;
         if (inspection != null) {
@@ -66,7 +72,7 @@ public final class ShaderPackInspectorScreen extends Screen {
             searchField.setResponder(value -> {
                 query = value;
                 page = 0;
-                updateNavigationButtons();
+                rebuildFilteredFiles();
             });
             addRenderableWidget(searchField);
             addRenderableWidget(Button.builder(Component.translatable("caustiq.inspector.clear"),
@@ -78,7 +84,7 @@ public final class ShaderPackInspectorScreen extends Screen {
                 fileFilter = fileFilter.next();
                 page = 0;
                 button.setMessage(fileFilterLabel());
-                updateNavigationButtons();
+                rebuildFilteredFiles();
             }).bounds(left + 212, 42, 98, 20).build());
 
             previousPageButton = Button.builder(Component.translatable("caustiq.inspector.previous"),
@@ -87,7 +93,7 @@ public final class ShaderPackInspectorScreen extends Screen {
                     button -> changePage(1)).bounds(left + 62, height - 56, 58, 20).build();
             copyPathsButton = Button.builder(Component.translatable("caustiq.inspector.copy_paths"), button -> {
                 Minecraft.getInstance().keyboardHandler.setClipboard(
-                        inspection.createFileListReport(filteredFiles()));
+                        inspection.createFileListReport(filteredFiles));
                 button.setMessage(Component.translatable("caustiq.inspector.paths_copied"));
             }).bounds(left + 124, height - 56, 82, 20).build();
             addRenderableWidget(previousPageButton);
@@ -130,6 +136,8 @@ public final class ShaderPackInspectorScreen extends Screen {
                 failureMessage = summarizeFailure(failure);
             } else {
                 inspection = result;
+                fileBrowser = new ShaderPackFileBrowserModel(result.files());
+                filteredFiles = fileBrowser.apply(query, fileFilter);
                 page = 0;
             }
             if (Minecraft.getInstance().screen == this) {
@@ -177,8 +185,7 @@ public final class ShaderPackInspectorScreen extends Screen {
             y = drawWrapped(graphics, header.get(index), 16, y, width - 32, color);
         }
 
-        List<String> files = filteredFiles();
-        if (files.isEmpty()) {
+        if (filteredFiles.isEmpty()) {
             Component empty = inspection.files().isEmpty()
                     ? Component.translatable("caustiq.inspector.empty")
                     : Component.translatable("caustiq.inspector.no_matches");
@@ -188,9 +195,9 @@ public final class ShaderPackInspectorScreen extends Screen {
 
         int pageSize = pageSize();
         int first = page * pageSize;
-        int last = Math.min(first + pageSize, files.size());
+        int last = Math.min(first + pageSize, filteredFiles.size());
         for (int index = first; index < last; index++) {
-            String path = "shaders/" + files.get(index);
+            String path = "shaders/" + filteredFiles.get(index);
             List<FormattedCharSequence> lines = font.split(Component.literal(path), width - 32);
             int rowY = y + 8 + (index - first) * FILE_ROW_HEIGHT;
             if (!lines.isEmpty()) {
@@ -228,7 +235,7 @@ public final class ShaderPackInspectorScreen extends Screen {
                         formatSize(descriptor.declaredUncompressedBytes())),
                 metadata,
                 Component.translatable("caustiq.inspector.file_count_filtered",
-                        filteredFiles().size(), inspection.files().size()),
+                        filteredFiles.size(), inspection.files().size()),
                 Component.translatable("caustiq.inspector.file_heading")
         );
     }
@@ -247,13 +254,12 @@ public final class ShaderPackInspectorScreen extends Screen {
     }
 
     private int pageCount() {
-        int fileCount = filteredFiles().size();
-        return Math.max(1, (fileCount + pageSize() - 1) / pageSize());
+        return Math.max(1, (filteredFiles.size() + pageSize() - 1) / pageSize());
     }
 
-    private List<String> filteredFiles() {
-        return inspection == null ? List.of()
-                : ShaderPackFileBrowserModel.apply(inspection.files(), query, fileFilter);
+    private void rebuildFilteredFiles() {
+        filteredFiles = fileBrowser == null ? List.of() : fileBrowser.apply(query, fileFilter);
+        updateNavigationButtons();
     }
 
     private Component fileFilterLabel() {
@@ -271,7 +277,7 @@ public final class ShaderPackInspectorScreen extends Screen {
         page = Math.clamp(page, 0, pages - 1);
         if (previousPageButton != null) previousPageButton.active = page > 0;
         if (nextPageButton != null) nextPageButton.active = page + 1 < pages;
-        if (copyPathsButton != null) copyPathsButton.active = !filteredFiles().isEmpty();
+        if (copyPathsButton != null) copyPathsButton.active = !filteredFiles.isEmpty();
     }
 
     private void changePage(int direction) {

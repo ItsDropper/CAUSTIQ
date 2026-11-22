@@ -6,41 +6,52 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
-/** Pure search and file-kind filtering rules for the shader-pack inspector. */
+/** Pre-indexed, immutable search and file-kind filtering rules for the shader-pack inspector. */
 public final class ShaderPackFileBrowserModel {
     private static final Set<String> SHADER_EXTENSIONS =
             Set.of("vsh", "fsh", "gsh", "csh", "tcs", "tes", "glsl");
-    private static final Comparator<String> PATH_ORDER =
-            Comparator.comparing((String path) -> path, String.CASE_INSENSITIVE_ORDER)
-                    .thenComparing(Comparator.naturalOrder());
+    private static final Comparator<FileEntry> PATH_ORDER =
+            Comparator.comparing(FileEntry::path, String.CASE_INSENSITIVE_ORDER)
+                    .thenComparing(FileEntry::path);
 
-    private ShaderPackFileBrowserModel() { }
+    private final List<FileEntry> files;
 
-    public static List<String> apply(List<String> files, String query, FileFilter fileFilter) {
+    public ShaderPackFileBrowserModel(List<String> files) {
         Objects.requireNonNull(files, "files");
+        this.files = files.stream()
+                .map(path -> {
+                    String requiredPath = Objects.requireNonNull(path, "file path");
+                    return new FileEntry(
+                            requiredPath,
+                            requiredPath.toLowerCase(Locale.ROOT),
+                            extension(requiredPath));
+                })
+                .sorted(PATH_ORDER)
+                .toList();
+    }
+
+    /** Filters the pre-sorted, pre-normalized inventory without re-sorting or re-normalizing paths. */
+    public List<String> apply(String query, FileFilter fileFilter) {
         Objects.requireNonNull(fileFilter, "fileFilter");
         String[] terms = query == null || query.isBlank()
                 ? new String[0] : query.trim().toLowerCase(Locale.ROOT).split("\\s+");
 
         return files.stream()
-                .map(path -> Objects.requireNonNull(path, "file path"))
-                .filter(path -> matchesFilter(path, fileFilter))
-                .filter(path -> matchesQuery(path, terms))
-                .sorted(PATH_ORDER)
+                .filter(file -> matchesFilter(file.extension(), fileFilter))
+                .filter(file -> matchesQuery(file.normalizedPath(), terms))
+                .map(FileEntry::path)
                 .toList();
     }
 
-    private static boolean matchesQuery(String path, String[] terms) {
+    private static boolean matchesQuery(String normalizedPath, String[] terms) {
         if (terms.length == 0) return true;
-        String normalized = path.toLowerCase(Locale.ROOT);
         for (String term : terms) {
-            if (!normalized.contains(term)) return false;
+            if (!normalizedPath.contains(term)) return false;
         }
         return true;
     }
 
-    private static boolean matchesFilter(String path, FileFilter fileFilter) {
-        String extension = extension(path);
+    private static boolean matchesFilter(String extension, FileFilter fileFilter) {
         boolean shaderSource = SHADER_EXTENSIONS.contains(extension);
         boolean properties = extension.equals("properties");
         return switch (fileFilter) {
@@ -57,6 +68,8 @@ public final class ShaderPackFileBrowserModel {
         if (dot <= separator || dot == path.length() - 1) return "";
         return path.substring(dot + 1).toLowerCase(Locale.ROOT);
     }
+
+    private record FileEntry(String path, String normalizedPath, String extension) { }
 
     public enum FileFilter {
         ALL,
