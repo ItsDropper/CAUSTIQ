@@ -118,7 +118,6 @@ public final class NvidiumGBufferTargets {
             }
         } finally {
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
-            GL15C.glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, previousPixelPackBuffer);
             GL13C.glActiveTexture(previousActiveTexture);
         }
     }
@@ -314,6 +313,7 @@ public final class NvidiumGBufferTargets {
         } finally {
             MemoryUtil.memFree(pixels);
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
+            GL15C.glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, previousPixelPackBuffer);
             GL13C.glActiveTexture(previousActiveTexture);
         }
     }
