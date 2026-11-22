@@ -58,6 +58,11 @@ public final class ShaderRuntime {
     private static long lastReportedNvidiumSolidFrames;
     private static boolean warnedNvidiumBackendNotObserved;
     private static int lastVoxelImageClearFrame = Integer.MIN_VALUE;
+    private static int strictGpuCiFrames;
+    private static int strictGpuCiBaselineFrame;
+    private static NvidiumRenderBridge.Snapshot strictGpuCiBaseline;
+    private static boolean strictGpuCiCameraRotated;
+    private static boolean strictGpuCiFinished;
 
     private ShaderRuntime() { }
 
@@ -223,6 +228,13 @@ public final class ShaderRuntime {
             for (ShaderPackMetadata.Option option : model.options().options()) {
                 optionDefines.put(option.name(), CaustiqConfig.get().option(
                         selected.id(), option.name(), option.defaultValue()));
+            }
+            if (Boolean.getBoolean("caustiq.strictGpuCi")) {
+                // Photon gates its setup/shadow-composite compute programs behind
+                // COLORED_LIGHTS. Force that path only in the dedicated GPU test.
+                optionDefines.put("COLORED_LIGHTS", "1");
+                CaustiqClient.LOGGER.info(
+                        "CAUSTIQ_STRICT_GPU_CI: enabling Photon COLORED_LIGHTS to exercise its compute pipeline.");
             }
             selectedDefines = Map.copyOf(optionDefines);
             IrisShaderResources loadedResources = IrisShaderResources.load(
@@ -640,6 +652,108 @@ public final class ShaderRuntime {
         boolean executedIrisPasses = executeScheduledIrisPasses();
         executeFinalPass();
         if (!executedIrisPasses) IRIS_PASS_EXECUTOR.publishTerrainOutputs(activePassPlan);
+        verifyStrictGpuCi();
+    }
+
+    /**
+     * Optional fail-closed in-game integration gate. This runs only when a
+     * dedicated GPU CI runner launches Minecraft with -Dcaustiq.strictGpuCi=true.
+     * It requires observed shader adaptation, Nvidium terrain rasterization,
+     * live MRT attachments, Iris fullscreen/compute execution, and real shadow
+     * rendering before it emits a PASS marker.
+     */
+    private static void verifyStrictGpuCi() {
+        if (!Boolean.getBoolean("caustiq.strictGpuCi") || strictGpuCiFinished) return;
+        strictGpuCiFrames++;
+        NvidiumRenderBridge.Snapshot evidence = NvidiumRenderBridge.snapshot();
+        if (evidence.shadowNonClearReadbacks() == 0
+                && evidence.shadowFrames() >= 15
+                && evidence.shadowFrames() % 120 == 15
+                && NvidiumShadowRenderer.hasNonClearShadowDepthForStrictCi()) {
+            NvidiumRenderBridge.shadowPixelsObserved();
+            CaustiqClient.LOGGER.info(
+                    "CAUSTIQ_STRICT_EVIDENCE: GPU readback found non-clear depth written by the isolated Nvidium shadow rasterizer.");
+            evidence = NvidiumRenderBridge.snapshot();
+        }
+
+        boolean baselineReady = evidence.adaptedPrimaryPrograms() > 0
+                && evidence.primaryRasterCalls() >= 30 && evidence.primaryRasterRegions() > 0
+                && evidence.successfulGbufferAttachments() >= 30
+                && evidence.completedGbufferDraws() >= 30
+                && evidence.gbufferNonClearReadbacks() > 0
+                && evidence.completedSolidPasses() >= 30
+                && evidence.adaptedTranslucentPrograms() > 0
+                && evidence.adaptedShadowPrograms() > 0 && evidence.shadowFrames() >= 15
+                && evidence.shadowNonClearReadbacks() > 0
+                && evidence.fullscreenPasses() >= 30 && evidence.computePasses() >= 10
+                && evidence.translucentRasterCalls() > 0
+                && evidence.completedTranslucentPasses() > 0
+                && !evidence.hasUnfinishedPass()
+                && NvidiumShadowRenderer.isAvailable()
+                && NvidiumShadowRenderer.shadowTexture() != 0;
+
+        if (strictGpuCiBaseline == null) {
+            if (baselineReady) {
+                strictGpuCiBaseline = evidence;
+                strictGpuCiBaselineFrame = strictGpuCiFrames;
+                var player = Minecraft.getInstance().player;
+                if (player != null) {
+                    player.setYRot(player.getYRot() + 90.0f);
+                    player.setXRot(Math.max(-60.0f, Math.min(60.0f, player.getXRot() + 10.0f)));
+                    strictGpuCiCameraRotated = true;
+                }
+                CaustiqClient.LOGGER.info(
+                        "CAUSTIQ_STRICT_GPU_CI_BASELINE frames={} primaryRasterCalls={} translucentRasterCalls={} gbufferDraws={} shadowFrames={} fullscreenPasses={} computePasses={} cameraRotated={}",
+                        strictGpuCiFrames, evidence.primaryRasterCalls(), evidence.translucentRasterCalls(),
+                        evidence.completedGbufferDraws(), evidence.shadowFrames(), evidence.fullscreenPasses(),
+                        evidence.computePasses(), strictGpuCiCameraRotated);
+            } else if (strictGpuCiFrames >= 1800) {
+                strictGpuCiFinished = true;
+                CaustiqClient.LOGGER.error(
+                        "CAUSTIQ_STRICT_GPU_CI_FAIL phase=initial frames={} evidence={} shadowStatus={}",
+                        strictGpuCiFrames, evidence, NvidiumShadowRenderer.shadowMapStatus());
+                Minecraft.getInstance().stop();
+            }
+            return;
+        }
+
+        int stableFrames = strictGpuCiFrames - strictGpuCiBaselineFrame;
+        if (stableFrames < 600) return;
+        NvidiumRenderBridge.Snapshot baseline = strictGpuCiBaseline;
+        boolean sustainedAfterCameraChange = strictGpuCiCameraRotated
+                && evidence.primaryRasterCalls() >= baseline.primaryRasterCalls() + 600
+                && evidence.completedGbufferDraws() >= baseline.completedGbufferDraws() + 600
+                && evidence.completedSolidPasses() >= baseline.completedSolidPasses() + 600
+                && evidence.translucentRasterCalls() >= baseline.translucentRasterCalls() + 300
+                && evidence.completedTranslucentPasses() >= baseline.completedTranslucentPasses() + 300
+                && evidence.shadowFrames() >= baseline.shadowFrames() + 300
+                && evidence.fullscreenPasses() >= baseline.fullscreenPasses() + 600
+                && evidence.computePasses() >= baseline.computePasses() + 100
+                && evidence.gbufferNonClearReadbacks() > 0
+                && evidence.shadowNonClearReadbacks() > 0
+                && !evidence.hasUnfinishedPass()
+                && NvidiumShadowRenderer.isAvailable()
+                && NvidiumShadowRenderer.shadowTexture() != 0;
+        if (sustainedAfterCameraChange) {
+            strictGpuCiFinished = true;
+            CaustiqClient.LOGGER.info(
+                    "CAUSTIQ_STRICT_GPU_CI_PASS frames={} stableFrames={} cameraRotated=true primaryPrograms={} primaryRasterCalls={} primaryRegions={} translucentPrograms={} translucentRasterCalls={} gbufferAttachments={} gbufferDraws={} gbufferPixelReadbacks={} shadowPrograms={} shadowFrames={} shadowDepthReadbacks={} fullscreenPasses={} computePasses={} shadowResolution={}",
+                    strictGpuCiFrames, stableFrames, evidence.adaptedPrimaryPrograms(),
+                    evidence.primaryRasterCalls(), evidence.primaryRasterRegions(),
+                    evidence.adaptedTranslucentPrograms(), evidence.translucentRasterCalls(),
+                    evidence.successfulGbufferAttachments(), evidence.completedGbufferDraws(),
+                    evidence.gbufferNonClearReadbacks(), evidence.adaptedShadowPrograms(),
+                    evidence.shadowFrames(), evidence.shadowNonClearReadbacks(),
+                    evidence.fullscreenPasses(), evidence.computePasses(),
+                    NvidiumShadowRenderer.shadowResolution());
+        } else if (stableFrames >= 1200) {
+            strictGpuCiFinished = true;
+            CaustiqClient.LOGGER.error(
+                    "CAUSTIQ_STRICT_GPU_CI_FAIL phase=stability frames={} stableFrames={} baseline={} current={} shadowStatus={}",
+                    strictGpuCiFrames, stableFrames, baseline, evidence,
+                    NvidiumShadowRenderer.shadowMapStatus());
+            Minecraft.getInstance().stop();
+        }
     }
 
     private static void compileNextProgram() {

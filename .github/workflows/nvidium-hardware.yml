@@ -1,0 +1,217 @@
+name: Nvidium Hardware Integration
+
+on:
+  push:
+    branches: [nvidium]
+    paths:
+      - ".github/workflows/nvidium-hardware.yml"
+      - ".github/scripts/create_gpu_ci_world.py"
+      - "src/**"
+      - "build.gradle.kts"
+      - "gradle.properties"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: caustiq-nvidium-hardware-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  nvidium-hardware:
+    name: Minecraft + Photon + live Nvidium GPU renderer
+    # This job must run on a real NVIDIA GPU. GitHub-hosted software GL is
+    # intentionally not accepted as a substitute for Nvidium's NV extensions.
+    runs-on: [self-hosted, Windows, X64, caustiq-gpu]
+    timeout-minutes: 35
+    steps:
+      - name: Check out CAUSTIQ
+        uses: actions/checkout@v4
+
+      - name: Reset persistent game directories for an isolated run
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (Test-Path "run") { Remove-Item -Recurse -Force "run" }
+          New-Item -ItemType Directory -Force "run" | Out-Null
+
+      - name: Require a physical NVIDIA GPU and interactive desktop session
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $nvidia = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+          if (-not $nvidia) { throw "nvidia-smi is unavailable; this is not an NVIDIA GPU runner." }
+          $gpu = & nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader
+          if ($LASTEXITCODE -ne 0 -or -not $gpu) { throw "NVIDIA driver cannot enumerate a GPU." }
+          if ($gpu -notmatch "RTX|GeForce|Quadro|NVIDIA") { throw "Unexpected GPU: $gpu" }
+          "GPU: $gpu" | Tee-Object -FilePath "$env:GITHUB_STEP_SUMMARY" -Append
+          $session = (Get-Process -Id $PID).SessionId
+          if ($session -eq 0) { throw "The runner is running as a Windows service in Session 0. Run the GitHub Actions runner interactively in the logged-in desktop session so Minecraft can create a real WGL context." }
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Python for deterministic world generation
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install hash-pinned Sodium and Nvidium runtime versions
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $mods = Join-Path $PWD "run/mods"
+          New-Item -ItemType Directory -Force $mods | Out-Null
+          $requirements = @(
+            @{ VersionId = "NFkjnzWE"; Version = "mc1.21.11-0.8.12-fabric"; Label = "Sodium 0.8.12" },
+            @{ VersionId = "4x9ci9sF"; Version = "0.4.3-beta13-1.21.11"; Label = "Nvidium 0.4.3-beta13" }
+          )
+          foreach ($requirement in $requirements) {
+            $version = Invoke-RestMethod -Uri "https://api.modrinth.com/v2/version/$($requirement.VersionId)"
+            if ($version.version_number -ne $requirement.Version -or
+                $version.game_versions -notcontains "1.21.11" -or
+                $version.loaders -notcontains "fabric") {
+              throw "Modrinth version metadata does not match the pinned $($requirement.Label) release."
+            }
+            $files = @($version.files | Where-Object { $_.primary })
+            if ($files.Count -ne 1 -or -not $files[0].hashes.sha512) {
+              throw "Expected one SHA-512-addressed primary artifact for $($requirement.Label)."
+            }
+            $destination = Join-Path $mods $files[0].filename
+            Invoke-WebRequest -Uri $files[0].url -OutFile $destination
+            $actualHash = (Get-FileHash -Path $destination -Algorithm SHA512).Hash.ToLowerInvariant()
+            if ($actualHash -ne $files[0].hashes.sha512.ToLowerInvariant()) {
+              throw "SHA-512 mismatch for $($requirement.Label)."
+            }
+            if ((Get-Item $destination).Length -lt 10000) {
+              throw "Downloaded mod is suspiciously small: $destination"
+            }
+            "Verified $($requirement.Label): $($version.id), SHA-512=$actualHash"
+          }
+          Get-ChildItem $mods | Format-Table Name,Length
+
+      - name: Download pinned Photon shader pack
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $archive = Join-Path $env:RUNNER_TEMP "photon-2a3d502c17d2e310412c717be47241f014cba7fc.tar.gz"
+          Invoke-WebRequest -Uri "https://github.com/sixthsurge/photon/archive/2a3d502c17d2e310412c717be47241f014cba7fc.tar.gz" -OutFile $archive
+          $source = Join-Path $env:RUNNER_TEMP "photon-source"
+          $destination = Join-Path $PWD "run/shaderpacks/Photon"
+          if (Test-Path $source) { Remove-Item -Recurse -Force $source }
+          if (Test-Path $destination) { Remove-Item -Recurse -Force $destination }
+          New-Item -ItemType Directory -Force $source,$destination | Out-Null
+          tar -xzf $archive --strip-components=1 -C $source
+          Copy-Item -Path (Join-Path $source "*") -Destination $destination -Recurse -Force
+          if (-not (Test-Path (Join-Path $destination "shaders/world0/gbuffers_terrain.vsh"))) {
+            throw "Pinned Photon archive did not contain the expected terrain program."
+          }
+          if (-not (Test-Path (Join-Path $destination "shaders/world0/shadow.vsh"))) {
+            throw "Pinned Photon archive did not contain the expected shadow program."
+          }
+
+      - name: Configure CAUSTIQ to load Photon before Nvidium constructs its renderer
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $config = Join-Path $PWD "run/config"
+          New-Item -ItemType Directory -Force $config | Out-Null
+          @(
+            "enabled=true"
+            "compileBudget=4"
+            "selectedPack=photon-13itpjw"
+          ) | Set-Content -Encoding ascii (Join-Path $config "caustiq.properties")
+
+      - name: Build and run all deterministic tests
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          .\gradlew.bat clean build --no-daemon --stacktrace
+          if ($LASTEXITCODE -ne 0) { throw "Gradle build/test suite failed." }
+
+      - name: Generate a deterministic flat world with water
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          python --version
+          python .github/scripts/create_gpu_ci_world.py
+          if ($LASTEXITCODE -ne 0) { throw "Minecraft world generation failed." }
+          $world = Join-Path $PWD "run/saves/caustiq-ci"
+          if (-not (Test-Path (Join-Path $world "region"))) { throw "Generated client world is missing region data." }
+
+      - name: Launch Minecraft with Photon and the actual Nvidium renderer
+        shell: powershell
+        env:
+          JAVA_TOOL_OPTIONS: "-Dcaustiq.strictGpuCi=true -Dcaustiq.dumpNvidiumShaders=true"
+        run: |
+          $ErrorActionPreference = "Stop"
+          $diagnostics = Join-Path $PWD "build/caustiq-gpu-ci"
+          New-Item -ItemType Directory -Force $diagnostics | Out-Null
+          $gradleLog = Join-Path $diagnostics "client-gradle.log"
+          $gradleErrorLog = Join-Path $diagnostics "client-gradle-error.log"
+          $latestLog = Join-Path $PWD "run/logs/latest.log"
+          $arguments = '/c .\gradlew.bat runClient --args="--quickPlaySingleplayer caustiq-ci --width 1280 --height 720"'
+          $client = Start-Process -FilePath "cmd.exe" -ArgumentList $arguments -WorkingDirectory $PWD -PassThru -RedirectStandardOutput $gradleLog -RedirectStandardError $gradleErrorLog
+          $deadline = (Get-Date).AddMinutes(18)
+          $result = $null
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 3
+            $logs = ""
+            if (Test-Path $gradleLog) { $logs += Get-Content $gradleLog -Raw -ErrorAction SilentlyContinue }
+            if (Test-Path $gradleErrorLog) { $logs += Get-Content $gradleErrorLog -Raw -ErrorAction SilentlyContinue }
+            if (Test-Path $latestLog) { $logs += Get-Content $latestLog -Raw -ErrorAction SilentlyContinue }
+            if ($logs -match "CAUSTIQ_STRICT_GPU_CI_FAIL") { $result = "fail"; break }
+            if ($logs -match "CAUSTIQ_STRICT_GPU_CI_PASS") { $result = "pass"; break }
+            if ($client.HasExited) { $result = "exited"; break }
+          }
+          if ($result -ne "pass") {
+            if (-not $client.HasExited) { & taskkill.exe /PID $client.Id /T /F | Out-Null }
+            if (Test-Path $gradleLog) { Get-Content $gradleLog -Tail 160 }
+            if (Test-Path $latestLog) { Get-Content $latestLog -Tail 240 }
+            throw "Strict in-game Nvidium GPU integration did not pass (result=$result)."
+          }
+          # Keep the world running after the gate trips; a single lucky frame
+          # must not be enough to green the job.
+          Start-Sleep -Seconds 45
+          $logs = (Get-Content $gradleLog -Raw) + (Get-Content $gradleErrorLog -Raw) + (Get-Content $latestLog -Raw)
+          if ($logs -notmatch "CAUSTIQ_STRICT_GPU_CI_PASS") { throw "The strict GPU PASS marker disappeared from the client logs." }
+          if ($logs -match "CAUSTIQ_STRICT_GPU_CI_FAIL") { throw "The strict GPU test failed after its initial pass." }
+          & taskkill.exe /PID $client.Id /T /F | Out-Null
+          "Strict runtime assertion passed: real Nvidium terrain, translucent terrain, MRT, shadow, fullscreen and compute work were observed repeatedly in Minecraft." | Tee-Object -FilePath "$env:GITHUB_STEP_SUMMARY" -Append
+
+      - name: Verify strict runtime evidence and reject shader failures
+        if: always()
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $logs = @()
+          foreach ($file in @("run/logs/latest.log","build/caustiq-gpu-ci/client-gradle.log","build/caustiq-gpu-ci/client-gradle-error.log")) {
+            if (Test-Path $file) { $logs += Get-Content $file -Raw }
+          }
+          $combined = $logs -join "`n"
+          if ($combined -notmatch "CAUSTIQ_STRICT_GPU_CI_PASS") {
+            throw "No strict in-game GPU PASS marker was recorded."
+          }
+          if ($combined -match "CAUSTIQ_STRICT_GPU_CI_FAIL|failed to compile|failed to link|Shader .* failed|Nvidium.*pipeline failed") {
+            throw "A shader compilation/link or renderer pipeline failure was found in the runtime log."
+          }
+          if ($combined -notmatch "CAUSTIQ_STRICT_EVIDENCE: isolated Nvidium light-space shadow terrain rendered") {
+            throw "No successful isolated Nvidium shadow terrain draw was recorded."
+          }
+
+      - name: Upload real-GPU runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: caustiq-nvidium-gpu-evidence-${{ github.sha }}
+          path: |
+            build/caustiq-gpu-ci/
+            run/logs/latest.log
+            run/crash-reports/
+            run/logs/caustiq-nvidium-shaders/
+          if-no-files-found: warn
+          retention-days: 30

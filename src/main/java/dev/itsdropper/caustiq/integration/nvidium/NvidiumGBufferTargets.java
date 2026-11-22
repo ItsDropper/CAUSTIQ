@@ -9,9 +9,12 @@ import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL12C;
 import org.lwjgl.opengl.GL13C;
+import org.lwjgl.opengl.GL15C;
 import org.lwjgl.opengl.GL20C;
+import org.lwjgl.opengl.GL21C;
 import org.lwjgl.opengl.GL30C;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
@@ -115,6 +118,7 @@ public final class NvidiumGBufferTargets {
             }
         } finally {
             GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
+            GL15C.glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, previousPixelPackBuffer);
             GL13C.glActiveTexture(previousActiveTexture);
         }
     }
@@ -268,6 +272,50 @@ public final class NvidiumGBufferTargets {
             throw new IllegalArgumentException("G-buffer attachment must be between 1 and " + MAX_ATTACHMENT + ".");
         }
         return TEXTURES[attachment - 1];
+    }
+
+    /**
+     * Strict-CI readback proving the terrain fragment stage wrote real pixels
+     * into CAUSTIQ's normal attachment. This is intentionally opt-in because
+     * synchronous GPU readback stalls the render thread.
+     */
+    public static boolean hasNonClearPixelsForStrictCi() {
+        int texture = TEXTURES[NORMAL - 1];
+        if (texture == 0 || width <= 0 || height <= 0) return false;
+        List<Integer> physicalTargets = physicalOutputTargets();
+        if (physicalTargets.isEmpty()) return false;
+        IrisTerrainPassScheduler.RenderTarget firstTarget = targetSpecs.get(physicalTargets.get(0));
+        if (firstTarget != null && !firstTarget.clear()) return false;
+        float[] clearColor = parseClearColor(firstTarget == null
+                ? "0.0 0.0 0.0 0.0" : firstTarget.clearColor());
+        java.nio.FloatBuffer pixels = MemoryUtil.memAllocFloat(Math.multiplyExact(Math.multiplyExact(width, height), 4));
+        int previousActiveTexture = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
+        int previousPixelPackBuffer = GL11C.glGetInteger(GL21C.GL_PIXEL_PACK_BUFFER_BINDING);
+        GL13C.glActiveTexture(GL13C.GL_TEXTURE0);
+        int previousTexture = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
+        try {
+            GL15C.glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, 0);
+            GL11C.glFinish();
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, texture);
+            GL11C.glGetTexImage(GL11C.GL_TEXTURE_2D, 0, GL11C.GL_RGBA, GL11C.GL_FLOAT, pixels);
+            int changedPixels = 0;
+            for (int pixel = 0; pixel < width * height; pixel++) {
+                int offset = pixel * 4;
+                float red = pixels.get(offset);
+                float green = pixels.get(offset + 1);
+                float blue = pixels.get(offset + 2);
+                if ((Float.isFinite(red) && Math.abs(red - clearColor[0]) > 0.02f)
+                        || (Float.isFinite(green) && Math.abs(green - clearColor[1]) > 0.02f)
+                        || (Float.isFinite(blue) && Math.abs(blue - clearColor[2]) > 0.02f)) {
+                    if (++changedPixels >= 64) return true;
+                }
+            }
+            return false;
+        } finally {
+            MemoryUtil.memFree(pixels);
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
+            GL13C.glActiveTexture(previousActiveTexture);
+        }
     }
 
     /** Alternate storage used by Iris deferred/composite ping-pong passes. */

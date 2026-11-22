@@ -5,6 +5,7 @@ import dev.itsdropper.caustiq.integration.nvidium.NvidiumGBufferTargets;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisTextureBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumIrisUniformBridge;
 import dev.itsdropper.caustiq.integration.nvidium.NvidiumShadowRenderer;
+import dev.itsdropper.caustiq.integration.nvidium.NvidiumRenderBridge;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -30,6 +31,7 @@ public abstract class NvidiumTranslucentTerrainRasterizerMixin {
             @Coerce Object pass, int regionCount, long commandAddress,
             @Coerce Object terrainSampler, CallbackInfo callbackInfo) {
         if (NvidiumShadowRenderer.isShadowRasterization()) return;
+        NvidiumRenderBridge.translucentRasterized(regionCount);
         try {
             NvidiumIrisTextureBridge.captureOpaqueDepthSnapshot();
         } catch (RuntimeException exception) {

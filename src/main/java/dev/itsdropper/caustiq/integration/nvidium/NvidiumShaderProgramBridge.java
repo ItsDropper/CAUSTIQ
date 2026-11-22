@@ -155,15 +155,23 @@ public final class NvidiumShaderProgramBridge {
             case SHADOW_TRANSLUCENT -> shadowTranslucentTerrainAdapter != null
                     ? shadowTranslucentTerrainAdapter : shadowTerrainAdapter;
         };
+        boolean irisAdapted = false;
         if (irisAdapter != null) {
+            Map<String, String> beforeIrisAdapter = transformed;
             transformed = applyAdapter(irisAdapter, transformed,
                     pipeline == PipelineKind.TRANSLUCENT ? "Iris translucent terrain"
                             : pipeline == PipelineKind.SHADOW_TRANSLUCENT ? "Iris translucent shadow terrain"
                             : pipeline == PipelineKind.SHADOW_CUTOUT ? "Iris cutout shadow terrain"
                             : pipeline == PipelineKind.SHADOW ? "Iris shadow terrain" : "Iris terrain", true);
+            irisAdapted = !transformed.equals(beforeIrisAdapter);
         }
 
         if (transformed.equals(original)) return;
+        if (irisAdapted) {
+            NvidiumRenderBridge.shaderAdapted(pipeline);
+            LOGGER.info("CAUSTIQ adapted Nvidium {} shader stages with the Iris program for pipeline {}.",
+                    transformed.keySet(), pipeline);
+        }
         dumpShaderSources("compiled", transformed);
         for (Map.Entry<?, String> entry : shaderSources.entrySet()) {
             if (entry.getKey() instanceof Enum<?> stage) {

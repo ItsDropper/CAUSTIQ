@@ -134,6 +134,7 @@ public final class IrisGlPassExecutor implements AutoCloseable {
                     renderPass(pass, plan.targets(), program, mainTarget, targetWidth, targetHeight,
                             alternateCurrent, hasWritten, clearedTargets, resources);
                 }
+                dev.itsdropper.caustiq.integration.nvidium.NvidiumRenderBridge.fullscreenPassExecuted(pass.compute());
             }
             for (int index = 1; index <= MAX_COLOR_TARGET; index++) {
                 IrisTerrainPassScheduler.RenderTarget target = plan.targets().get(index);

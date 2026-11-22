@@ -12,7 +12,9 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL12C;
 import org.lwjgl.opengl.GL13C;
+import org.lwjgl.opengl.GL15C;
 import org.lwjgl.opengl.GL20C;
+import org.lwjgl.opengl.GL21C;
 import org.lwjgl.opengl.GL30C;
 import org.lwjgl.opengl.GL33C;
 import org.lwjgl.opengl.GL42C;
@@ -133,6 +135,10 @@ public final class NvidiumShadowRenderer {
             state.depthValid = true;
             activeState = state;
             lastRenderStatus = "shadow terrain rendered " + regionCount + " region(s)";
+            NvidiumRenderBridge.shadowFrameRendered(regionCount);
+            if (NvidiumRenderBridge.snapshot().shadowFrames() == 1) {
+                CaustiqClient.LOGGER.info("CAUSTIQ_STRICT_EVIDENCE: isolated Nvidium light-space shadow terrain rendered {} region(s).", regionCount);
+            }
             failureLogged = false;
         } catch (ReflectiveOperationException | RuntimeException exception) {
             if (!failureLogged) {
@@ -195,6 +201,40 @@ public final class NvidiumShadowRenderer {
     public static boolean isAvailable() {
         State state = activeState;
         return state != null && state.depthTexture != 0 && state.depthValid;
+    }
+
+    /**
+     * Strict-CI readback proving the isolated light-space rasterizer wrote
+     * depth values rather than merely allocating and clearing a shadow map.
+     */
+    public static boolean hasNonClearShadowDepthForStrictCi() {
+        State state = activeState;
+        if (state == null || !state.depthValid || state.depthTexture == 0 || state.resolution <= 0) return false;
+        FloatBuffer pixels = MemoryUtil.memAllocFloat(Math.multiplyExact(state.resolution, state.resolution));
+        int previousActiveTexture = GL11C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE);
+        int previousPixelPackBuffer = GL11C.glGetInteger(GL21C.GL_PIXEL_PACK_BUFFER_BINDING);
+        GL13C.glActiveTexture(GL13C.GL_TEXTURE0);
+        int previousTexture = GL11C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D);
+        try {
+            GL15C.glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, 0);
+            GL11C.glFinish();
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, state.depthTexture);
+            GL11C.glGetTexImage(GL11C.GL_TEXTURE_2D, 0,
+                    GL11C.GL_DEPTH_COMPONENT, GL11C.GL_FLOAT, pixels);
+            int writtenPixels = 0;
+            for (int index = 0; index < state.resolution * state.resolution; index++) {
+                float depth = pixels.get(index);
+                if (Float.isFinite(depth) && depth >= 0.0f && depth < 0.999f) {
+                    if (++writtenPixels >= 64) return true;
+                }
+            }
+            return false;
+        } finally {
+            MemoryUtil.memFree(pixels);
+            GL11C.glBindTexture(GL11C.GL_TEXTURE_2D, previousTexture);
+            GL15C.glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, previousPixelPackBuffer);
+            GL13C.glActiveTexture(previousActiveTexture);
+        }
     }
 
     /** Diagnostic state included when an Iris pass requests an unavailable shadow map. */

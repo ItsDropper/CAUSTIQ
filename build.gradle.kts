@@ -9,6 +9,15 @@ group = property("maven_group") as String
 version = property("mod_version") as String
 base { archivesName.set(property("archives_base_name") as String) }
 
+loom {
+    runs {
+        server {
+            server()
+            runDirectory = file("run/server")
+        }
+    }
+}
+
 repositories {
     mavenCentral()
     maven { name = "CaffeineMC"; url = uri("https://maven.caffeinemc.net/releases") }
