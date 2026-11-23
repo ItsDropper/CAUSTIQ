@@ -13,6 +13,7 @@ import net.minecraft.SharedConstants;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 /** Builds a privacy-conscious report that can be attached to Caustiq bug reports. */
 public final class CaustiqDiagnostics {
@@ -107,7 +108,7 @@ public final class CaustiqDiagnostics {
             return IssueKind.UNSAFE_PATH;
         }
         if (containsAny(normalized,
-                "compressed size limit", "uncompressed size", "total uncompressed size",
+                "compressed size", "uncompressed size", "total uncompressed size",
                 "compression ratio", "nesting depth", "size overflowed")
                 || (normalized.contains("more than ")
                 && (normalized.contains(" entries") || normalized.contains(" candidates")))) {
@@ -122,6 +123,22 @@ public final class CaustiqDiagnostics {
             return IssueKind.INVALID_SOURCE;
         }
         return IssueKind.OTHER;
+    }
+
+    /** Creates the path-safe presentation model used by the diagnostics UI. */
+    public static IssueDetails describeIssue(ShaderPackIssue issue) {
+        Objects.requireNonNull(issue, "issue");
+        String candidateName = issue.displayName();
+        String reason = issue.displayReason();
+        return new IssueDetails(candidateName, reason, classifyIssue(reason));
+    }
+
+    public record IssueDetails(String candidateName, String reason, IssueKind kind) {
+        public IssueDetails {
+            candidateName = ShaderPackIssue.sanitizeDisplayText(candidateName);
+            reason = ShaderPackIssue.sanitizeDisplayText(reason);
+            kind = kind == null ? IssueKind.OTHER : kind;
+        }
     }
 
     private static boolean containsAny(String value, String... fragments) {
