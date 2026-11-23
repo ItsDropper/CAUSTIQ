@@ -18,8 +18,8 @@ import java.util.Locale;
 /** Runtime and shader-pack discovery diagnostics with actionable, path-safe guidance. */
 public final class ShaderPackDiagnosticsScreen extends Screen {
     private static final int MAX_PAGE_SIZE = 3;
-    private static final int NORMAL_ISSUE_ROW_HEIGHT = 68;
-    private static final int COMPACT_ISSUE_ROW_HEIGHT = 52;
+    private static final int NORMAL_ISSUE_ROW_HEIGHT = 76;
+    private static final int COMPACT_ISSUE_ROW_HEIGHT = 60;
 
     private final Screen parent;
     private int page;
@@ -223,8 +223,9 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         int maxLines = width < 360 ? 1 : 2;
         int x = 16;
         int maxWidth = width - 32;
-        int cursor = drawLimitedWrapped(graphics, Component.literal(issue.displayName()),
+        int nameBottom = drawLimitedWrapped(graphics, Component.literal(issue.displayName()),
                 x, y, Math.max(1, maxWidth - 80), 0xFFFFFFFF, 1) + 1;
+        int cursor = Math.max(nameBottom, y + 18) + 1;
         cursor = drawLimitedWrapped(graphics, Component.literal(issue.displayReason()),
                 x, cursor, maxWidth, 0xFFBBBBBB, maxLines) + 1;
 
