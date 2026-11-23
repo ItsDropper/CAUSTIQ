@@ -54,7 +54,7 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         if (displayedScan != null && !displayedScan.issues().isEmpty()) {
             int start = page * pageSize;
             int end = Math.min(start + pageSize, displayedScan.issues().size());
-            int rowTop = overviewBottom();
+            int rowTop = issueListTop();
             for (int index = start; index < end; index++) {
                 ShaderPackIssue issue = displayedScan.issues().get(index);
                 Button detailsButton = Button.builder(
@@ -239,9 +239,17 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
     }
 
     private int calculatePageSize() {
-        int estimatedBottom = overviewBottom();
-        int available = height - 80 - estimatedBottom;
+        int available = height - 80 - issueListTop();
         return Math.max(1, Math.min(MAX_PAGE_SIZE, available / issueRowHeight()));
+    }
+
+    private int issueListTop() {
+        int top = overviewBottom();
+        if (displayedScan == null || displayedScan.issues().isEmpty()) return top;
+        Component heading = Component.translatable(
+                "caustiq.diagnostics.rejected_heading", displayedScan.issues().size());
+        int headingLines = Math.max(1, font.split(heading, Math.max(1, width - 32)).size());
+        return top + (headingLines - 1) * 10;
     }
 
     private int overviewBottom() {
