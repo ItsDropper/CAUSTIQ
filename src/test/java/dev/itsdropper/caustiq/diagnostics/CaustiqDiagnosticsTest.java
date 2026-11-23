@@ -1,14 +1,65 @@
 package dev.itsdropper.caustiq.diagnostics;
 
+import dev.itsdropper.caustiq.diagnostics.CaustiqDiagnostics.IssueDetails;
+import dev.itsdropper.caustiq.diagnostics.CaustiqDiagnostics.IssueKind;
 import dev.itsdropper.caustiq.diagnostics.CaustiqDiagnostics.RejectedCandidate;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CaustiqDiagnosticsTest {
+    @Test
+    void classifiesScannerRejectionsIntoActionableCategories() {
+        Map<String, IssueKind> examples = Map.ofEntries(
+                Map.entry("Shader-pack directory must not be a symbolic link.", IssueKind.UNSUPPORTED_LINK),
+                Map.entry("Invalid ZIP archive: central directory is missing.", IssueKind.INVALID_ARCHIVE),
+                Map.entry("No shaders/ directory was found.", IssueKind.PACK_LAYOUT),
+                Map.entry("Multiple shaders/ roots were found; the pack layout is ambiguous.", IssueKind.PACK_LAYOUT),
+                Map.entry("No recognized shader pipeline entry points were found under shaders/",
+                        IssueKind.PIPELINE_ENTRY_POINTS),
+                Map.entry("ZIP archive contains an empty or invalid entry path.", IssueKind.UNSAFE_PATH),
+                Map.entry("Directory pack contains an unsafe relative path: ../outside",
+                        IssueKind.UNSAFE_PATH),
+                Map.entry("ZIP archive exceeds the compressed size limit of 536870912 bytes.",
+                        IssueKind.RESOURCE_LIMIT),
+                Map.entry("ZIP entry has an unknown compressed size: shaders/large.bin",
+                        IssueKind.RESOURCE_LIMIT),
+                Map.entry("Directory pack exceeds the maximum nesting depth of 16.",
+                        IssueKind.RESOURCE_LIMIT),
+                Map.entry("Directory pack contains more than 10000 entries.", IssueKind.RESOURCE_LIMIT),
+                Map.entry("Unable to list shader-pack directory: Permission denied", IssueKind.ACCESS),
+                Map.entry("Shader-pack directory does not exist or is not a directory.", IssueKind.ACCESS),
+                Map.entry("Candidate is not a regular directory or ZIP archive.", IssueKind.INVALID_SOURCE),
+                Map.entry("Unexpected scanner failure.", IssueKind.OTHER)
+        );
+
+        examples.forEach((reason, expected) ->
+                assertEquals(expected, CaustiqDiagnostics.classifyIssue(reason), reason));
+        assertEquals(IssueKind.OTHER, CaustiqDiagnostics.classifyIssue(null));
+    }
+
+    @Test
+    void issueDetailsExposeOnlySanitizedCandidateIdentityAndReason() {
+        Path source = Path.of("/home/player/.minecraft/shaderpacks/Broken.zip");
+        ShaderPackIssue issue = new ShaderPackIssue(source,
+                "Unable to read " + source + ": Invalid ZIP archive");
+
+        IssueDetails details = CaustiqDiagnostics.describeIssue(issue);
+
+        assertEquals("Broken.zip", details.candidateName());
+        assertEquals(IssueKind.INVALID_ARCHIVE, details.kind());
+        assertTrue(details.reason().contains("[path]"));
+        assertFalse(details.reason().contains("/home/player"));
+        assertFalse(details.reason().contains(".minecraft"));
+    }
+
     @Test
     void includesRendererAndShaderPackStateInReport() {
         String report = CaustiqDiagnostics.format(new CaustiqDiagnostics.Snapshot(
