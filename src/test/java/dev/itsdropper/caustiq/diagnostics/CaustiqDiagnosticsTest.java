@@ -6,12 +6,16 @@ import dev.itsdropper.caustiq.diagnostics.CaustiqDiagnostics.RejectedCandidate;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CaustiqDiagnosticsTest {
@@ -58,6 +62,55 @@ class CaustiqDiagnosticsTest {
         assertTrue(details.reason().contains("[path]"));
         assertFalse(details.reason().contains("/home/player"));
         assertFalse(details.reason().contains(".minecraft"));
+    }
+
+    @Test
+    void diagnosticsScreenTranslationsCoverRuntimeAndEveryIssueCategory() throws IOException {
+        try (InputStream input = CaustiqDiagnosticsTest.class.getResourceAsStream(
+                "/assets/caustiq/lang/en_us.json")) {
+            assertNotNull(input, "English language resource must be available to tests");
+            String translations = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            List<String> required = List.of(
+                    "caustiq.diagnostics.runtime",
+                    "caustiq.diagnostics.renderer",
+                    "caustiq.diagnostics.renderer.sodium_nvidium",
+                    "caustiq.diagnostics.renderer.sodium",
+                    "caustiq.diagnostics.renderer.nvidium_without_sodium",
+                    "caustiq.diagnostics.renderer.vanilla",
+                    "caustiq.diagnostics.guidance.ready",
+                    "caustiq.diagnostics.guidance.missing_nvidium",
+                    "caustiq.diagnostics.guidance.missing_sodium",
+                    "caustiq.diagnostics.guidance.missing_both",
+                    "caustiq.diagnostics.shader_state",
+                    "caustiq.diagnostics.shaders_enabled",
+                    "caustiq.diagnostics.shaders_disabled",
+                    "caustiq.diagnostics.shaders_disabled_hint",
+                    "caustiq.diagnostics.no_selected_pack_hint",
+                    "caustiq.diagnostics.scan_not_completed",
+                    "caustiq.diagnostics.scan_summary",
+                    "caustiq.diagnostics.rejected_heading",
+                    "caustiq.diagnostics.issue_details.title",
+                    "caustiq.diagnostics.issue_details.candidate",
+                    "caustiq.diagnostics.issue_details.category",
+                    "caustiq.diagnostics.issue_details.reason_heading",
+                    "caustiq.diagnostics.issue_details.guidance_heading",
+                    "caustiq.diagnostics.issue_details.privacy",
+                    "caustiq.diagnostics.issue_details.scroll_hint",
+                    "caustiq.diagnostics.copy_issue",
+                    "caustiq.diagnostics.issue_copied",
+                    "caustiq.diagnostics.issue_report"
+            );
+            for (String key : required) {
+                assertTrue(translations.contains("\"" + key + "\""), "Missing translation: " + key);
+            }
+            for (IssueKind kind : IssueKind.values()) {
+                String suffix = kind.name().toLowerCase(java.util.Locale.ROOT);
+                assertTrue(translations.contains("\"caustiq.diagnostics.issue_type." + suffix + "\""),
+                        "Missing issue type translation: " + suffix);
+                assertTrue(translations.contains("\"caustiq.diagnostics.issue_guidance." + suffix + "\""),
+                        "Missing issue guidance translation: " + suffix);
+            }
+        }
     }
 
     @Test
