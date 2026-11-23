@@ -47,11 +47,11 @@ public final class ShaderPackIssueDetailsScreen extends Screen {
                             issueGuidance());
                     Minecraft.getInstance().keyboardHandler.setClipboard(report.getString());
                     button.setMessage(Component.translatable("caustiq.diagnostics.issue_copied"));
-                }).bounds(width / 2 - 104, height - 28, 100, 20).build();
+                }).bounds(width / 2 - 104, height - 28, 116, 20).build();
         addRenderableWidget(copyButton);
         addRenderableWidget(Button.builder(Component.translatable("caustiq.diagnostics.back"),
                 button -> Minecraft.getInstance().setScreen(parent))
-                .bounds(width / 2 + 4, height - 28, 100, 20).build());
+                .bounds(width / 2 + 20, height - 28, 84, 20).build());
         setFocused(copyButton);
     }
 
@@ -65,13 +65,16 @@ public final class ShaderPackIssueDetailsScreen extends Screen {
         scrollOffset = Math.clamp(scrollOffset, 0, Math.max(0, contentHeight - viewportHeight));
 
         graphics.enableScissor(8, CONTENT_TOP, Math.max(9, width - 8), viewportBottom);
-        int y = CONTENT_TOP - scrollOffset;
-        for (ContentLine line : content) {
-            y += line.gapBefore();
-            y = drawWrapped(graphics, line.text(), 16, y, Math.max(1, width - 32), line.color());
+        try {
+            int y = CONTENT_TOP - scrollOffset;
+            for (ContentLine line : content) {
+                y += line.gapBefore();
+                y = drawWrapped(graphics, line.text(), 16, y, Math.max(1, width - 32), line.color());
+            }
+            contentHeight = Math.max(0, y - (CONTENT_TOP - scrollOffset));
+        } finally {
+            graphics.disableScissor();
         }
-        contentHeight = Math.max(0, y - (CONTENT_TOP - scrollOffset));
-        graphics.disableScissor();
 
         int maxScroll = maxScroll();
         if (maxScroll > 0) {
@@ -97,6 +100,7 @@ public final class ShaderPackIssueDetailsScreen extends Screen {
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         int maxScroll = maxScroll();
+        if (maxScroll == 0) return super.keyPressed(keyCode, scanCode, modifiers);
         int pageStep = Math.max(18, viewportBottom() - CONTENT_TOP - 18);
         switch (keyCode) {
             case GLFW.GLFW_KEY_UP -> scrollOffset = Math.max(0, scrollOffset - 18);
@@ -169,7 +173,8 @@ public final class ShaderPackIssueDetailsScreen extends Screen {
 
     private void drawScrollbar(GuiGraphics graphics, int viewportBottom, int maxScroll) {
         int trackHeight = viewportBottom - CONTENT_TOP;
-        int thumbHeight = Math.max(14, trackHeight * trackHeight / Math.max(trackHeight, contentHeight));
+        int thumbHeight = Math.min(trackHeight,
+                Math.max(14, trackHeight * trackHeight / Math.max(trackHeight, contentHeight)));
         int thumbTravel = Math.max(0, trackHeight - thumbHeight);
         int thumbY = CONTENT_TOP + (int) ((long) thumbTravel * scrollOffset / maxScroll);
         graphics.fill(width - 5, CONTENT_TOP, width - 3, viewportBottom, 0x66555555);
