@@ -28,6 +28,8 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
     private Button previousButton;
     private Button nextButton;
     private Button copyButton;
+    private List<OverviewLine> overview = List.of();
+    private int pageSize = 1;
 
     public ShaderPackDiagnosticsScreen(Screen parent) {
         super(Component.translatable("caustiq.diagnostics.title"));
@@ -39,6 +41,8 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         clearWidgets();
         if (snapshot == null) snapshot = CaustiqDiagnostics.createSnapshot();
         if (displayedScan == null) displayedScan = CaustiqClient.scanResult();
+        overview = buildOverviewLines();
+        pageSize = calculatePageSize();
 
         int pages = pageCount();
         page = Math.clamp(page, 0, pages - 1);
@@ -71,7 +75,7 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
                 button -> Minecraft.getInstance().setScreen(parent))
                 .bounds(width / 2 - 100, height - 28, 200, 20).build());
 
-        setFocused(copyButton);
+        setFocused(nextButton.active ? nextButton : copyButton);
     }
 
     public void refreshView() {
@@ -90,7 +94,7 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         graphics.drawCenteredString(font, getTitle(), width / 2, 20, 0xFFFFFFFF);
 
         int y = 42;
-        for (OverviewLine line : overviewLines()) {
+        for (OverviewLine line : overview) {
             y = drawWrapped(graphics, line.text(), 16, y, width - 32, line.color()) + 2;
         }
 
@@ -111,7 +115,6 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         y = drawWrapped(graphics,
                 Component.translatable("caustiq.diagnostics.rejected_heading", displayedScan.issues().size()),
                 16, y + 8, width - 32, 0xFFFFFFFF);
-        int pageSize = pageSize();
         int start = page * pageSize;
         int end = Math.min(start + pageSize, displayedScan.issues().size());
         int rowHeight = issueRowHeight();
@@ -130,7 +133,7 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         Minecraft.getInstance().setScreen(parent);
     }
 
-    private List<OverviewLine> overviewLines() {
+    private List<OverviewLine> buildOverviewLines() {
         List<OverviewLine> lines = new ArrayList<>();
         if (height >= 340) {
             lines.add(new OverviewLine(Component.translatable("caustiq.diagnostics.runtime",
@@ -215,7 +218,7 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         drawLimitedWrapped(graphics, guidance, x, cursor, maxWidth, 0xFF88CCFF, maxLines);
     }
 
-    private int pageSize() {
+    private int calculatePageSize() {
         int estimatedBottom = overviewBottom();
         int available = height - 80 - estimatedBottom;
         return Math.max(1, Math.min(MAX_PAGE_SIZE, available / issueRowHeight()));
@@ -223,7 +226,7 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
 
     private int overviewBottom() {
         int y = 42;
-        for (OverviewLine line : overviewLines()) {
+        for (OverviewLine line : overview) {
             y += Math.max(1, font.split(line.text(), width - 32).size()) * 10 + 2;
         }
         return y + 22;
@@ -235,8 +238,7 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
 
     private int pageCount() {
         int issueCount = displayedScan == null ? 0 : displayedScan.issues().size();
-        int size = pageSize();
-        return Math.max(1, (issueCount + size - 1) / size);
+        return Math.max(1, (issueCount + pageSize - 1) / pageSize);
     }
 
     private void changePage(int direction) {
