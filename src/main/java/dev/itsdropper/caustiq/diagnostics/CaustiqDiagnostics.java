@@ -12,15 +12,25 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.SharedConstants;
 
 import java.util.List;
+import java.util.Locale;
 
 /** Builds a privacy-conscious report that can be attached to Caustiq bug reports. */
 public final class CaustiqDiagnostics {
     private static final int MAX_REPORTED_PACKS = 50;
     private static final int MAX_REPORTED_REJECTIONS = 25;
+    static final int MAX_REPORT_CHARACTERS = 16_384;
+    private static final String PRIVACY_NOTICE = "\nNo absolute game-directory paths or shader source contents are included. "
+            + "Candidate filenames and sanitized rejection reasons are included.";
+    private static final String TRUNCATION_NOTICE = "\n[Report truncated; additional entries were omitted to keep it within 16,384 characters.]";
 
     private CaustiqDiagnostics() { }
 
     public static String createReport() {
+        return format(createSnapshot());
+    }
+
+    /** Captures the same sanitized, bounded state used by the shareable report. */
+    public static Snapshot createSnapshot() {
         FabricLoader loader = FabricLoader.getInstance();
         RendererEnvironment renderer = RendererEnvironment.detect(loader::isModLoaded);
         NvidiumCompatibility.Status compatibility =
@@ -44,7 +54,7 @@ public final class CaustiqDiagnostics {
                 .map(issue -> new RejectedCandidate(issue.displayName(), issue.displayReason()))
                 .toList();
 
-        return format(new Snapshot(
+        return new Snapshot(
                 version,
                 SharedConstants.getCurrentVersion().name(),
                 System.getProperty("java.version", "unknown"),
@@ -66,7 +76,59 @@ public final class CaustiqDiagnostics {
                 scan == null ? 0 : Math.max(0, scan.issues().size() - rejectedCandidates.size()),
                 refreshStatus.state().name(),
                 refreshStatus.failureMessage()
-        ));
+        );
+    }
+
+    public enum IssueKind {
+        ACCESS,
+        INVALID_ARCHIVE,
+        PACK_LAYOUT,
+        PIPELINE_ENTRY_POINTS,
+        UNSAFE_PATH,
+        RESOURCE_LIMIT,
+        UNSUPPORTED_LINK,
+        INVALID_SOURCE,
+        OTHER
+    }
+
+    /** Maps scanner-owned failure messages to conservative, actionable setup guidance. */
+    public static IssueKind classifyIssue(String reason) {
+        String normalized = reason == null ? "" : reason.toLowerCase(Locale.ROOT);
+        if (normalized.contains("symbolic link")) return IssueKind.UNSUPPORTED_LINK;
+        if (normalized.contains("invalid zip archive")) return IssueKind.INVALID_ARCHIVE;
+        if (normalized.contains("no shaders/ directory")
+                || normalized.contains("multiple shaders/ roots")) return IssueKind.PACK_LAYOUT;
+        if (normalized.contains("no recognized shader pipeline entry points")) {
+            return IssueKind.PIPELINE_ENTRY_POINTS;
+        }
+        if (containsAny(normalized,
+                "absolute entry path", "unsafe entry path", "invalid entry path",
+                "duplicate or case-colliding paths", "invalid relative path", "unsafe relative path")) {
+            return IssueKind.UNSAFE_PATH;
+        }
+        if (containsAny(normalized,
+                "compressed size limit", "uncompressed size", "total uncompressed size",
+                "compression ratio", "nesting depth", "size overflowed")
+                || (normalized.contains("more than ")
+                && (normalized.contains(" entries") || normalized.contains(" candidates")))) {
+            return IssueKind.RESOURCE_LIMIT;
+        }
+        if (containsAny(normalized,
+                "unable to list shader-pack directory", "does not exist or is not a directory",
+                "permission denied", "access denied", "not readable")) {
+            return IssueKind.ACCESS;
+        }
+        if (normalized.contains("candidate is not a regular directory or zip archive")) {
+            return IssueKind.INVALID_SOURCE;
+        }
+        return IssueKind.OTHER;
+    }
+
+    private static boolean containsAny(String value, String... fragments) {
+        for (String fragment : fragments) {
+            if (value.contains(fragment)) return true;
+        }
+        return false;
     }
 
     static String format(Snapshot snapshot) {
@@ -117,19 +179,24 @@ public final class CaustiqDiagnostics {
             report.append(" - ").append(snapshot.latestRefreshFailureMessage());
         }
         report.append('\n');
-        report.append("\nNo absolute game-directory paths or shader source contents are included. ")
-                .append("Candidate filenames and sanitized rejection reasons are included.");
-        return report.toString();
+        String body = report.toString();
+        String complete = body + PRIVACY_NOTICE;
+        if (complete.length() <= MAX_REPORT_CHARACTERS) return complete;
+
+        int bodyLimit = Math.max(0,
+                MAX_REPORT_CHARACTERS - PRIVACY_NOTICE.length() - TRUNCATION_NOTICE.length());
+        return body.substring(0, Math.min(body.length(), bodyLimit)).stripTrailing()
+                + TRUNCATION_NOTICE + PRIVACY_NOTICE;
     }
 
-    record RejectedCandidate(String name, String reason) {
-        RejectedCandidate {
+    public record RejectedCandidate(String name, String reason) {
+        public RejectedCandidate {
             name = ShaderPackIssue.sanitizeDisplayText(name);
             reason = ShaderPackIssue.sanitizeDisplayText(reason);
         }
     }
 
-    record Snapshot(
+    public record Snapshot(
             String caustiqVersion,
             String minecraftVersion,
             String javaVersion,
@@ -152,11 +219,19 @@ public final class CaustiqDiagnostics {
             String latestRefreshState,
             String latestRefreshFailureMessage
     ) {
-        Snapshot {
-            packNames = List.copyOf(packNames);
-            rejectedCandidates = List.copyOf(rejectedCandidates);
+        public Snapshot {
+            caustiqVersion = ShaderPackIssue.sanitizeDisplayText(caustiqVersion);
+            minecraftVersion = ShaderPackIssue.sanitizeDisplayText(minecraftVersion);
+            javaVersion = ShaderPackIssue.sanitizeDisplayText(javaVersion);
+            operatingSystem = ShaderPackIssue.sanitizeDisplayText(operatingSystem);
+            rendererStack = ShaderPackIssue.sanitizeDisplayText(rendererStack);
+            nvidiumCompatibility = ShaderPackIssue.sanitizeDisplayText(nvidiumCompatibility);
+            selectedPack = ShaderPackIssue.sanitizeDisplayText(selectedPack);
+            packNames = packNames == null ? List.of()
+                    : packNames.stream().map(ShaderPackIssue::sanitizeDisplayText).toList();
+            rejectedCandidates = rejectedCandidates == null ? List.of() : List.copyOf(rejectedCandidates);
             latestRefreshState = latestRefreshState == null || latestRefreshState.isBlank()
-                    ? "UNKNOWN" : latestRefreshState;
+                    ? "UNKNOWN" : ShaderPackIssue.sanitizeDisplayText(latestRefreshState);
             latestRefreshFailureMessage = latestRefreshFailureMessage == null
                     || latestRefreshFailureMessage.isBlank()
                     ? "" : ShaderPackIssue.sanitizeDisplayText(latestRefreshFailureMessage);
