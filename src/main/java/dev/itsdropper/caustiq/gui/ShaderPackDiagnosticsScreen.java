@@ -28,6 +28,7 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
     private Button previousButton;
     private Button nextButton;
     private Button copyButton;
+    private Button firstDetailsButton;
     private List<OverviewLine> overview = List.of();
     private int pageSize = 1;
 
@@ -48,6 +49,24 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         page = Math.clamp(page, 0, pages - 1);
         int x = width / 2 - 155;
         int y = height - 56;
+
+        firstDetailsButton = null;
+        if (displayedScan != null && !displayedScan.issues().isEmpty()) {
+            int start = page * pageSize;
+            int end = Math.min(start + pageSize, displayedScan.issues().size());
+            int rowTop = overviewBottom();
+            for (int index = start; index < end; index++) {
+                ShaderPackIssue issue = displayedScan.issues().get(index);
+                Button detailsButton = Button.builder(
+                        Component.translatable("caustiq.diagnostics.details"),
+                        button -> Minecraft.getInstance().setScreen(new ShaderPackIssueDetailsScreen(
+                                this, CaustiqDiagnostics.describeIssue(issue))))
+                        .bounds(width - 82, rowTop + (index - start) * issueRowHeight(), 66, 18)
+                        .build();
+                if (firstDetailsButton == null) firstDetailsButton = detailsButton;
+                addRenderableWidget(detailsButton);
+            }
+        }
 
         previousButton = Button.builder(Component.translatable("caustiq.diagnostics.previous"),
                 button -> changePage(-1))
@@ -75,7 +94,8 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
                 button -> Minecraft.getInstance().setScreen(parent))
                 .bounds(width / 2 - 100, height - 28, 200, 20).build());
 
-        setFocused(nextButton.active ? nextButton : copyButton);
+        setFocused(firstDetailsButton != null ? firstDetailsButton
+                : nextButton.active ? nextButton : copyButton);
     }
 
     public void refreshView() {
@@ -204,7 +224,7 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         int x = 16;
         int maxWidth = width - 32;
         int cursor = drawLimitedWrapped(graphics, Component.literal(issue.displayName()),
-                x, y, maxWidth, 0xFFFFFFFF, 1) + 1;
+                x, y, Math.max(1, maxWidth - 80), 0xFFFFFFFF, 1) + 1;
         cursor = drawLimitedWrapped(graphics, Component.literal(issue.displayReason()),
                 x, cursor, maxWidth, 0xFFBBBBBB, maxLines) + 1;
 
@@ -245,7 +265,8 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         page = Math.clamp(page + direction, 0, pageCount() - 1);
         init();
         Button navigationTarget = direction < 0 ? previousButton : nextButton;
-        setFocused(navigationTarget.active ? navigationTarget : copyButton);
+        setFocused(navigationTarget.active ? navigationTarget
+                : firstDetailsButton != null ? firstDetailsButton : copyButton);
     }
 
     private int drawWrapped(
