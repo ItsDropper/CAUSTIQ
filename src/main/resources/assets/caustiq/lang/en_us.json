@@ -169,5 +169,6 @@
   "caustiq.diagnostics.issue_details.scroll_hint": "Scroll or use ↑/↓, Page Up/Down, Home/End to read the full details.",
   "caustiq.diagnostics.copy_issue": "Copy issue summary",
   "caustiq.diagnostics.issue_copied": "Issue summary copied",
-  "caustiq.diagnostics.issue_report": "CAUSTIQ shader-pack rejection\nCandidate: %s\nCategory: %s\nReason: %s\nSuggested action: %s\n\nAbsolute paths and shader source contents are intentionally omitted."
+  "caustiq.diagnostics.issue_report": "CAUSTIQ shader-pack rejection\nCandidate: %s\nCategory: %s\nReason: %s\nSuggested action: %s\n\nAbsolute paths and shader source contents are intentionally omitted.",
+  "caustiq.diagnostics.rejected_heading": "Rejected shader-pack candidates (%s)"
 }
