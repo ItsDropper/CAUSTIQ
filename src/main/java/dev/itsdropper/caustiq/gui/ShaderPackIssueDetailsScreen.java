@@ -6,9 +6,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,9 +21,8 @@ public final class ShaderPackIssueDetailsScreen extends Screen {
 
     private final Screen parent;
     private final IssueDetails issue;
+    private final ShaderPackIssueScrollState scrollState = new ShaderPackIssueScrollState();
     private List<ContentLine> content = List.of();
-    private int scrollOffset;
-    private int contentHeight;
 
     public ShaderPackIssueDetailsScreen(Screen parent, IssueDetails issue) {
         super(Component.translatable("caustiq.diagnostics.issue_details.title"));
@@ -35,7 +34,7 @@ public final class ShaderPackIssueDetailsScreen extends Screen {
     protected void init() {
         clearWidgets();
         content = buildContent();
-        contentHeight = 0;
+        scrollState.setDimensions(0, Math.max(0, viewportBottom() - CONTENT_TOP));
 
         Button copyButton = Button.builder(
                 Component.translatable("caustiq.diagnostics.copy_issue"),
@@ -62,23 +61,23 @@ public final class ShaderPackIssueDetailsScreen extends Screen {
 
         int viewportBottom = viewportBottom();
         int viewportHeight = viewportBottom - CONTENT_TOP;
-        scrollOffset = Math.clamp(scrollOffset, 0, Math.max(0, contentHeight - viewportHeight));
+        scrollState.setDimensions(scrollState.contentHeight(), viewportHeight);
 
+        int contentTop = CONTENT_TOP - scrollState.offset();
         graphics.enableScissor(8, CONTENT_TOP, Math.max(9, width - 8), viewportBottom);
         try {
-            int y = CONTENT_TOP - scrollOffset;
+            int y = contentTop;
             for (ContentLine line : content) {
                 y += line.gapBefore();
                 y = drawWrapped(graphics, line.text(), 16, y, Math.max(1, width - 32), line.color());
             }
-            contentHeight = Math.max(0, y - (CONTENT_TOP - scrollOffset));
+            scrollState.setDimensions(Math.max(0, y - contentTop), viewportHeight);
         } finally {
             graphics.disableScissor();
         }
 
-        int maxScroll = maxScroll();
-        if (maxScroll > 0) {
-            drawScrollbar(graphics, viewportBottom, maxScroll);
+        if (scrollState.maxOffset() > 0) {
+            drawScrollbar(graphics, viewportBottom);
             graphics.drawCenteredString(font,
                     Component.translatable("caustiq.diagnostics.issue_details.scroll_hint"),
                     width / 2, height - 40, 0xFF999999);
@@ -86,34 +85,23 @@ public final class ShaderPackIssueDetailsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double deltaY) {
-        if (mouseY < CONTENT_TOP || mouseY >= viewportBottom() || deltaY == 0) {
-            return super.mouseScrolled(mouseX, mouseY, deltaY);
+    public boolean mouseScrolled(
+            double mouseX,
+            double mouseY,
+            double horizontalAmount,
+            double verticalAmount
+    ) {
+        if (mouseY < CONTENT_TOP || mouseY >= viewportBottom() || verticalAmount == 0) {
+            return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
         }
-        int previous = scrollOffset;
-        int movement = (int) Math.round(deltaY * 18.0);
-        if (movement == 0) movement = deltaY > 0 ? 1 : -1;
-        scrollOffset = Math.clamp(scrollOffset - movement, 0, maxScroll());
-        return scrollOffset != previous || super.mouseScrolled(mouseX, mouseY, deltaY);
+        return scrollState.scrollWheel(verticalAmount, 18)
+                || super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        int maxScroll = maxScroll();
-        if (maxScroll == 0) return super.keyPressed(keyCode, scanCode, modifiers);
+    public boolean keyPressed(KeyEvent event) {
         int pageStep = Math.max(18, viewportBottom() - CONTENT_TOP - 18);
-        switch (keyCode) {
-            case GLFW.GLFW_KEY_UP -> scrollOffset = Math.max(0, scrollOffset - 18);
-            case GLFW.GLFW_KEY_DOWN -> scrollOffset = Math.min(maxScroll, scrollOffset + 18);
-            case GLFW.GLFW_KEY_PAGE_UP -> scrollOffset = Math.max(0, scrollOffset - pageStep);
-            case GLFW.GLFW_KEY_PAGE_DOWN -> scrollOffset = Math.min(maxScroll, scrollOffset + pageStep);
-            case GLFW.GLFW_KEY_HOME -> scrollOffset = 0;
-            case GLFW.GLFW_KEY_END -> scrollOffset = maxScroll;
-            default -> {
-                return super.keyPressed(keyCode, scanCode, modifiers);
-            }
-        }
-        return true;
+        return scrollState.handleKey(event.key(), 18, pageStep) || super.keyPressed(event);
     }
 
     @Override
@@ -167,16 +155,10 @@ public final class ShaderPackIssueDetailsScreen extends Screen {
         return Math.max(CONTENT_TOP + 1, height - 44);
     }
 
-    private int maxScroll() {
-        return Math.max(0, contentHeight - (viewportBottom() - CONTENT_TOP));
-    }
-
-    private void drawScrollbar(GuiGraphics graphics, int viewportBottom, int maxScroll) {
+    private void drawScrollbar(GuiGraphics graphics, int viewportBottom) {
         int trackHeight = viewportBottom - CONTENT_TOP;
-        int thumbHeight = Math.min(trackHeight,
-                Math.max(14, trackHeight * trackHeight / Math.max(trackHeight, contentHeight)));
-        int thumbTravel = Math.max(0, trackHeight - thumbHeight);
-        int thumbY = CONTENT_TOP + (int) ((long) thumbTravel * scrollOffset / maxScroll);
+        int thumbHeight = scrollState.thumbHeight(trackHeight, 14);
+        int thumbY = CONTENT_TOP + scrollState.thumbOffset(trackHeight, thumbHeight);
         graphics.fill(width - 5, CONTENT_TOP, width - 3, viewportBottom, 0x66555555);
         graphics.fill(width - 5, thumbY, width - 3, thumbY + thumbHeight, 0xFF88CCFF);
     }

@@ -175,4 +175,26 @@ class CaustiqDiagnosticsTest {
 
         assertTrue(report.contains("5 additional rejection(s) omitted"));
     }
+    @Test
+    void keepsLargeDiagnosticsReportsWithinTheDocumentedLimit() {
+        String repeated = "x".repeat(220);
+        List<String> packNames = java.util.stream.IntStream.range(0, 100)
+                .mapToObj(index -> "Pack-" + index + "-" + repeated)
+                .toList();
+        List<RejectedCandidate> rejected = java.util.stream.IntStream.range(0, 100)
+                .mapToObj(index -> new RejectedCandidate(
+                        "Broken-" + index + ".zip", "Invalid archive: " + repeated))
+                .toList();
+
+        String report = CaustiqDiagnostics.format(new CaustiqDiagnostics.Snapshot(
+                "1", "1.21.11", "25", "Linux", "SODIUM_WITH_NVIDIUM",
+                true, true, "SODIUM_AND_NVIDIUM_PRESENT", true, 3, "Lumina",
+                true, 200, 100, 100, packNames, rejected, 0, 0, "FAILED", repeated
+        ));
+
+        assertTrue(report.length() <= CaustiqDiagnostics.MAX_REPORT_CHARACTERS);
+        assertTrue(report.contains("[Report truncated; additional entries were omitted"));
+        assertTrue(report.contains("No absolute game-directory paths or shader source contents are included."));
+    }
+
 }
