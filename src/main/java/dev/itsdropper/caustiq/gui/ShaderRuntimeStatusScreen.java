@@ -28,6 +28,12 @@ public final class ShaderRuntimeStatusScreen extends Screen {
         this.parent = Objects.requireNonNull(parent, "parent");
     }
 
+    /** Keep the world ticking and rendering so compilation progress remains live behind this screen. */
+    @Override
+    public boolean isPauseScreen() {
+        return false;
+    }
+
     @Override
     protected void init() {
         clearWidgets();
@@ -47,7 +53,6 @@ public final class ShaderRuntimeStatusScreen extends Screen {
             ShaderRuntime.requestReload();
             button.setMessage(Component.translatable("caustiq.runtime_status.reload_requested"));
         }).bounds(left + buttonWidth + gap, y, buttonWidth, 20).build();
-        reloadButton.active = ShaderRuntime.status().canRetry();
         addRenderableWidget(reloadButton);
 
         addRenderableWidget(Button.builder(Component.translatable("caustiq.runtime_status.back"),
@@ -62,6 +67,8 @@ public final class ShaderRuntimeStatusScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         ShaderRuntimeStatus status = ShaderRuntime.status();
         reloadButton.active = status.canRetry();
+        reloadButton.setMessage(Component.translatable(status.isBusy()
+                ? "caustiq.runtime_status.working" : "caustiq.runtime_status.reload"));
         graphics.drawCenteredString(font, getTitle(), width / 2, 20, 0xFFFFFFFF);
 
         List<ContentLine> lines = buildContent(status);
@@ -75,7 +82,17 @@ public final class ShaderRuntimeStatusScreen extends Screen {
             int y = contentTop;
             for (ContentLine line : lines) {
                 y += line.gapBefore();
-                y = drawWrapped(graphics, line.text(), 16, y, Math.max(1, width - 32), line.color());
+                if (line.progress() >= 0.0) {
+                    int barWidth = Math.max(1, width - 48);
+                    int filledWidth = (int) Math.round(barWidth * line.progress());
+                    graphics.fill(16, y, 16 + barWidth, y + 6, 0xFF333333);
+                    if (filledWidth > 0) {
+                        graphics.fill(16, y, 16 + filledWidth, y + 6, 0xFF88CCFF);
+                    }
+                    y += 12;
+                } else {
+                    y = drawWrapped(graphics, line.text(), 16, y, Math.max(1, width - 32), line.color());
+                }
             }
             scrollState.setDimensions(Math.max(0, y - contentTop), viewportHeight);
         } finally {
@@ -117,9 +134,11 @@ public final class ShaderRuntimeStatusScreen extends Screen {
 
     private List<ContentLine> buildContent(ShaderRuntimeStatus status) {
         List<ContentLine> lines = new ArrayList<>();
-        String stateKey = "caustiq.runtime_status.state."
-                + status.state().name().toLowerCase(Locale.ROOT);
-        lines.add(new ContentLine(Component.translatable(stateKey), stateColor(status.state()), 0));
+        String stateSuffix = status.state().name().toLowerCase(Locale.ROOT);
+        lines.add(new ContentLine(Component.translatable(
+                "caustiq.runtime_status.state." + stateSuffix), stateColor(status.state()), 0));
+        lines.add(new ContentLine(Component.translatable(
+                "caustiq.runtime_status.guidance." + stateSuffix), 0xFFCCCCCC, 4));
         lines.add(new ContentLine(Component.translatable(
                 "caustiq.runtime_status.pack", Component.literal(status.packName())), 0xFFFFFFFF, 8));
 
@@ -128,14 +147,21 @@ public final class ShaderRuntimeStatusScreen extends Screen {
                     "caustiq.runtime_status.progress",
                     status.completedPrograms(), status.totalPrograms(), status.failedProgramCount()),
                     0xFFCCCCCC, 8));
+            lines.add(ContentLine.progress(status.progressFraction(), 2));
         }
         if (!status.currentProgram().isBlank()) {
             lines.add(new ContentLine(Component.translatable(
                     "caustiq.runtime_status.current_program",
                     Component.literal(status.currentProgram())), 0xFF88CCFF, 2));
         }
-        if (!status.message().isBlank()) {
-            lines.add(new ContentLine(Component.literal(status.message()), 0xFFCCCCCC, 10));
+        if (status.state() == ShaderRuntimeStatus.State.FAILED
+                || (status.state() == ShaderRuntimeStatus.State.READY_WITH_WARNINGS
+                && status.failedProgramCount() == 0)) {
+            lines.add(new ContentLine(Component.translatable(
+                    "caustiq.runtime_status.details_heading"), 0xFFFFFFFF, 10));
+            if (!status.message().isBlank()) {
+                lines.add(new ContentLine(Component.literal(status.message()), 0xFFFF9999, 2));
+            }
         }
 
         if (status.failedProgramCount() > 0) {
@@ -164,9 +190,10 @@ public final class ShaderRuntimeStatusScreen extends Screen {
     private static int stateColor(ShaderRuntimeStatus.State state) {
         return switch (state) {
             case READY -> 0xFF77DD88;
-            case READY_WITH_WARNINGS, FAILED, UNAVAILABLE -> 0xFFFF8888;
-            case PREPARING, PREPARED, DISCOVERING, COMPILING, WAITING_FOR_WORLD -> 0xFFFFBB66;
-            case DISABLED, NO_PACK -> 0xFFAAAAAA;
+            case READY_WITH_WARNINGS, PREPARING, PREPARED, DISCOVERING, COMPILING ->
+                    0xFFFFBB66;
+            case FAILED, UNAVAILABLE -> 0xFFFF8888;
+            case DISABLED, NO_PACK, WAITING_FOR_WORLD -> 0xFFAAAAAA;
         };
     }
 
@@ -197,5 +224,13 @@ public final class ShaderRuntimeStatusScreen extends Screen {
         graphics.fill(width - 5, thumbY, width - 3, thumbY + thumbHeight, 0xFF88CCFF);
     }
 
-    private record ContentLine(Component text, int color, int gapBefore) { }
+    private record ContentLine(Component text, int color, int gapBefore, double progress) {
+        private ContentLine(Component text, int color, int gapBefore) {
+            this(text, color, gapBefore, -1.0);
+        }
+
+        private static ContentLine progress(double fraction, int gapBefore) {
+            return new ContentLine(null, 0, gapBefore, Math.clamp(fraction, 0.0, 1.0));
+        }
+    }
 }

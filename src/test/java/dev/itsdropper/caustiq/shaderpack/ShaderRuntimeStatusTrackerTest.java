@@ -128,6 +128,27 @@ class ShaderRuntimeStatusTrackerTest {
     }
 
     @Test
+    void exposesRetryableFailureAndWarningStatesWithSanitizedMessages() {
+        ShaderRuntimeStatusTracker tracker = new ShaderRuntimeStatusTracker();
+
+        tracker.failed("Unable to read /home/player/.minecraft/shaderpacks/Lumina: Permission denied");
+        ShaderRuntimeStatus failed = tracker.snapshot();
+        assertEquals(ShaderRuntimeStatus.State.FAILED, failed.state());
+        assertTrue(failed.canRetry());
+        assertFalse(failed.isBusy());
+        assertFalse(failed.message().contains("/home/player"));
+        assertTrue(failed.message().contains("[path]"));
+
+        tracker.resetForSelection(true, true, "Lumina");
+        tracker.warning("Unsupported feature in /home/player/.minecraft/shaderpacks/Lumina");
+        ShaderRuntimeStatus warning = tracker.snapshot();
+        assertEquals(ShaderRuntimeStatus.State.READY_WITH_WARNINGS, warning.state());
+        assertTrue(warning.canRetry());
+        assertFalse(warning.isBusy());
+        assertFalse(warning.message().contains("/home/player"));
+    }
+
+    @Test
     void validatesProgressAndCopiesFailureCollections() {
         assertThrows(IllegalArgumentException.class, () -> new ShaderRuntimeStatus(
                 ShaderRuntimeStatus.State.COMPILING, "Lumina", 2, 1, "", null, 0, ""));

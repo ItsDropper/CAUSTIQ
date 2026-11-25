@@ -90,9 +90,14 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
                 .bounds(x + 224, y, 86, 20).build();
         retry.active = !CaustiqClient.refreshStatus().isScanning();
         addRenderableWidget(retry);
+        int footerButtonWidth = Math.max(90, Math.min(150, (width - 20) / 2));
+        int footerLeft = Math.max(4, (width - (footerButtonWidth * 2 + 5)) / 2);
+        addRenderableWidget(Button.builder(Component.translatable("caustiq.diagnostics.runtime_status"),
+                button -> Minecraft.getInstance().setScreen(new ShaderRuntimeStatusScreen(this)))
+                .bounds(footerLeft, height - 28, footerButtonWidth, 20).build());
         addRenderableWidget(Button.builder(Component.translatable("caustiq.diagnostics.back"),
                 button -> Minecraft.getInstance().setScreen(parent))
-                .bounds(width / 2 - 100, height - 28, 200, 20).build());
+                .bounds(footerLeft + footerButtonWidth + 5, height - 28, footerButtonWidth, 20).build());
 
         setFocused(firstDetailsButton != null ? firstDetailsButton
                 : nextButton.active ? nextButton : copyButton);

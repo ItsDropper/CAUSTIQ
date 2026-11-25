@@ -33,6 +33,7 @@ public final class ShaderRuntime {
     private static final List<CompiledShaderProgram> COMPILED = new ArrayList<>();
     private static final ShaderPostProcessPass POST_PROCESS = new ShaderPostProcessPass();
     private static final IrisGlPassExecutor IRIS_PASS_EXECUTOR = new IrisGlPassExecutor();
+    private static final ShaderRuntimeStatusTracker STATUS = new ShaderRuntimeStatusTracker();
     private static IrisShaderResources irisShaderResources = IrisShaderResources.empty();
     private static final Map<String, IrisGlProgram> IRIS_GL_PROGRAMS = new LinkedHashMap<>();
     private static boolean discoveryStarted, discoveryFinished;
@@ -70,8 +71,29 @@ public final class ShaderRuntime {
         discoveryStarted = false;
         discoveryFinished = false;
         SCAN_RESULT.set(result);
+        resetStatusForSelection(result);
         preloadSelectedPackModel(result);
         prepareSelectedNvidiumTerrainAdapter();
+    }
+
+    /** Returns an immutable, privacy-safe snapshot for the runtime status screen. */
+    public static ShaderRuntimeStatus status() {
+        return STATUS.snapshot();
+    }
+
+    private static void resetStatusForSelection(ShaderPackScanResult result) {
+        String selectedPackName = "";
+        if (result != null) {
+            String selectedId = CaustiqConfig.get().selectedPackId();
+            selectedPackName = result.packs().stream()
+                    .filter(pack -> pack.id().equals(selectedId))
+                    .map(ShaderPackDescriptor::displayName)
+                    .findFirst().orElse("");
+        }
+        STATUS.resetForSelection(
+                CaustiqConfig.get().enabled(),
+                FabricLoader.getInstance().isModLoaded("nvidium"),
+                selectedPackName);
     }
 
     /** Invalidates compiled resources after a UI/configuration change. Render-thread only. */
@@ -106,6 +128,7 @@ public final class ShaderRuntime {
         preparedDimensionMappings = Map.of();
         activeTerrainDimensionKey = "";
         preparedTerrainAdapterRegistered = false;
+        resetStatusForSelection(SCAN_RESULT.get());
         prepareSelectedNvidiumTerrainAdapter();
     }
 
@@ -757,15 +780,25 @@ public final class ShaderRuntime {
     }
 
     private static void compileNextProgram() {
-        if (sources == null || nextProgram >= pending.size()) {
+        boolean sourcesUnavailable = sources == null;
+        boolean allProgramsProcessed = nextProgram >= pending.size();
+        if (sourcesUnavailable || allProgramsProcessed) {
             discoveryFinished = true;
             closeSources();
             CaustiqClient.LOGGER.info("Caustiq shader compilation finished: {} linked program(s).", COMPILED.size());
+            if (STATUS.snapshot().state() == ShaderRuntimeStatus.State.COMPILING) {
+                if (sourcesUnavailable && !allProgramsProcessed) {
+                    STATUS.failed("Shader sources became unavailable before all programs were processed.");
+                } else {
+                    STATUS.complete();
+                }
+            }
             return;
         }
         int budget = CaustiqConfig.get().compileBudget();
         for (int compiledThisFrame = 0; compiledThisFrame < budget && nextProgram < pending.size(); compiledThisFrame++) {
             ShaderPackProgramCatalog.Program program = pending.get(nextProgram++);
+            STATUS.programStarted(program.name());
             try {
                 if (program.group() == ShaderPackProgramCatalog.Group.SETUP
                         || program.group() == ShaderPackProgramCatalog.Group.BEGIN
@@ -784,7 +817,10 @@ public final class ShaderRuntime {
                 CaustiqClient.LOGGER.info("Prepared Iris program '{}' ({} fullscreen programs linked).",
                         program.name(), IRIS_GL_PROGRAMS.size());
             } catch (IOException | RuntimeException exception) {
+                STATUS.programFailed(program.name(), exception);
                 CaustiqClient.LOGGER.error("Shader program '{}' failed: {}", program.name(), exception.getMessage());
+            } finally {
+                STATUS.programFinished();
             }
         }
     }
@@ -887,6 +923,7 @@ public final class ShaderRuntime {
     private static void beginDiscovery() {
         ShaderPackScanResult result = SCAN_RESULT.get();
         if (result == null || result.packs().isEmpty()) {
+            resetStatusForSelection(result);
             discoveryFinished = true;
             return;
         }
@@ -895,11 +932,13 @@ public final class ShaderRuntime {
                 .filter(pack -> pack.id().equals(selectedId))
                 .findFirst().orElse(null);
         if (selected == null) {
+            resetStatusForSelection(result);
             CaustiqClient.LOGGER.info("Shader compilation is idle: select one of the {} discovered packs in Video Settings.",
                     result.packs().size());
             discoveryFinished = true;
             return;
         }
+        STATUS.preparing(selected.displayName());
         try {
             sources = ShaderPackSources.open(selected);
             List<String> shaderFiles = sources.listShaderFiles();
@@ -916,6 +955,7 @@ public final class ShaderRuntime {
             }
             IrisShaderPackModel packModel = selected.id().equals(preparedPackId) && preparedPackModel != null
                     ? preparedPackModel : new IrisShaderPackParser().parse(sources);
+            STATUS.discovering(selected.displayName());
             Map<String, String> defines = new LinkedHashMap<>();
             for (ShaderPackMetadata.Option option : packModel.options().options()) {
                 defines.put(option.name(), CaustiqConfig.get().option(
@@ -952,6 +992,8 @@ public final class ShaderRuntime {
                 CaustiqClient.LOGGER.warn(
                         "Shader pack '{}' requires Iris feature flag(s) CAUSTIQ cannot provide: {}; refusing partial activation.",
                         selected.displayName(), unsupportedRequiredFeatures);
+                STATUS.failed("This pack requires unsupported Iris features: " + unsupportedRequiredFeatures
+                        + ". Choose a compatible pack or remove those requirements.");
                 pending = List.of();
                 discoveryFinished = true;
                 closeSources();
@@ -965,6 +1007,8 @@ public final class ShaderRuntime {
                 CaustiqClient.LOGGER.warn(
                         "Shader pack '{}' uses Iris features that CAUSTIQ has parsed but cannot execute yet: {}. Refusing partial activation.",
                         selected.displayName(), packModel.diagnostics());
+                STATUS.failed("This pack uses unsupported Iris features: " + packModel.diagnostics()
+                        + ". See latest.log for details.");
                 pending = List.of();
                 discoveryFinished = true;
                 closeSources();
@@ -976,6 +1020,7 @@ public final class ShaderRuntime {
                     || finalProgram.stages().size() != 2)) {
                 CaustiqClient.LOGGER.warn("Shader pack '{}' has an unsupported final program stage shape.",
                         selected.displayName());
+                STATUS.failed("The selected pack's final program has an unsupported shader-stage layout.");
                 pending = List.of();
                 discoveryFinished = true;
                 closeSources();
@@ -1010,6 +1055,8 @@ public final class ShaderRuntime {
             if (!unsupportedGroups.isEmpty()) {
                 CaustiqClient.LOGGER.warn("Shader pack '{}' requires unimplemented Iris pass groups {}; refusing partial execution.",
                         selected.displayName(), unsupportedGroups);
+                STATUS.failed("This pack uses unsupported shader pass groups: " + unsupportedGroups
+                        + ". See latest.log for details.");
                 pending = List.of();
                 discoveryFinished = true;
                 closeSources();
@@ -1026,12 +1073,14 @@ public final class ShaderRuntime {
             if (hasMultiPass && !FabricLoader.getInstance().isModLoaded("nvidium")) {
                 CaustiqClient.LOGGER.warn("Shader pack '{}' requires Nvidium's terrain MRT path for its deferred/composite passes.",
                         selected.displayName());
+                STATUS.failed("This pack requires Nvidium's terrain render-target path. Install the supported Nvidium version.");
                 pending = List.of();
                 discoveryFinished = true;
                 closeSources();
                 return;
             }
             pending = catalog.programs();
+            STATUS.beginCompilation(pending.size());
 
             CaustiqClient.LOGGER.info(
                     "Parsed Iris pack '{}': {} base program(s), {} dimension override(s), {} required feature(s), {} preprocessed shader stage(s), {} option define(s).",
@@ -1041,11 +1090,13 @@ public final class ShaderRuntime {
             if (pending.isEmpty()) {
                 discoveryFinished = true;
                 closeSources();
+                STATUS.complete();
             }
         } catch (IOException | RuntimeException exception) {
             irisShaderResources.close();
             irisShaderResources = IrisShaderResources.empty();
             CaustiqClient.LOGGER.error("Unable to prepare shader pack '{}': {}", selected.displayName(), exception.getMessage());
+            STATUS.failed("Unable to prepare the selected shader pack: " + exception.getMessage());
             discoveryFinished = true;
             closeSources();
         }

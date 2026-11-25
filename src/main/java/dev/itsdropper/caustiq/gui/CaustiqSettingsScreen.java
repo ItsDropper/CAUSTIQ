@@ -85,16 +85,21 @@ public final class CaustiqSettingsScreen extends Screen {
             config.setCompileBudget(nextBudget);
             button.setMessage(compileBudgetLabel(nextBudget));
         }).bounds(width / 2 + 55, 68, 100, 20).build());
-        int actionLeft = width / 2 - 155;
+        int actionButtonWidth = Math.max(70, Math.min(100, (width - 30) / 3));
+        int actionGap = 5;
+        int actionLeft = Math.max(4, (width - (actionButtonWidth * 3 + actionGap * 2)) / 2);
         addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.scan_details",
                 scan == null ? 0 : scan.issues().size()), button ->
                 Minecraft.getInstance().setScreen(new ShaderPackDiagnosticsScreen(this)))
-                .bounds(actionLeft, 164, 150, 20).build());
+                .bounds(actionLeft, 164, actionButtonWidth, 20).build());
         Button inspectPack = Button.builder(Component.translatable("caustiq.settings.inspect_pack"), button ->
                 Minecraft.getInstance().setScreen(new ShaderPackInspectorScreen(this, selected)))
-                .bounds(actionLeft + 160, 164, 150, 20).build();
+                .bounds(actionLeft + actionButtonWidth + actionGap, 164, actionButtonWidth, 20).build();
         inspectPack.active = selected != null;
         addRenderableWidget(inspectPack);
+        addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.runtime_status"), button ->
+                Minecraft.getInstance().setScreen(new ShaderRuntimeStatusScreen(this)))
+                .bounds(actionLeft + (actionButtonWidth + actionGap) * 2, 164, actionButtonWidth, 20).build());
 
         if (selected != null) {
             if (metadataState == MetadataState.FAILED) {

@@ -49,6 +49,11 @@ public record ShaderRuntimeStatus(
         return failures.size() + omittedFailureCount;
     }
 
+    /** Returns a normalized fraction without inventing progress when no programs were discovered. */
+    public double progressFraction() {
+        return totalPrograms == 0 ? 0.0 : completedPrograms / (double) totalPrograms;
+    }
+
     public boolean isBusy() {
         return state == State.PREPARING || state == State.DISCOVERING || state == State.COMPILING;
     }
