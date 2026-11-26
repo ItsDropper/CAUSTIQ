@@ -3,6 +3,7 @@ package dev.itsdropper.caustiq.gui;
 import dev.itsdropper.caustiq.CaustiqClient;
 import dev.itsdropper.caustiq.diagnostics.CaustiqDiagnostics;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackRefreshStatus;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
