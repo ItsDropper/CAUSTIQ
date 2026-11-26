@@ -35,6 +35,7 @@ public final class ShaderPackBrowserScreen extends Screen {
     private Button previousPageButton;
     private Button nextPageButton;
     private Button backButton;
+    private Button refreshButton;
 
     public ShaderPackBrowserScreen(Screen parent) {
         super(Component.translatable("caustiq.browser.title"));
@@ -77,10 +78,11 @@ public final class ShaderPackBrowserScreen extends Screen {
             rebuildResults();
         }).bounds(left + 160, 70, 150, 20).build());
 
-        Button refresh = Button.builder(Component.translatable("caustiq.browser.rescan"),
+        refreshButton = Button.builder(Component.translatable("caustiq.browser.rescan"),
                 button -> CaustiqClient.refreshShaderPacks()).bounds(left, 96, 310, 20).build();
-        refresh.active = !CaustiqClient.refreshStatus().isScanning();
-        addRenderableWidget(refresh);
+        ShaderPackScanProgressView.updateButton(refreshButton, CaustiqClient.refreshStatus(),
+                "caustiq.browser.rescan", "caustiq.browser.scanning", "caustiq.browser.retry_scan");
+        addRenderableWidget(refreshButton);
 
         previousPageButton = Button.builder(Component.translatable("caustiq.browser.previous"),
                 button -> changePage(-1)).bounds(left, height - 56, 100, 20).build();
@@ -114,9 +116,11 @@ public final class ShaderPackBrowserScreen extends Screen {
         }
 
         ShaderPackRefreshStatus status = CaustiqClient.refreshStatus();
+        ShaderPackScanProgressView.updateButton(refreshButton, status,
+                "caustiq.browser.rescan", "caustiq.browser.scanning", "caustiq.browser.retry_scan");
         Component statusText = switch (status.state()) {
             case IDLE -> null;
-            case SCANNING -> Component.translatable("caustiq.browser.scanning");
+            case SCANNING -> ShaderPackScanProgressView.message(status, width >= 480);
             case COMPLETE -> Component.translatable("caustiq.browser.scan_complete",
                     status.packCount(), status.rejectedCandidateCount());
             case FAILED -> Component.translatable("caustiq.browser.scan_failed", status.failureMessage());
@@ -125,6 +129,7 @@ public final class ShaderPackBrowserScreen extends Screen {
             int color = status.state() == ShaderPackRefreshStatus.State.FAILED ? 0xFFFF7777
                     : status.state() == ShaderPackRefreshStatus.State.SCANNING ? 0xFFFFAA00 : 0xFF88DD88;
             drawWrapped(graphics, statusText, height - 100, width - 36, color);
+            ShaderPackScanProgressView.drawBar(graphics, width / 2 - 155, height - 88, 310, status);
         }
     }
 

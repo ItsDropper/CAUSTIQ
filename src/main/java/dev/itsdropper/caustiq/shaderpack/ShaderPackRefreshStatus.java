@@ -5,10 +5,20 @@ public record ShaderPackRefreshStatus(
         State state,
         int packCount,
         int rejectedCandidateCount,
-        String failureMessage
+        String failureMessage,
+        ShaderPackScanProgress progress
 ) {
     public ShaderPackRefreshStatus(State state, int packCount, int rejectedCandidateCount) {
-        this(state, packCount, rejectedCandidateCount, "");
+        this(state, packCount, rejectedCandidateCount, "", null);
+    }
+
+    public ShaderPackRefreshStatus(
+            State state,
+            int packCount,
+            int rejectedCandidateCount,
+            String failureMessage
+    ) {
+        this(state, packCount, rejectedCandidateCount, failureMessage, null);
     }
 
     public ShaderPackRefreshStatus {
@@ -27,6 +37,11 @@ public record ShaderPackRefreshStatus(
         if (state != State.FAILED && !failureMessage.isEmpty()) {
             throw new IllegalArgumentException("Only a failed scan can contain a failure message");
         }
+        if (state == State.SCANNING) {
+            progress = progress == null ? ShaderPackScanProgress.discoveringCandidates() : progress;
+        } else if (progress != null) {
+            throw new IllegalArgumentException("Only a scanning refresh can contain progress");
+        }
     }
 
     public static ShaderPackRefreshStatus idle() {
@@ -34,7 +49,11 @@ public record ShaderPackRefreshStatus(
     }
 
     public static ShaderPackRefreshStatus scanning() {
-        return new ShaderPackRefreshStatus(State.SCANNING, 0, 0);
+        return scanning(ShaderPackScanProgress.discoveringCandidates());
+    }
+
+    public static ShaderPackRefreshStatus scanning(ShaderPackScanProgress progress) {
+        return new ShaderPackRefreshStatus(State.SCANNING, 0, 0, "", progress);
     }
 
     public static ShaderPackRefreshStatus complete(ShaderPackScanResult result) {
@@ -54,6 +73,14 @@ public record ShaderPackRefreshStatus(
 
     public boolean isScanning() {
         return state == State.SCANNING;
+    }
+
+    public double progressFraction() {
+        return progress == null ? 0.0 : progress.fraction();
+    }
+
+    public boolean isDeterminate() {
+        return progress != null && progress.isDeterminate();
     }
 
     public enum State {

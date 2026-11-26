@@ -17,6 +17,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -46,7 +47,20 @@ public final class ShaderPackScanner {
     );
 
     public ShaderPackScanResult scan(Path shaderPackDirectory) {
+        return scan(shaderPackDirectory, ignored -> { });
+    }
+
+    /**
+     * Scans without extracting archives and reports bounded, filename-only progress.
+     * The listener is invoked on the calling thread and should not perform blocking work.
+     */
+    public ShaderPackScanResult scan(
+            Path shaderPackDirectory,
+            Consumer<ShaderPackScanProgress> progressListener
+    ) {
         Objects.requireNonNull(shaderPackDirectory, "shaderPackDirectory");
+        Objects.requireNonNull(progressListener, "progressListener");
+        progressListener.accept(ShaderPackScanProgress.discoveringCandidates());
 
         Path directory = shaderPackDirectory.toAbsolutePath().normalize();
         List<ShaderPackDescriptor> packs = new ArrayList<>();
@@ -87,9 +101,16 @@ public final class ShaderPackScanner {
             candidates = candidates.subList(0, MAX_CANDIDATES);
         }
 
+        int totalCandidates = candidates.size();
+        if (totalCandidates == 0) {
+            progressListener.accept(ShaderPackScanProgress.inspectingCandidates(0, 0, ""));
+        } else {
+            progressListener.accept(ShaderPackScanProgress.inspectingCandidates(
+                    0, totalCandidates, candidates.getFirst().getFileName().toString()));
+        }
+
         int inspected = 0;
         for (Path candidate : candidates) {
-            inspected++;
             try {
                 ShaderPackDescriptor descriptor = inspect(candidate);
                 if (descriptor != null) {
@@ -98,6 +119,11 @@ public final class ShaderPackScanner {
             } catch (IOException | IllegalArgumentException exception) {
                 issues.add(new ShaderPackIssue(candidate, safeMessage(exception)));
             }
+            inspected++;
+            String nextCandidate = inspected < totalCandidates
+                    ? candidates.get(inspected).getFileName().toString() : "";
+            progressListener.accept(ShaderPackScanProgress.inspectingCandidates(
+                    inspected, totalCandidates, nextCandidate));
         }
 
         return new ShaderPackScanResult(packs, issues, inspected);

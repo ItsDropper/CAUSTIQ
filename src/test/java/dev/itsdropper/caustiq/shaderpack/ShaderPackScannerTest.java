@@ -183,6 +183,30 @@ class ShaderPackScannerTest {
         assertEquals(2, result.candidatesInspected());
     }
 
+
+    @Test
+    void reportsFilenameOnlyProgressForEveryCandidateIncludingRejectedArchives() throws IOException {
+        Path packs = Files.createDirectory(temporaryDirectory.resolve("progress-packs"));
+        Path valid = Files.createDirectories(packs.resolve("ValidPack/shaders"));
+        Files.writeString(valid.resolve("final.fsh"), "void main() {}");
+        Files.writeString(packs.resolve("Broken.zip"), "not a zip archive");
+
+        List<ShaderPackScanProgress> progress = new java.util.ArrayList<>();
+        ShaderPackScanResult result = scanner.scan(packs, progress::add);
+
+        assertEquals(1, result.packs().size());
+        assertEquals(1, result.issues().size());
+        assertEquals(2, result.candidatesInspected());
+        assertEquals(4, progress.size());
+        assertEquals(ShaderPackScanProgress.Stage.DISCOVERING_CANDIDATES, progress.get(0).stage());
+        assertEquals(0, progress.get(0).totalCandidates());
+        assertEquals(ShaderPackScanProgress.inspectingCandidates(0, 2, "Broken.zip"), progress.get(1));
+        assertEquals(ShaderPackScanProgress.inspectingCandidates(1, 2, "ValidPack"), progress.get(2));
+        assertEquals(ShaderPackScanProgress.inspectingCandidates(2, 2, ""), progress.get(3));
+        assertTrue(progress.stream().noneMatch(update ->
+                update.currentCandidate().contains("/") || update.currentCandidate().indexOf((char) 92) >= 0));
+    }
+
     private void writeZip(Path destination, List<ZipContent> entries) throws IOException {
         try (OutputStream output = Files.newOutputStream(destination);
              ZipOutputStream zip = new ZipOutputStream(output)) {

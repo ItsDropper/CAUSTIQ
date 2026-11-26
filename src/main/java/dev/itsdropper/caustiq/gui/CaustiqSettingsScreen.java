@@ -34,6 +34,7 @@ public final class CaustiqSettingsScreen extends Screen {
     private MetadataState metadataState = MetadataState.IDLE;
     private String metadataFailureMessage = "";
     private long metadataRequest;
+    private Button refreshButton;
 
     private enum MetadataState {
         IDLE,
@@ -70,10 +71,11 @@ public final class CaustiqSettingsScreen extends Screen {
                 .bounds(width / 2 + 5, 42, 150, 20).build());
 
         ShaderPackRefreshStatus refreshStatus = CaustiqClient.refreshStatus();
-        Button refreshButton = Button.builder(Component.translatable("caustiq.settings.refresh_short"),
+        refreshButton = Button.builder(Component.translatable("caustiq.settings.refresh_short"),
                 button -> CaustiqClient.refreshShaderPacks())
                 .bounds(width / 2 - 155, 68, 100, 20).build();
-        refreshButton.active = !refreshStatus.isScanning();
+        ShaderPackScanProgressView.updateButton(refreshButton, refreshStatus,
+                "caustiq.settings.refresh_short", "caustiq.settings.scanning", "caustiq.settings.retry_scan");
         addRenderableWidget(refreshButton);
         addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.copy_diagnostics_short"),
                 button -> {
@@ -168,6 +170,8 @@ public final class CaustiqSettingsScreen extends Screen {
         }
 
         ShaderPackRefreshStatus status = CaustiqClient.refreshStatus();
+        ShaderPackScanProgressView.updateButton(refreshButton, status,
+                "caustiq.settings.refresh_short", "caustiq.settings.scanning", "caustiq.settings.retry_scan");
         Component message = refreshStatusMessage(status);
         if (message != null) {
             int color = switch (status.state()) {
@@ -176,7 +180,12 @@ public final class CaustiqSettingsScreen extends Screen {
                 case FAILED -> 0xFFFF5555;
                 case IDLE -> 0xFFFFFFFF;
             };
-            graphics.drawCenteredString(font, message, width / 2, 92, color);
+            if (status.isScanning()) {
+                drawCenteredWrapped(graphics, message, 92, width - 32, color);
+                ShaderPackScanProgressView.drawBar(graphics, width / 2 - 100, 103, 200, status);
+            } else {
+                graphics.drawCenteredString(font, message, width / 2, 92, color);
+            }
         }
     }
 
@@ -201,7 +210,7 @@ public final class CaustiqSettingsScreen extends Screen {
     private static Component refreshStatusMessage(ShaderPackRefreshStatus status) {
         return switch (status.state()) {
             case IDLE -> null;
-            case SCANNING -> Component.translatable("caustiq.settings.scan_in_progress");
+            case SCANNING -> ShaderPackScanProgressView.message(status, false);
             case COMPLETE -> Component.translatable("caustiq.settings.scan_complete",
                     status.packCount(), status.rejectedCandidateCount());
             case FAILED -> Component.translatable("caustiq.settings.scan_failed");

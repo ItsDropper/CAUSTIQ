@@ -28,6 +28,7 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
     private Button previousButton;
     private Button nextButton;
     private Button copyButton;
+    private Button retryButton;
     private Button firstDetailsButton;
     private List<OverviewLine> overview = List.of();
     private int pageSize = 1;
@@ -85,11 +86,13 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         }).bounds(x + 136, y, 84, 20).build();
         addRenderableWidget(copyButton);
 
-        Button retry = Button.builder(Component.translatable("caustiq.diagnostics.retry"),
+        retryButton = Button.builder(Component.translatable("caustiq.diagnostics.retry"),
                 button -> CaustiqClient.refreshShaderPacks())
                 .bounds(x + 224, y, 86, 20).build();
-        retry.active = !CaustiqClient.refreshStatus().isScanning();
-        addRenderableWidget(retry);
+        ShaderPackScanProgressView.updateButton(retryButton, CaustiqClient.refreshStatus(),
+                "caustiq.diagnostics.retry", "caustiq.diagnostics.scanning_short",
+                "caustiq.diagnostics.retry");
+        addRenderableWidget(retryButton);
         int footerButtonWidth = Math.max(90, Math.min(150, (width - 20) / 2));
         int footerLeft = Math.max(4, (width - (footerButtonWidth * 2 + 5)) / 2);
         addRenderableWidget(Button.builder(Component.translatable("caustiq.diagnostics.runtime_status"),
@@ -121,6 +124,17 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         int y = 42;
         for (OverviewLine line : overview) {
             y = drawWrapped(graphics, line.text(), 16, y, width - 32, line.color()) + 2;
+        }
+
+        ShaderPackRefreshStatus refreshStatus = CaustiqClient.refreshStatus();
+        ShaderPackScanProgressView.updateButton(retryButton, refreshStatus,
+                "caustiq.diagnostics.retry", "caustiq.diagnostics.scanning_short",
+                "caustiq.diagnostics.retry");
+        if (refreshStatus.isScanning()) {
+            Component progressMessage = ShaderPackScanProgressView.message(refreshStatus, false);
+            y = drawWrapped(graphics, progressMessage, 16, y, width - 32, 0xFFFFBB66) + 2;
+            ShaderPackScanProgressView.drawBar(graphics, 16, y, width - 32, refreshStatus);
+            y += 6;
         }
 
         if (displayedScan == null) {
@@ -263,7 +277,7 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         for (OverviewLine line : overview) {
             y += Math.max(1, font.split(line.text(), width - 32).size()) * 10 + 2;
         }
-        return y + 22;
+        return y + 22 + (CaustiqClient.refreshStatus().isScanning() ? 18 : 0);
     }
 
     private int issueRowHeight() {

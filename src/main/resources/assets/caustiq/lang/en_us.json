@@ -211,6 +211,11 @@
   "caustiq.runtime_status.guidance.compiling": "Programs are processed within the configured per-frame compile budget.",
   "caustiq.runtime_status.guidance.ready": "The selected pack's supported shader programs finished processing.",
   "caustiq.runtime_status.guidance.ready_with_warnings": "Some programs could not be processed. Review the failures below and consult latest.log.",
-  "caustiq.runtime_status.guidance.failed": "Review the details below, correct the pack or renderer setup, then retry."
-
+  "caustiq.runtime_status.guidance.failed": "Review the details below, correct the pack or renderer setup, then retry.",
+  "caustiq.scan.discovering": "Finding shader-pack folders and ZIP archives...",
+  "caustiq.scan.inspecting_candidate": "Inspecting candidate %s of %s: %s",
+  "caustiq.scan.inspecting_count": "Inspecting candidate %s of %s",
+  "caustiq.scan.inspected_count": "Inspected %s of %s candidates",
+  "caustiq.browser.retry_scan": "Retry scan",
+  "caustiq.diagnostics.scanning_short": "Scanning..."
 }

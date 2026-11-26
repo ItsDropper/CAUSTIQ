@@ -106,7 +106,8 @@ public final class CaustiqClient implements ClientModInitializer {
             refreshSettingsScreen();
             return;
         }
-        CompletableFuture.supplyAsync(() -> new ShaderPackScanner().scan(directory))
+        CompletableFuture.supplyAsync(() -> new ShaderPackScanner().scan(directory,
+                        progress -> refreshStatus = ShaderPackRefreshStatus.scanning(progress)))
                 .whenComplete((result, failure) -> {
                     Minecraft.getInstance().execute(() -> {
                         if (failure != null) {

@@ -64,6 +64,29 @@ class ShaderPackRefreshStatusTest {
                 () -> new ShaderPackRefreshStatus(ShaderPackRefreshStatus.State.COMPLETE, 0, 0, "failure"));
     }
 
+
+    @Test
+    void startsWithIndeterminateDiscoveryThenCarriesDeterminateCandidateProgress() {
+        ShaderPackRefreshStatus discovering = ShaderPackRefreshStatus.scanning();
+        assertEquals(ShaderPackScanProgress.Stage.DISCOVERING_CANDIDATES, discovering.progress().stage());
+        assertFalse(discovering.isDeterminate());
+
+        ShaderPackScanProgress progress = ShaderPackScanProgress.inspectingCandidates(2, 5, "Example.zip");
+        ShaderPackRefreshStatus inspecting = ShaderPackRefreshStatus.scanning(progress);
+        assertTrue(inspecting.isScanning());
+        assertTrue(inspecting.isDeterminate());
+        assertEquals(0.4, inspecting.progressFraction(), 0.000001);
+        assertEquals(progress, inspecting.progress());
+    }
+
+    @Test
+    void rejectsScanProgressOutsideScanningState() {
+        ShaderPackScanProgress progress = ShaderPackScanProgress.inspectingCandidates(1, 2, "Pack");
+        assertThrows(IllegalArgumentException.class,
+                () -> new ShaderPackRefreshStatus(
+                        ShaderPackRefreshStatus.State.COMPLETE, 0, 0, "", progress));
+    }
+
     @Test
     void rejectsImpossiblePartialCounts() {
         assertThrows(IllegalArgumentException.class,
