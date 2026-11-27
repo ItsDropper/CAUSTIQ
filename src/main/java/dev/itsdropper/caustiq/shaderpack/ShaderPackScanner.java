@@ -16,7 +16,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -47,7 +49,7 @@ public final class ShaderPackScanner {
     );
 
     public ShaderPackScanResult scan(Path shaderPackDirectory) {
-        return scan(shaderPackDirectory, ignored -> { });
+        return scan(shaderPackDirectory, ignored -> { }, () -> false);
     }
 
     /**
@@ -58,26 +60,46 @@ public final class ShaderPackScanner {
             Path shaderPackDirectory,
             Consumer<ShaderPackScanProgress> progressListener
     ) {
+        return scan(shaderPackDirectory, progressListener, () -> false);
+    }
+
+    /**
+     * Scans with cooperative cancellation checked between directory and archive entries.
+     * Cancellation discards the in-progress result rather than publishing a partial pack list.
+     */
+    public ShaderPackScanResult scan(
+            Path shaderPackDirectory,
+            Consumer<ShaderPackScanProgress> progressListener,
+            BooleanSupplier cancellationRequested
+    ) {
         Objects.requireNonNull(shaderPackDirectory, "shaderPackDirectory");
         Objects.requireNonNull(progressListener, "progressListener");
+        Objects.requireNonNull(cancellationRequested, "cancellationRequested");
+        checkCancellation(cancellationRequested);
         progressListener.accept(ShaderPackScanProgress.discoveringCandidates());
+        checkCancellation(cancellationRequested);
 
         Path directory = shaderPackDirectory.toAbsolutePath().normalize();
         List<ShaderPackDescriptor> packs = new ArrayList<>();
         List<ShaderPackIssue> issues = new ArrayList<>();
 
         if (Files.isSymbolicLink(directory)) {
+            checkCancellation(cancellationRequested);
             issues.add(new ShaderPackIssue(directory, "Shader-pack directory must not be a symbolic link."));
+            checkCancellation(cancellationRequested);
             return new ShaderPackScanResult(packs, issues, 0);
         }
         if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
+            checkCancellation(cancellationRequested);
             issues.add(new ShaderPackIssue(directory, "Shader-pack directory does not exist or is not a directory."));
+            checkCancellation(cancellationRequested);
             return new ShaderPackScanResult(packs, issues, 0);
         }
 
         List<Path> candidates = new ArrayList<>(MAX_CANDIDATES + 1);
         try (DirectoryStream<Path> children = Files.newDirectoryStream(directory)) {
             for (Path child : children) {
+                checkCancellation(cancellationRequested);
                 if (isCandidate(child)) {
                     candidates.add(child);
                     if (candidates.size() > MAX_CANDIDATES) {
@@ -86,10 +108,13 @@ public final class ShaderPackScanner {
                 }
             }
         } catch (IOException exception) {
+            checkCancellation(cancellationRequested);
             issues.add(new ShaderPackIssue(directory, "Unable to list shader-pack directory: " + safeMessage(exception)));
+            checkCancellation(cancellationRequested);
             return new ShaderPackScanResult(packs, issues, 0);
         }
 
+        checkCancellation(cancellationRequested);
         candidates.sort(Comparator.comparing(
                 (Path path) -> path.getFileName().toString(),
                 String.CASE_INSENSITIVE_ORDER
@@ -111,8 +136,10 @@ public final class ShaderPackScanner {
 
         int inspected = 0;
         for (Path candidate : candidates) {
+            checkCancellation(cancellationRequested);
             try {
-                ShaderPackDescriptor descriptor = inspect(candidate);
+                ShaderPackDescriptor descriptor = inspect(candidate, cancellationRequested);
+                checkCancellation(cancellationRequested);
                 if (descriptor != null) {
                     packs.add(descriptor);
                 }
@@ -126,6 +153,7 @@ public final class ShaderPackScanner {
                     inspected, totalCandidates, nextCandidate));
         }
 
+        checkCancellation(cancellationRequested);
         return new ShaderPackScanResult(packs, issues, inspected);
     }
 
@@ -141,17 +169,19 @@ public final class ShaderPackScanner {
                 && !path.getFileName().toString().startsWith(".");
     }
 
-    private ShaderPackDescriptor inspect(Path source) throws IOException {
+    private ShaderPackDescriptor inspect(Path source, BooleanSupplier cancellationRequested) throws IOException {
+        checkCancellation(cancellationRequested);
         if (Files.isDirectory(source, LinkOption.NOFOLLOW_LINKS)) {
-            return inspectDirectory(source);
+            return inspectDirectory(source, cancellationRequested);
         }
         if (Files.isRegularFile(source, LinkOption.NOFOLLOW_LINKS)) {
-            return inspectArchive(source);
+            return inspectArchive(source, cancellationRequested);
         }
         throw new IOException("Candidate is not a regular directory or ZIP archive.");
     }
 
-    private ShaderPackDescriptor inspectDirectory(Path source) throws IOException {
+    private ShaderPackDescriptor inspectDirectory(Path source, BooleanSupplier cancellationRequested) throws IOException {
+        checkCancellation(cancellationRequested);
         Set<String> filePaths = new HashSet<>();
         AtomicLong totalBytes = new AtomicLong();
         AtomicLong entryCount = new AtomicLong();
@@ -159,6 +189,7 @@ public final class ShaderPackScanner {
         Files.walkFileTree(source, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException {
+                checkCancellation(cancellationRequested);
                 if (attributes.isSymbolicLink()) {
                     return FileVisitResult.SKIP_SUBTREE;
                 }
@@ -171,6 +202,7 @@ public final class ShaderPackScanner {
 
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                checkCancellation(cancellationRequested);
                 if (attributes.isSymbolicLink() || !attributes.isRegularFile()) {
                     return FileVisitResult.CONTINUE;
                 }
@@ -184,10 +216,12 @@ public final class ShaderPackScanner {
             }
         });
 
-        return createDescriptor(source, ShaderPackSourceType.DIRECTORY, filePaths, totalBytes.get());
+        checkCancellation(cancellationRequested);
+        return createDescriptor(source, ShaderPackSourceType.DIRECTORY, filePaths, totalBytes.get(), cancellationRequested);
     }
 
-    private ShaderPackDescriptor inspectArchive(Path source) throws IOException {
+    private ShaderPackDescriptor inspectArchive(Path source, BooleanSupplier cancellationRequested) throws IOException {
+        checkCancellation(cancellationRequested);
         long archiveSize = Files.size(source);
         if (archiveSize > MAX_ARCHIVE_BYTES) {
             throw new IOException("ZIP archive exceeds the compressed size limit of " + MAX_ARCHIVE_BYTES + " bytes.");
@@ -201,6 +235,7 @@ public final class ShaderPackScanner {
         try (ZipFile zipFile = new ZipFile(source.toFile())) {
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
             while (entries.hasMoreElements()) {
+                checkCancellation(cancellationRequested);
                 ZipEntry entry = entries.nextElement();
                 entryCount++;
                 if (entryCount > MAX_ENTRIES) {
@@ -228,20 +263,23 @@ public final class ShaderPackScanner {
             throw new IOException("Invalid ZIP archive: " + safeMessage(exception), exception);
         }
 
-        return createDescriptor(source, ShaderPackSourceType.ZIP_ARCHIVE, filePaths, totalBytes.get());
+        checkCancellation(cancellationRequested);
+        return createDescriptor(source, ShaderPackSourceType.ZIP_ARCHIVE, filePaths, totalBytes.get(), cancellationRequested);
     }
 
     private ShaderPackDescriptor createDescriptor(
             Path source,
             ShaderPackSourceType sourceType,
             Set<String> filePaths,
-            long totalBytes
+            long totalBytes,
+            BooleanSupplier cancellationRequested
     ) throws IOException {
         Set<String> shaderRoots = new HashSet<>();
         int shaderFileCount = 0;
         int pipelineEntryPointCount = 0;
 
         for (String filePath : filePaths) {
+            checkCancellation(cancellationRequested);
             String[] segments = filePath.split("/");
             for (int index = 0; index < segments.length - 1; index++) {
                 if (!segments[index].equalsIgnoreCase("shaders")) {
@@ -365,6 +403,12 @@ public final class ShaderPackScanner {
     private void countEntry(AtomicLong entryCount) throws IOException {
         if (entryCount.incrementAndGet() > MAX_ENTRIES) {
             throw new IOException("Directory pack contains more than " + MAX_ENTRIES + " entries.");
+        }
+    }
+
+    private static void checkCancellation(BooleanSupplier cancellationRequested) {
+        if (cancellationRequested.getAsBoolean()) {
+            throw new CancellationException("Shader-pack scan was cancelled.");
         }
     }
 

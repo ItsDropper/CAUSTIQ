@@ -37,10 +37,10 @@ public record ShaderPackRefreshStatus(
         if (state != State.FAILED && !failureMessage.isEmpty()) {
             throw new IllegalArgumentException("Only a failed scan can contain a failure message");
         }
-        if (state == State.SCANNING) {
+        if (state == State.SCANNING || state == State.CANCELLING) {
             progress = progress == null ? ShaderPackScanProgress.discoveringCandidates() : progress;
         } else if (progress != null) {
-            throw new IllegalArgumentException("Only a scanning refresh can contain progress");
+            throw new IllegalArgumentException("Only an active scan can contain progress");
         }
     }
 
@@ -54,6 +54,14 @@ public record ShaderPackRefreshStatus(
 
     public static ShaderPackRefreshStatus scanning(ShaderPackScanProgress progress) {
         return new ShaderPackRefreshStatus(State.SCANNING, 0, 0, "", progress);
+    }
+
+    public static ShaderPackRefreshStatus cancelling(ShaderPackScanProgress progress) {
+        return new ShaderPackRefreshStatus(State.CANCELLING, 0, 0, "", progress);
+    }
+
+    public static ShaderPackRefreshStatus cancelled() {
+        return new ShaderPackRefreshStatus(State.CANCELLED, 0, 0);
     }
 
     public static ShaderPackRefreshStatus complete(ShaderPackScanResult result) {
@@ -72,7 +80,15 @@ public record ShaderPackRefreshStatus(
     }
 
     public boolean isScanning() {
+        return state == State.SCANNING || state == State.CANCELLING;
+    }
+
+    public boolean isCancellable() {
         return state == State.SCANNING;
+    }
+
+    public boolean isCancelling() {
+        return state == State.CANCELLING;
     }
 
     public double progressFraction() {
@@ -86,7 +102,9 @@ public record ShaderPackRefreshStatus(
     public enum State {
         IDLE,
         SCANNING,
+        CANCELLING,
         COMPLETE,
+        CANCELLED,
         FAILED
     }
 }

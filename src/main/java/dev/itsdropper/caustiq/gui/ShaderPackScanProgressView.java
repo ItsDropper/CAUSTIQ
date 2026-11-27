@@ -13,7 +13,9 @@ final class ShaderPackScanProgressView {
     private ShaderPackScanProgressView() { }
 
     static Component message(ShaderPackRefreshStatus status, boolean includeCandidateName) {
-        if (status == null || !status.isScanning()) return null;
+        if (status == null) return null;
+        if (status.isCancelling()) return Component.translatable("caustiq.scan.cancelling");
+        if (!status.isScanning()) return null;
         ShaderPackScanProgress progress = status.progress();
         if (progress.stage() == ShaderPackScanProgress.Stage.DISCOVERING_CANDIDATES) {
             return Component.translatable("caustiq.scan.discovering");
@@ -35,13 +37,16 @@ final class ShaderPackScanProgressView {
             Button button,
             ShaderPackRefreshStatus status,
             String idleTranslation,
-            String scanningTranslation,
             String retryTranslation
     ) {
         if (button == null || status == null) return;
-        button.active = !status.isScanning();
-        String translation = status.isScanning() ? scanningTranslation
-                : status.state() == ShaderPackRefreshStatus.State.FAILED ? retryTranslation : idleTranslation;
+        button.active = !status.isCancelling();
+        String translation = switch (status.state()) {
+            case SCANNING -> "caustiq.scan.cancel";
+            case CANCELLING -> "caustiq.scan.cancelling";
+            case FAILED -> retryTranslation;
+            default -> idleTranslation;
+        };
         button.setMessage(Component.translatable(translation));
     }
 

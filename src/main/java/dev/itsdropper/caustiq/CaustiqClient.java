@@ -22,7 +22,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class CaustiqClient implements ClientModInitializer {
     public static final String MOD_ID = "caustiq";
@@ -31,6 +33,7 @@ public final class CaustiqClient implements ClientModInitializer {
     private static final int MAX_LOGGED_ISSUES = 10;
     private static volatile ShaderPackScanResult scanResult;
     private static volatile ShaderPackRefreshStatus refreshStatus = ShaderPackRefreshStatus.idle();
+    private static volatile AtomicBoolean activeScanCancellation;
     private static Path shaderPackDirectory;
 
     @Override
@@ -106,11 +109,27 @@ public final class CaustiqClient implements ClientModInitializer {
             refreshSettingsScreen();
             return;
         }
+
+        AtomicBoolean cancellation = new AtomicBoolean();
+        activeScanCancellation = cancellation;
         CompletableFuture.supplyAsync(() -> new ShaderPackScanner().scan(directory,
-                        progress -> refreshStatus = ShaderPackRefreshStatus.scanning(progress)))
-                .whenComplete((result, failure) -> {
-                    Minecraft.getInstance().execute(() -> {
-                        if (failure != null) {
+                        progress -> {
+                            synchronized (CaustiqClient.class) {
+                                if (activeScanCancellation == cancellation && !cancellation.get()
+                                        && refreshStatus.state() == ShaderPackRefreshStatus.State.SCANNING) {
+                                    refreshStatus = ShaderPackRefreshStatus.scanning(progress);
+                                }
+                            }
+                        },
+                        cancellation::get))
+                .whenComplete((result, failure) -> Minecraft.getInstance().execute(() -> {
+                    synchronized (CaustiqClient.class) {
+                        if (activeScanCancellation == cancellation) {
+                            activeScanCancellation = null;
+                        }
+                        if (cancellation.get() || isCancellation(failure)) {
+                            refreshStatus = ShaderPackRefreshStatus.cancelled();
+                        } else if (failure != null) {
                             LOGGER.error("Shader-pack discovery failed for {}", directory.toAbsolutePath(), failure);
                             refreshStatus = ShaderPackRefreshStatus.failed(failureSummary(failure));
                         } else {
@@ -120,9 +139,39 @@ public final class CaustiqClient implements ClientModInitializer {
                             refreshStatus = ShaderPackRefreshStatus.complete(result);
                             logScanResult(result, directory);
                         }
-                        refreshSettingsScreen();
-                    });
-                });
+                    }
+                    refreshSettingsScreen();
+                }));
+    }
+
+    /** Starts a scan when idle, or requests cancellation while a scan is active. */
+    public static synchronized void toggleShaderPackScan() {
+        if (refreshStatus.state() == ShaderPackRefreshStatus.State.SCANNING) {
+            cancelShaderPackScan();
+        } else if (refreshStatus.state() != ShaderPackRefreshStatus.State.CANCELLING) {
+            refreshShaderPacks();
+        }
+    }
+
+    /** Requests cooperative cancellation; the previous completed scan remains published. */
+    public static synchronized void cancelShaderPackScan() {
+        if (refreshStatus.state() != ShaderPackRefreshStatus.State.SCANNING) return;
+        AtomicBoolean cancellation = activeScanCancellation;
+        if (cancellation == null) return;
+
+        cancellation.set(true);
+        refreshStatus = ShaderPackRefreshStatus.cancelling(refreshStatus.progress());
+        refreshSettingsScreen();
+    }
+
+    private static boolean isCancellation(Throwable failure) {
+        Throwable cause = failure;
+        while (cause != null) {
+            if (cause instanceof CancellationException) return true;
+            if (cause.getCause() == cause) break;
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private static String failureSummary(Throwable failure) {

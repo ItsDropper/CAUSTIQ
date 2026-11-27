@@ -87,6 +87,11 @@ class CaustiqDiagnosticsTest {
                     "caustiq.diagnostics.shaders_disabled_hint",
                     "caustiq.diagnostics.no_selected_pack_hint",
                     "caustiq.diagnostics.scan_not_completed",
+                    "caustiq.diagnostics.scan_cancelling_previous",
+                    "caustiq.diagnostics.scan_cancelled_previous",
+                    "caustiq.scan.cancel",
+                    "caustiq.scan.cancelling",
+                    "caustiq.scan.cancelled",
                     "caustiq.diagnostics.scan_summary",
                     "caustiq.diagnostics.rejected_heading",
                     "caustiq.diagnostics.issue_details.title",
@@ -160,6 +165,21 @@ class CaustiqDiagnosticsTest {
         assertFalse(report.contains("/home/player"));
         assertFalse(report.contains(".minecraft"));
         assertTrue(report.contains("No absolute game-directory paths or shader source contents"));
+    }
+
+    @Test
+    void reportsCancelledRefreshWithoutReplacingTheLastCompletedScan() {
+        String report = CaustiqDiagnostics.format(new CaustiqDiagnostics.Snapshot(
+                "1", "1.21.11", "25", "Windows 11", "SODIUM_WITH_NVIDIUM",
+                true, true, "SODIUM_AND_NVIDIUM_PRESENT", true, 3, "Lumina",
+                true, 5, 2, 1, List.of("Lumina", "Stillwater"),
+                List.of(new RejectedCandidate("Broken.zip", "Invalid ZIP")),
+                0, 0, "CANCELLED", ""
+        ));
+
+        assertTrue(report.contains("2 valid pack(s), 1 rejected candidate(s) across 5 inspected candidate(s)"));
+        assertTrue(report.contains("Latest shader-pack refresh: CANCELLED"));
+        assertFalse(report.contains("Latest shader-pack refresh: CANCELLED -"));
     }
 
     @Test

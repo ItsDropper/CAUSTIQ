@@ -88,11 +88,10 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         addRenderableWidget(copyButton);
 
         retryButton = Button.builder(Component.translatable("caustiq.diagnostics.retry"),
-                button -> CaustiqClient.refreshShaderPacks())
+                button -> CaustiqClient.toggleShaderPackScan())
                 .bounds(x + 224, y, 86, 20).build();
         ShaderPackScanProgressView.updateButton(retryButton, CaustiqClient.refreshStatus(),
-                "caustiq.diagnostics.retry", "caustiq.diagnostics.scanning_short",
-                "caustiq.diagnostics.retry");
+                "caustiq.diagnostics.retry", "caustiq.diagnostics.retry");
         addRenderableWidget(retryButton);
         int footerButtonWidth = Math.max(90, Math.min(150, (width - 20) / 2));
         int footerLeft = Math.max(4, (width - (footerButtonWidth * 2 + 5)) / 2);
@@ -129,8 +128,7 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
 
         ShaderPackRefreshStatus refreshStatus = CaustiqClient.refreshStatus();
         ShaderPackScanProgressView.updateButton(retryButton, refreshStatus,
-                "caustiq.diagnostics.retry", "caustiq.diagnostics.scanning_short",
-                "caustiq.diagnostics.retry");
+                "caustiq.diagnostics.retry", "caustiq.diagnostics.retry");
         if (refreshStatus.isScanning()) {
             Component progressMessage = ShaderPackScanProgressView.message(refreshStatus, false);
             y = drawWrapped(graphics, progressMessage, 16, y, width - 32, 0xFFFFBB66) + 2;
@@ -207,6 +205,12 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
             if ("SCANNING".equals(snapshot.latestRefreshState())) {
                 lines.add(new OverviewLine(
                         Component.translatable("caustiq.diagnostics.scanning_previous"), 0xFFFFBB66));
+            } else if ("CANCELLING".equals(snapshot.latestRefreshState())) {
+                lines.add(new OverviewLine(
+                        Component.translatable("caustiq.diagnostics.scan_cancelling_previous"), 0xFFFFBB66));
+            } else if ("CANCELLED".equals(snapshot.latestRefreshState())) {
+                lines.add(new OverviewLine(
+                        Component.translatable("caustiq.diagnostics.scan_cancelled_previous"), 0xFFAAAAAA));
             } else if ("FAILED".equals(snapshot.latestRefreshState())) {
                 lines.add(new OverviewLine(Component.translatable("caustiq.diagnostics.failure_previous",
                         snapshot.latestRefreshFailureMessage()), 0xFFFF7777));

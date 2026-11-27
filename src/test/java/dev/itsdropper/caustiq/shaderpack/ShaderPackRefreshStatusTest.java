@@ -88,6 +88,43 @@ class ShaderPackRefreshStatusTest {
     }
 
     @Test
+    void cancellingRetainsProgressUntilTheWorkerAcknowledgesCancellation() {
+        ShaderPackScanProgress progress = ShaderPackScanProgress.inspectingCandidates(2, 5, "LargePack.zip");
+
+        ShaderPackRefreshStatus status = ShaderPackRefreshStatus.cancelling(progress);
+
+        assertEquals(ShaderPackRefreshStatus.State.CANCELLING, status.state());
+        assertTrue(status.isScanning());
+        assertFalse(status.isCancellable());
+        assertTrue(status.isCancelling());
+        assertEquals(progress, status.progress());
+        assertEquals(0, status.packCount());
+        assertEquals(0, status.rejectedCandidateCount());
+    }
+
+    @Test
+    void cancelledIsTerminalAndDoesNotExposePartialResults() {
+        ShaderPackRefreshStatus status = ShaderPackRefreshStatus.cancelled();
+
+        assertEquals(ShaderPackRefreshStatus.State.CANCELLED, status.state());
+        assertFalse(status.isScanning());
+        assertFalse(status.isCancellable());
+        assertFalse(status.isCancelling());
+        assertEquals(null, status.progress());
+        assertEquals(0, status.packCount());
+        assertEquals(0, status.rejectedCandidateCount());
+        assertEquals("", status.failureMessage());
+    }
+
+    @Test
+    void rejectsProgressOutsideActiveScanStates() {
+        ShaderPackScanProgress progress = ShaderPackScanProgress.inspectingCandidates(1, 2, "Pack");
+        assertThrows(IllegalArgumentException.class,
+                () -> new ShaderPackRefreshStatus(
+                        ShaderPackRefreshStatus.State.CANCELLED, 0, 0, "", progress));
+    }
+
+    @Test
     void rejectsImpossiblePartialCounts() {
         assertThrows(IllegalArgumentException.class,
                 () -> new ShaderPackRefreshStatus(ShaderPackRefreshStatus.State.SCANNING, 1, 0));

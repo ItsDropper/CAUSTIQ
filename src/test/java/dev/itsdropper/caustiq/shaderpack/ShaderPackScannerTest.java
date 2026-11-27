@@ -8,6 +8,9 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -205,6 +208,69 @@ class ShaderPackScannerTest {
         assertEquals(ShaderPackScanProgress.inspectingCandidates(2, 2, ""), progress.get(3));
         assertTrue(progress.stream().noneMatch(update ->
                 update.currentCandidate().contains("/") || update.currentCandidate().indexOf((char) 92) >= 0));
+    }
+
+    @Test
+    void cancellationDuringCandidateDiscoveryStopsBeforeInspectingCandidates() throws IOException {
+        Path packs = Files.createDirectory(temporaryDirectory.resolve("cancel-discovery"));
+        Path shaders = Files.createDirectories(packs.resolve("ValidPack/shaders"));
+        Files.writeString(shaders.resolve("final.fsh"), "void main() {}");
+        AtomicBoolean cancellation = new AtomicBoolean();
+
+        assertThrows(CancellationException.class, () -> scanner.scan(packs, progress -> {
+            if (progress.stage() == ShaderPackScanProgress.Stage.DISCOVERING_CANDIDATES) {
+                cancellation.set(true);
+            }
+        }, cancellation::get));
+    }
+
+    @Test
+    void cancellationDuringDirectoryTraversalStopsBetweenEntries() throws IOException {
+        Path packs = Files.createDirectory(temporaryDirectory.resolve("cancel-directory"));
+        Path assets = Files.createDirectories(packs.resolve("LargePack/shaders/assets"));
+        Files.writeString(packs.resolve("LargePack/shaders/final.fsh"), "void main() {}");
+        for (int index = 0; index < 128; index++) {
+            Files.writeString(assets.resolve("asset-" + index + ".bin"), "asset");
+        }
+        AtomicInteger checks = new AtomicInteger();
+
+        assertThrows(CancellationException.class,
+                () -> scanner.scan(packs, ignored -> { }, () -> checks.incrementAndGet() > 20));
+        assertTrue(checks.get() > 20, "Cancellation should be observed during recursive directory traversal");
+    }
+
+    @Test
+    void cancellationDuringArchiveInspectionStopsBetweenZipEntries() throws IOException {
+        Path packs = Files.createDirectory(temporaryDirectory.resolve("cancel-archive"));
+        Path archive = packs.resolve("LargePack.zip");
+        List<ZipContent> entries = new java.util.ArrayList<>();
+        entries.add(new ZipContent("shaders/final.fsh", "void main() {}"));
+        for (int index = 0; index < 128; index++) {
+            entries.add(new ZipContent("shaders/assets/asset-" + index + ".bin", "asset"));
+        }
+        writeZip(archive, entries);
+        AtomicInteger checks = new AtomicInteger();
+
+        assertThrows(CancellationException.class,
+                () -> scanner.scan(packs, ignored -> { }, () -> checks.incrementAndGet() > 20));
+        assertTrue(checks.get() > 20, "Cancellation should be observed while enumerating ZIP entries");
+    }
+
+    @Test
+    void cancellationAfterOneCandidateDiscardsThePartialScan() throws IOException {
+        Path packs = Files.createDirectory(temporaryDirectory.resolve("cancel-partial"));
+        for (String name : List.of("A", "B")) {
+            Path shaders = Files.createDirectories(packs.resolve(name).resolve("shaders"));
+            Files.writeString(shaders.resolve("final.fsh"), "void main() {}");
+        }
+        AtomicBoolean cancellation = new AtomicBoolean();
+
+        assertThrows(CancellationException.class, () -> scanner.scan(packs, progress -> {
+            if (progress.stage() == ShaderPackScanProgress.Stage.INSPECTING_CANDIDATES
+                    && progress.completedCandidates() == 1) {
+                cancellation.set(true);
+            }
+        }, cancellation::get));
     }
 
     private void writeZip(Path destination, List<ZipContent> entries) throws IOException {

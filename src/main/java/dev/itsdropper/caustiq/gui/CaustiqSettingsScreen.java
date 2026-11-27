@@ -72,10 +72,10 @@ public final class CaustiqSettingsScreen extends Screen {
 
         ShaderPackRefreshStatus refreshStatus = CaustiqClient.refreshStatus();
         refreshButton = Button.builder(Component.translatable("caustiq.settings.refresh_short"),
-                button -> CaustiqClient.refreshShaderPacks())
+                button -> CaustiqClient.toggleShaderPackScan())
                 .bounds(width / 2 - 155, 68, 100, 20).build();
         ShaderPackScanProgressView.updateButton(refreshButton, refreshStatus,
-                "caustiq.settings.refresh_short", "caustiq.settings.scanning", "caustiq.settings.retry_scan");
+                "caustiq.settings.refresh_short", "caustiq.settings.retry_scan");
         addRenderableWidget(refreshButton);
         addRenderableWidget(Button.builder(Component.translatable("caustiq.settings.copy_diagnostics_short"),
                 button -> {
@@ -171,14 +171,14 @@ public final class CaustiqSettingsScreen extends Screen {
 
         ShaderPackRefreshStatus status = CaustiqClient.refreshStatus();
         ShaderPackScanProgressView.updateButton(refreshButton, status,
-                "caustiq.settings.refresh_short", "caustiq.settings.scanning", "caustiq.settings.retry_scan");
+                "caustiq.settings.refresh_short", "caustiq.settings.retry_scan");
         Component message = refreshStatusMessage(status);
         if (message != null) {
             int color = switch (status.state()) {
-                case SCANNING -> 0xFFFFAA00;
+                case SCANNING, CANCELLING -> 0xFFFFAA00;
                 case COMPLETE -> 0xFF55FF55;
+                case CANCELLED, IDLE -> 0xFFAAAAAA;
                 case FAILED -> 0xFFFF5555;
-                case IDLE -> 0xFFFFFFFF;
             };
             if (status.isScanning()) {
                 drawCenteredWrapped(graphics, message, 92, width - 32, color);
@@ -210,9 +210,10 @@ public final class CaustiqSettingsScreen extends Screen {
     private static Component refreshStatusMessage(ShaderPackRefreshStatus status) {
         return switch (status.state()) {
             case IDLE -> null;
-            case SCANNING -> ShaderPackScanProgressView.message(status, false);
+            case SCANNING, CANCELLING -> ShaderPackScanProgressView.message(status, false);
             case COMPLETE -> Component.translatable("caustiq.settings.scan_complete",
                     status.packCount(), status.rejectedCandidateCount());
+            case CANCELLED -> Component.translatable("caustiq.scan.cancelled");
             case FAILED -> Component.translatable("caustiq.settings.scan_failed");
         };
     }

@@ -79,9 +79,9 @@ public final class ShaderPackBrowserScreen extends Screen {
         }).bounds(left + 160, 70, 150, 20).build());
 
         refreshButton = Button.builder(Component.translatable("caustiq.browser.rescan"),
-                button -> CaustiqClient.refreshShaderPacks()).bounds(left, 96, 310, 20).build();
+                button -> CaustiqClient.toggleShaderPackScan()).bounds(left, 96, 310, 20).build();
         ShaderPackScanProgressView.updateButton(refreshButton, CaustiqClient.refreshStatus(),
-                "caustiq.browser.rescan", "caustiq.browser.scanning", "caustiq.browser.retry_scan");
+                "caustiq.browser.rescan", "caustiq.browser.retry_scan");
         addRenderableWidget(refreshButton);
 
         previousPageButton = Button.builder(Component.translatable("caustiq.browser.previous"),
@@ -117,17 +117,22 @@ public final class ShaderPackBrowserScreen extends Screen {
 
         ShaderPackRefreshStatus status = CaustiqClient.refreshStatus();
         ShaderPackScanProgressView.updateButton(refreshButton, status,
-                "caustiq.browser.rescan", "caustiq.browser.scanning", "caustiq.browser.retry_scan");
+                "caustiq.browser.rescan", "caustiq.browser.retry_scan");
         Component statusText = switch (status.state()) {
             case IDLE -> null;
-            case SCANNING -> ShaderPackScanProgressView.message(status, width >= 480);
+            case SCANNING, CANCELLING -> ShaderPackScanProgressView.message(status, width >= 480);
             case COMPLETE -> Component.translatable("caustiq.browser.scan_complete",
                     status.packCount(), status.rejectedCandidateCount());
+            case CANCELLED -> Component.translatable("caustiq.scan.cancelled");
             case FAILED -> Component.translatable("caustiq.browser.scan_failed", status.failureMessage());
         };
         if (statusText != null) {
-            int color = status.state() == ShaderPackRefreshStatus.State.FAILED ? 0xFFFF7777
-                    : status.state() == ShaderPackRefreshStatus.State.SCANNING ? 0xFFFFAA00 : 0xFF88DD88;
+            int color = switch (status.state()) {
+                case FAILED -> 0xFFFF7777;
+                case SCANNING, CANCELLING -> 0xFFFFAA00;
+                case CANCELLED, IDLE -> 0xFFAAAAAA;
+                case COMPLETE -> 0xFF88DD88;
+            };
             drawWrapped(graphics, statusText, height - 100, width - 36, color);
             ShaderPackScanProgressView.drawBar(graphics, width / 2 - 155, height - 88, 310, status);
         }
