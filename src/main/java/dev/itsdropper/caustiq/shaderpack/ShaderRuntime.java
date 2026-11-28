@@ -412,7 +412,7 @@ public final class ShaderRuntime {
      * program analysis there needlessly stalls the Loading Terrain screen.
      * OpenGL-backed image/texture creation remains on the render thread.
      */
-    private static CompletableFuture<ParsedShaderPack> preloadSelectedPackModel(
+    private static synchronized CompletableFuture<ParsedShaderPack> preloadSelectedPackModel(
             ShaderPackScanResult result) {
         if (result == null
                 || !CaustiqConfig.get().enabled()
