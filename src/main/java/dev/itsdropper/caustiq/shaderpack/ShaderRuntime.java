@@ -172,7 +172,10 @@ public final class ShaderRuntime {
         preparedDimensionMappings = Map.of();
         activeTerrainDimensionKey = "";
         preparedTerrainAdapterRegistered = false;
-        resetStatusForSelection(SCAN_RESULT.get());
+        ShaderPackScanResult currentScan = SCAN_RESULT.get();
+        resetStatusForSelection(currentScan);
+        CompletableFuture<ParsedShaderPack> preload = preloadSelectedPackModel(currentScan);
+        trackPreloadedPackStatus(currentScan, preload);
         prepareSelectedNvidiumTerrainAdapter();
     }
 
