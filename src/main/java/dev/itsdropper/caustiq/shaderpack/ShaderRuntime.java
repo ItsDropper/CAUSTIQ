@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -37,9 +38,9 @@ public final class ShaderRuntime {
     private static IrisShaderResources irisShaderResources = IrisShaderResources.empty();
     private static final Map<String, IrisGlProgram> IRIS_GL_PROGRAMS = new LinkedHashMap<>();
     private static boolean discoveryStarted, discoveryFinished;
-    private static volatile String preloadedPackId = "";
-    private static volatile ShaderPackScanResult preloadedScanResult;
-    private static volatile CompletableFuture<ParsedShaderPack> preloadedPack;
+    private static final ShaderPackModelPreloadCache<ParsedShaderPack> PRELOADED_PACK =
+            new ShaderPackModelPreloadCache<>();
+    private static final AtomicLong PRELOAD_STATUS_GENERATION = new AtomicLong();
     private static ShaderPackSources sources;
     private static IrisShaderPackModel preparedPackModel;
     private static String preparedPackId = "";
@@ -77,17 +78,45 @@ public final class ShaderRuntime {
     }
 
     private static void publishScanResult(ShaderPackScanResult result, boolean prepareTerrainAdapter) {
+        PRELOAD_STATUS_GENERATION.incrementAndGet();
         discoveryStarted = false;
         discoveryFinished = false;
         SCAN_RESULT.set(result);
         resetStatusForSelection(result);
-        preloadSelectedPackModel(result);
+        CompletableFuture<ParsedShaderPack> preload = preloadSelectedPackModel(result);
+        trackPreloadedPackStatus(result, preload);
         if (prepareTerrainAdapter) prepareSelectedNvidiumTerrainAdapter();
     }
 
     /** Starts the selected pack's CPU-only parse as soon as startup discovery completes. */
     public static void preloadSelectedPackModelForStartup(ShaderPackScanResult result) {
         preloadSelectedPackModel(result);
+    }
+
+    private static void trackPreloadedPackStatus(
+            ShaderPackScanResult result,
+            CompletableFuture<ParsedShaderPack> preload
+    ) {
+        if (preload == null) return;
+        String selectedId = CaustiqConfig.get().selectedPackId();
+        ShaderPackDescriptor selected = result.packs().stream()
+                .filter(pack -> pack.id().equals(selectedId))
+                .findFirst().orElse(null);
+        if (selected == null) return;
+
+        long generation = PRELOAD_STATUS_GENERATION.get();
+        STATUS.preparing(selected.displayName());
+        preload.whenComplete((parsed, failure) -> {
+            if (PRELOAD_STATUS_GENERATION.get() != generation
+                    || !PRELOADED_PACK.isCurrent(selected.id(), result, preload)) {
+                return;
+            }
+            if (failure != null) {
+                STATUS.failed("Unable to read the selected shader pack: " + safeFailureSummary(failure));
+            } else {
+                resetStatusForSelection(result);
+            }
+        });
     }
 
     /** Returns an immutable, privacy-safe snapshot for the runtime status screen. */
@@ -112,6 +141,7 @@ public final class ShaderRuntime {
 
     /** Invalidates compiled resources after a UI/configuration change. Render-thread only. */
     public static void requestReload() {
+        PRELOAD_STATUS_GENERATION.incrementAndGet();
         closeSources();
         NvidiumShadowRenderer.configure(false, 2048, 128.0f);
         NvidiumShaderProgramBridge.unregisterTerrainAdapter();
@@ -247,6 +277,8 @@ public final class ShaderRuntime {
                 .findFirst().orElse(null);
         if (selected == null) return;
 
+        PRELOAD_STATUS_GENERATION.incrementAndGet();
+        STATUS.preparing(selected.displayName());
         try {
             long parseWaitStarted = System.nanoTime();
             CompletableFuture<ParsedShaderPack> parseFuture = preloadSelectedPackModel(result);
@@ -285,6 +317,8 @@ public final class ShaderRuntime {
                 CaustiqClient.LOGGER.warn(
                         "Shader pack '{}' requires Iris feature flag(s) CAUSTIQ cannot provide: {}; Nvidium terrain translation remains disabled.",
                         selected.displayName(), unsupportedRequiredFeatures);
+                STATUS.failed("This pack requires unsupported Iris features: " + unsupportedRequiredFeatures
+                        + ". Choose a compatible pack or remove those requirements.");
                 return;
             }
 
@@ -325,6 +359,7 @@ public final class ShaderRuntime {
                         selected.displayName());
                 NvidiumShadowRenderer.configure(false, 2048, 128.0f);
                 NvidiumShaderProgramBridge.unregisterTerrainAdapter();
+                STATUS.failed("This pack has no terrain program that can be prepared for the current Nvidium ABI.");
                 return;
             }
 
@@ -342,7 +377,11 @@ public final class ShaderRuntime {
             CaustiqClient.LOGGER.info(
                     "Prepared {} separate Iris translucent terrain program(s) for Nvidium.",
                     translucentTranslators.size());
-            activateTerrainAdapterForCurrentWorld();
+            if (activateTerrainAdapterForCurrentWorld()) {
+                STATUS.prepared();
+            } else {
+                STATUS.failed("The selected pack has no supported terrain program for the active dimension.");
+            }
             }
         } catch (IOException | RuntimeException exception) {
             irisShaderResources.close();
@@ -361,6 +400,7 @@ public final class ShaderRuntime {
             CaustiqClient.LOGGER.warn(
                     "Selected shader pack '{}' cannot be installed into Nvidium's terrain compiler; preserving Nvidium's Iris safety gate: {}",
                     selected.displayName(), exception.getMessage());
+            STATUS.failed("Unable to prepare the selected shader pack: " + safeFailureSummary(exception));
         }
     }
 
@@ -372,11 +412,13 @@ public final class ShaderRuntime {
      * program analysis there needlessly stalls the Loading Terrain screen.
      * OpenGL-backed image/texture creation remains on the render thread.
      */
-    private static synchronized CompletableFuture<ParsedShaderPack> preloadSelectedPackModel(
+    private static CompletableFuture<ParsedShaderPack> preloadSelectedPackModel(
             ShaderPackScanResult result) {
-        if (!CaustiqConfig.get().enabled()
+        if (result == null
+                || !CaustiqConfig.get().enabled()
                 || !FabricLoader.getInstance().isModLoaded("nvidium")
                 || !NvidiumShaderProgramBridge.hasNativeSourceAdapter()) {
+            PRELOADED_PACK.invalidate();
             return null;
         }
         String selectedId = CaustiqConfig.get().selectedPackId();
@@ -384,19 +426,11 @@ public final class ShaderRuntime {
                 .filter(pack -> pack.id().equals(selectedId))
                 .findFirst().orElse(null);
         if (selected == null) {
-            preloadedPackId = "";
-            preloadedScanResult = result;
-            preloadedPack = null;
+            PRELOADED_PACK.invalidate();
             return null;
         }
-        if (preloadedPack != null && selected.id().equals(preloadedPackId)
-                && preloadedScanResult == result) {
-            return preloadedPack;
-        }
 
-        preloadedPackId = selected.id();
-        preloadedScanResult = result;
-        preloadedPack = CompletableFuture.supplyAsync(() -> {
+        return PRELOADED_PACK.getOrStart(selected.id(), result, () -> CompletableFuture.supplyAsync(() -> {
             long started = System.nanoTime();
             try (ShaderPackSources packSources = ShaderPackSources.open(selected)) {
                 IrisShaderPackModel model = new IrisShaderPackParser().parse(packSources);
@@ -404,8 +438,17 @@ public final class ShaderRuntime {
             } catch (IOException exception) {
                 throw new CompletionException(exception);
             }
-        });
-        return preloadedPack;
+        }));
+    }
+
+    private static String safeFailureSummary(Throwable failure) {
+        Throwable cause = failure;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        String message = cause.getMessage();
+        return ShaderPackIssue.sanitizeDisplayText(
+                message == null || message.isBlank() ? cause.getClass().getSimpleName() : message);
     }
 
     private record ParsedShaderPack(IrisShaderPackModel model, long parseMillis) { }
@@ -1151,6 +1194,8 @@ public final class ShaderRuntime {
 
     public static void shutdown() {
         requestReload();
+        PRELOAD_STATUS_GENERATION.incrementAndGet();
+        PRELOADED_PACK.invalidate();
         NvidiumGBufferTargets.destroy();
         SCAN_RESULT.set(null);
     }
