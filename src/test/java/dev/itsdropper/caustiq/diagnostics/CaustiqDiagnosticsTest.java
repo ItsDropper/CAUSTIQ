@@ -90,7 +90,13 @@ class CaustiqDiagnosticsTest {
                     "caustiq.diagnostics.scan_cancelling_previous",
                     "caustiq.diagnostics.scan_cancelled_previous",
                     "caustiq.scan.cancel",
+                    "caustiq.scan.startup",
                     "caustiq.scan.cancelling",
+                    "caustiq.settings.scan_startup",
+                    "caustiq.settings.scan_startup_hint",
+                    "caustiq.browser.scan_in_progress",
+                    "caustiq.diagnostics.scan_in_progress",
+                    "caustiq.diagnostics.scan_startup",
                     "caustiq.scan.cancelled",
                     "caustiq.diagnostics.scan_summary",
                     "caustiq.diagnostics.rejected_heading",
@@ -140,10 +146,11 @@ class CaustiqDiagnosticsTest {
         String report = CaustiqDiagnostics.format(new CaustiqDiagnostics.Snapshot(
                 "unknown", "1.21.11", "21", "Linux", "VANILLA",
                 false, false, "MISSING_SODIUM", false, 1, "Not available",
-                false, 0, 0, 0, List.of(), List.of(), 0, 0, "IDLE", ""
+                false, 0, 0, 0, List.of(), List.of(), 0, 0, "STARTUP_SCANNING", ""
         ));
 
         assertTrue(report.contains("Shader-pack scan: not completed"));
+        assertTrue(report.contains("Latest shader-pack refresh: STARTUP_SCANNING"));
         assertFalse(report.contains("0 valid pack(s)"));
     }
 

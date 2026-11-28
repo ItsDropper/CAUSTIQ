@@ -128,9 +128,11 @@ public final class CaustiqSettingsScreen extends Screen {
         ShaderPackDescriptor selected = packs.stream()
                 .filter(pack -> pack.id().equals(CaustiqConfig.get().selectedPackId()))
                 .findFirst().orElse(null);
+        ShaderPackRefreshStatus status = CaustiqClient.refreshStatus();
         Component packName = selected == null
                 ? Component.translatable(packs.isEmpty()
-                        ? "caustiq.settings.no_packs" : "caustiq.settings.select_pack")
+                        ? status.isScanning() ? "caustiq.settings.scan_startup" : "caustiq.settings.no_packs"
+                        : "caustiq.settings.select_pack")
                 : Component.literal(selected.displayName());
         graphics.drawCenteredString(font, packName, width / 2, 108, 0xFFFFFFFF);
         if (selected != null) {
@@ -155,7 +157,9 @@ public final class CaustiqSettingsScreen extends Screen {
                         width / 2, 176, 0xFF888888);
             }
         } else {
-            graphics.drawCenteredString(font, Component.translatable("caustiq.settings.no_selection"),
+            graphics.drawCenteredString(font, Component.translatable(
+                            scan == null && status.isScanning()
+                                    ? "caustiq.settings.scan_startup_hint" : "caustiq.settings.no_selection"),
                     width / 2, 198, 0xFFAAAAAA);
         }
         if (selected != null) {
@@ -169,13 +173,12 @@ public final class CaustiqSettingsScreen extends Screen {
             }
         }
 
-        ShaderPackRefreshStatus status = CaustiqClient.refreshStatus();
         ShaderPackScanProgressView.updateButton(refreshButton, status,
                 "caustiq.settings.refresh_short", "caustiq.settings.retry_scan");
         Component message = refreshStatusMessage(status);
         if (message != null) {
             int color = switch (status.state()) {
-                case SCANNING, CANCELLING -> 0xFFFFAA00;
+                case STARTUP_SCANNING, SCANNING, CANCELLING -> 0xFFFFAA00;
                 case COMPLETE -> 0xFF55FF55;
                 case CANCELLED, IDLE -> 0xFFAAAAAA;
                 case FAILED -> 0xFFFF5555;
@@ -210,7 +213,7 @@ public final class CaustiqSettingsScreen extends Screen {
     private static Component refreshStatusMessage(ShaderPackRefreshStatus status) {
         return switch (status.state()) {
             case IDLE -> null;
-            case SCANNING, CANCELLING -> ShaderPackScanProgressView.message(status, false);
+            case STARTUP_SCANNING, SCANNING, CANCELLING -> ShaderPackScanProgressView.message(status, false);
             case COMPLETE -> Component.translatable("caustiq.settings.scan_complete",
                     status.packCount(), status.rejectedCandidateCount());
             case CANCELLED -> Component.translatable("caustiq.scan.cancelled");

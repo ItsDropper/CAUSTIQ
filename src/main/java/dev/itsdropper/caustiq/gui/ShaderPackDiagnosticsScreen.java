@@ -137,7 +137,8 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         }
 
         if (displayedScan == null) {
-            drawWrapped(graphics, Component.translatable("caustiq.diagnostics.no_results"),
+            drawWrapped(graphics, Component.translatable(refreshStatus.isScanning()
+                            ? "caustiq.diagnostics.scan_in_progress" : "caustiq.diagnostics.no_results"),
                     16, y + 8, width - 32, 0xFFAAAAAA);
             return;
         }
@@ -197,8 +198,9 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         }
 
         if (!snapshot.scanCompleted()) {
-            lines.add(new OverviewLine(
-                    Component.translatable("caustiq.diagnostics.scan_not_completed"), 0xFFFFBB66));
+            String key = "STARTUP_SCANNING".equals(snapshot.latestRefreshState())
+                    ? "caustiq.diagnostics.scan_startup" : "caustiq.diagnostics.scan_not_completed";
+            lines.add(new OverviewLine(Component.translatable(key), 0xFFFFBB66));
         } else {
             lines.add(new OverviewLine(Component.translatable("caustiq.diagnostics.scan_summary",
                     snapshot.packCount(), snapshot.rejectedCount(), snapshot.candidateCount()), 0xFFCCCCCC));

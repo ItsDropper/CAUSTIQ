@@ -40,8 +40,10 @@ final class ShaderPackScanProgressView {
             String retryTranslation
     ) {
         if (button == null || status == null) return;
-        button.active = !status.isCancelling();
+        button.active = status.state() != ShaderPackRefreshStatus.State.STARTUP_SCANNING
+                && !status.isCancelling();
         String translation = switch (status.state()) {
+            case STARTUP_SCANNING -> "caustiq.scan.startup";
             case SCANNING -> "caustiq.scan.cancel";
             case CANCELLING -> "caustiq.scan.cancelling";
             case FAILED -> retryTranslation;

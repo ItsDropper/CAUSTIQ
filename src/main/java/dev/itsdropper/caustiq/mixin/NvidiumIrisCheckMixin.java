@@ -1,5 +1,6 @@
 package dev.itsdropper.caustiq.mixin;
 
+import dev.itsdropper.caustiq.CaustiqClient;
 import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
@@ -13,8 +14,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class NvidiumIrisCheckMixin {
     @Inject(method = "checkIrisShouldDisable", at = @At("HEAD"), cancellable = true, remap = false)
     private static void caustiq$allowAdaptedIrisTerrain(CallbackInfoReturnable<Boolean> callbackInfo) {
-        // This is the first safe lifecycle point for resource-backed shader
-        // preparation and is still before Nvidium applies its Iris opt-out.
+        // Keep this at the existing pre-world decision point: discovery may still
+        // be running because startup no longer blocks the title-screen bootstrap.
+        CaustiqClient.awaitStartupScan();
         ShaderRuntime.prepareSelectedNvidiumTerrainAdapter();
         if (ShaderRuntime.activateTerrainAdapterForCurrentWorld()) callbackInfo.setReturnValue(true);
     }

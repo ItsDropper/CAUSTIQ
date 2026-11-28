@@ -68,12 +68,26 @@ public final class ShaderRuntime {
     private ShaderRuntime() { }
 
     public static void publishScanResult(ShaderPackScanResult result) {
+        publishScanResult(result, true);
+    }
+
+    /** Publishes startup discovery without creating GL resources before Nvidium's pre-world check. */
+    public static void publishStartupScanResult(ShaderPackScanResult result) {
+        publishScanResult(result, false);
+    }
+
+    private static void publishScanResult(ShaderPackScanResult result, boolean prepareTerrainAdapter) {
         discoveryStarted = false;
         discoveryFinished = false;
         SCAN_RESULT.set(result);
         resetStatusForSelection(result);
         preloadSelectedPackModel(result);
-        prepareSelectedNvidiumTerrainAdapter();
+        if (prepareTerrainAdapter) prepareSelectedNvidiumTerrainAdapter();
+    }
+
+    /** Starts the selected pack's CPU-only parse as soon as startup discovery completes. */
+    public static void preloadSelectedPackModelForStartup(ShaderPackScanResult result) {
+        preloadSelectedPackModel(result);
     }
 
     /** Returns an immutable, privacy-safe snapshot for the runtime status screen. */
@@ -196,12 +210,10 @@ public final class ShaderRuntime {
      * callback is too late.
      */
     public static void prepareSelectedNvidiumTerrainAdapter() {
-        // Startup shader-pack discovery runs from onInitializeClient(), before
-        // Minecraft has installed its resource manager or created the GL context.
-        // This method also allocates Iris images and resolves pack textures, so it
-        // must only run once the client resources are ready. Nvidium calls its Iris
-        // safety check during RenderSectionManager construction; the mixin retries
-        // preparation there, before Nvidium decides whether to disable itself.
+        // Startup discovery is asynchronous. CaustiqClient waits for its result at
+        // Nvidium's existing Iris safety check during RenderSectionManager construction.
+        // This method allocates Iris images and resolves pack textures, so it must only
+        // run once the client resources and GL context are ready.
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.getResourceManager() == null) {
             CaustiqClient.LOGGER.debug(

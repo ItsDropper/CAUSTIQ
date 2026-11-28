@@ -23,6 +23,22 @@ class ShaderPackRefreshStatusTest {
     }
 
     @Test
+    void startupScanShowsProgressButCannotBeCancelled() {
+        ShaderPackScanProgress progress = ShaderPackScanProgress.inspectingCandidates(1, 3, "LargePack.zip");
+
+        ShaderPackRefreshStatus status = ShaderPackRefreshStatus.startupScanning(progress);
+
+        assertEquals(ShaderPackRefreshStatus.State.STARTUP_SCANNING, status.state());
+        assertTrue(status.isScanning());
+        assertFalse(status.isCancellable());
+        assertFalse(status.isCancelling());
+        assertTrue(status.isDeterminate());
+        assertEquals(1.0 / 3.0, status.progressFraction(), 0.000001);
+        assertEquals(0, status.packCount());
+        assertEquals(0, status.rejectedCandidateCount());
+    }
+
+    @Test
     void publishesCountsOnlyAfterTheScanCompletes() {
         ShaderPackDescriptor pack = new ShaderPackDescriptor(
                 "example", "Example", Path.of("Example"), "",

@@ -11,6 +11,7 @@ import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackRefreshStatus;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanner;
+import dev.itsdropper.caustiq.shaderpack.ShaderPackStartupScan;
 import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
@@ -34,6 +35,7 @@ public final class CaustiqClient implements ClientModInitializer {
     private static volatile ShaderPackScanResult scanResult;
     private static volatile ShaderPackRefreshStatus refreshStatus = ShaderPackRefreshStatus.idle();
     private static volatile AtomicBoolean activeScanCancellation;
+    private static volatile ShaderPackStartupScan startupScan;
     private static Path shaderPackDirectory;
 
     @Override
@@ -91,11 +93,66 @@ public final class CaustiqClient implements ClientModInitializer {
      * its section manager, before the first world-render callback.
      */
     private static void scanShaderPacksAtStartup() {
-        ShaderPackScanResult result = new ShaderPackScanner().scan(shaderPackDirectory);
-        scanResult = result;
-        refreshStatus = ShaderPackRefreshStatus.complete(result);
-        ShaderRuntime.publishScanResult(result);
-        logScanResult(result, shaderPackDirectory);
+        Path directory = shaderPackDirectory;
+        refreshStatus = ShaderPackRefreshStatus.startupScanning();
+        ShaderPackStartupScan scan = ShaderPackStartupScan.start(() -> {
+            ShaderPackScanResult result = new ShaderPackScanner().scan(directory, progress -> {
+                synchronized (CaustiqClient.class) {
+                    if (refreshStatus.state() == ShaderPackRefreshStatus.State.STARTUP_SCANNING) {
+                        refreshStatus = ShaderPackRefreshStatus.startupScanning(progress);
+                    }
+                }
+            });
+            try {
+                // Start CPU-only parsing while the title screen is loading. GL-backed
+                // resource creation remains at Nvidium's existing pre-world safety check.
+                ShaderRuntime.preloadSelectedPackModelForStartup(result);
+            } catch (RuntimeException exception) {
+                LOGGER.warn("Could not start background parsing for the selected startup pack.", exception);
+            }
+            return result;
+        });
+        startupScan = scan;
+        scan.publishWhenReady(
+                command -> Minecraft.getInstance().execute(command),
+                outcome -> publishStartupScan(scan, outcome, directory));
+    }
+
+    /** Waits for discovery only at Nvidium's existing pre-world Iris compatibility check. */
+    public static void awaitStartupScan() {
+        ShaderPackStartupScan scan = startupScan;
+        if (scan != null) {
+            scan.awaitAndPublish(outcome -> publishStartupScan(scan, outcome, shaderPackDirectory));
+        }
+    }
+
+    private static void publishStartupScan(
+            ShaderPackStartupScan scan,
+            ShaderPackStartupScan.Outcome outcome,
+            Path directory
+    ) {
+        synchronized (CaustiqClient.class) {
+            if (startupScan != scan) return;
+            startupScan = null;
+            if (outcome.failure() != null) {
+                scanResult = null;
+                LOGGER.error("Shader-pack discovery failed for {}", directory.toAbsolutePath(), outcome.failure());
+                refreshStatus = ShaderPackRefreshStatus.failed(failureSummary(outcome.failure()));
+            } else {
+                ShaderPackScanResult result = outcome.result();
+                scanResult = result;
+                try {
+                    // Publish without GL preparation; the Nvidium compatibility hook
+                    // performs that once, at its unchanged pre-world decision point.
+                    ShaderRuntime.publishStartupScanResult(result);
+                } catch (RuntimeException exception) {
+                    LOGGER.warn("Could not publish the startup shader-pack scan to the runtime.", exception);
+                }
+                refreshStatus = ShaderPackRefreshStatus.complete(result);
+                logScanResult(result, directory);
+            }
+        }
+        refreshSettingsScreen();
     }
 
     public static synchronized void refreshShaderPacks() {
@@ -146,16 +203,16 @@ public final class CaustiqClient implements ClientModInitializer {
 
     /** Starts a scan when idle, or requests cancellation while a scan is active. */
     public static synchronized void toggleShaderPackScan() {
-        if (refreshStatus.state() == ShaderPackRefreshStatus.State.SCANNING) {
+        if (refreshStatus.isCancellable()) {
             cancelShaderPackScan();
-        } else if (refreshStatus.state() != ShaderPackRefreshStatus.State.CANCELLING) {
+        } else if (!refreshStatus.isScanning()) {
             refreshShaderPacks();
         }
     }
 
     /** Requests cooperative cancellation; the previous completed scan remains published. */
     public static synchronized void cancelShaderPackScan() {
-        if (refreshStatus.state() != ShaderPackRefreshStatus.State.SCANNING) return;
+        if (!refreshStatus.isCancellable()) return;
         AtomicBoolean cancellation = activeScanCancellation;
         if (cancellation == null) return;
 

@@ -102,11 +102,14 @@ public final class ShaderPackBrowserScreen extends Screen {
         graphics.drawCenteredString(font, getTitle(), width / 2, 20, 0xFFFFFFFF);
 
         ShaderPackScanResult scan = CaustiqClient.scanResult();
+        ShaderPackRefreshStatus status = CaustiqClient.refreshStatus();
         List<ShaderPackDescriptor> packs = filteredPacks();
         graphics.drawCenteredString(font, Component.translatable("caustiq.browser.count",
                 packs.size(), scan == null ? 0 : scan.packs().size()), width / 2, 124, 0xFFCCCCCC);
         if (packs.isEmpty()) {
-            Component empty = scan == null || scan.packs().isEmpty()
+            Component empty = scan == null && status.isScanning()
+                    ? Component.translatable("caustiq.browser.scan_in_progress")
+                    : scan == null || scan.packs().isEmpty()
                     ? Component.translatable("caustiq.browser.empty")
                     : Component.translatable("caustiq.browser.no_matches");
             drawWrapped(graphics, empty, RESULTS_TOP + 8, width - 36, 0xFFAAAAAA);
@@ -115,12 +118,12 @@ public final class ShaderPackBrowserScreen extends Screen {
                     page + 1, pageCount(packs.size())), width / 2, height - 70, 0xFFAAAAAA);
         }
 
-        ShaderPackRefreshStatus status = CaustiqClient.refreshStatus();
         ShaderPackScanProgressView.updateButton(refreshButton, status,
                 "caustiq.browser.rescan", "caustiq.browser.retry_scan");
         Component statusText = switch (status.state()) {
             case IDLE -> null;
-            case SCANNING, CANCELLING -> ShaderPackScanProgressView.message(status, width >= 480);
+            case STARTUP_SCANNING, SCANNING, CANCELLING ->
+                    ShaderPackScanProgressView.message(status, width >= 480);
             case COMPLETE -> Component.translatable("caustiq.browser.scan_complete",
                     status.packCount(), status.rejectedCandidateCount());
             case CANCELLED -> Component.translatable("caustiq.scan.cancelled");
@@ -129,7 +132,7 @@ public final class ShaderPackBrowserScreen extends Screen {
         if (statusText != null) {
             int color = switch (status.state()) {
                 case FAILED -> 0xFFFF7777;
-                case SCANNING, CANCELLING -> 0xFFFFAA00;
+                case STARTUP_SCANNING, SCANNING, CANCELLING -> 0xFFFFAA00;
                 case CANCELLED, IDLE -> 0xFFAAAAAA;
                 case COMPLETE -> 0xFF88DD88;
             };
