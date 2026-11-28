@@ -36,6 +36,7 @@ class ShaderRuntimeStatusTrackerTest {
 
         tracker.prepared();
         assertEquals(ShaderRuntimeStatus.State.PREPARED, tracker.snapshot().state());
+        assertTrue(tracker.snapshot().message().contains("world rendering"));
 
         tracker.discovering("Lumina");
         tracker.beginCompilation(3);
