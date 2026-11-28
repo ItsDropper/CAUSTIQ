@@ -8,6 +8,8 @@ import dev.itsdropper.caustiq.shaderpack.ShaderPackDescriptor;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackScanResult;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackRefreshStatus;
+import dev.itsdropper.caustiq.shaderpack.ShaderRuntime;
+import dev.itsdropper.caustiq.shaderpack.ShaderRuntimeStatus;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.SharedConstants;
 
@@ -21,13 +23,13 @@ public final class CaustiqDiagnostics {
     private static final int MAX_REPORTED_REJECTIONS = 25;
     static final int MAX_REPORT_CHARACTERS = 16_384;
     private static final String PRIVACY_NOTICE = "\nNo absolute game-directory paths or shader source contents are included. "
-            + "Candidate filenames and sanitized rejection reasons are included.";
+            + "Candidate filenames and sanitized rejection reasons are included. Runtime exception messages and compiler output are omitted.";
     private static final String TRUNCATION_NOTICE = "\n[Report truncated; additional entries were omitted to keep it within 16,384 characters.]";
 
     private CaustiqDiagnostics() { }
 
     public static String createReport() {
-        return format(createSnapshot());
+        return format(createSnapshot(), ShaderRuntime.status());
     }
 
     /** Captures the same sanitized, bounded state used by the shareable report. */
@@ -149,6 +151,11 @@ public final class CaustiqDiagnostics {
     }
 
     static String format(Snapshot snapshot) {
+        return format(snapshot, null);
+    }
+
+    /** Adds a bounded runtime summary without exporting exception messages or compiler output. */
+    static String format(Snapshot snapshot, ShaderRuntimeStatus runtimeStatus) {
         StringBuilder report = new StringBuilder(768);
         report.append("CAUSTIQ Diagnostics\n")
                 .append("CAUSTIQ: ").append(snapshot.caustiqVersion()).append('\n')
@@ -196,6 +203,16 @@ public final class CaustiqDiagnostics {
             report.append(" - ").append(snapshot.latestRefreshFailureMessage());
         }
         report.append('\n');
+        if (runtimeStatus != null) {
+            report.append("Shader runtime state: ").append(runtimeStatus.state().name()).append('\n')
+                    .append("Runtime selected pack: ").append(runtimeStatus.packName()).append('\n')
+                    .append("Runtime programs processed: ").append(runtimeStatus.completedPrograms())
+                    .append(" / ").append(runtimeStatus.totalPrograms()).append('\n')
+                    .append("Runtime program failures: ").append(runtimeStatus.failedProgramCount()).append('\n');
+            if (!runtimeStatus.currentProgram().isBlank()) {
+                report.append("Current shader program: ").append(runtimeStatus.currentProgram()).append('\n');
+            }
+        }
         String body = report.toString();
         String complete = body + PRIVACY_NOTICE;
         if (complete.length() <= MAX_REPORT_CHARACTERS) return complete;
