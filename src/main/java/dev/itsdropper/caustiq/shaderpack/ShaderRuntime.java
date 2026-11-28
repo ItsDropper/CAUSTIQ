@@ -106,7 +106,7 @@ public final class ShaderRuntime {
 
         long generation = PRELOAD_STATUS_GENERATION.get();
         STATUS.preparing(selected.displayName());
-        preload.whenComplete((parsed, failure) -> {
+        preload.whenComplete((parsed, failure) -> Minecraft.getInstance().execute(() -> {
             if (PRELOAD_STATUS_GENERATION.get() != generation
                     || !PRELOADED_PACK.isCurrent(selected.id(), result, preload)) {
                 return;
@@ -117,7 +117,7 @@ public final class ShaderRuntime {
             } else {
                 resetStatusForSelection(result);
             }
-        });
+        }));
     }
 
     /** Returns an immutable, privacy-safe snapshot for the runtime status screen. */
