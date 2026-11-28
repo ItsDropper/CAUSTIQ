@@ -1156,7 +1156,8 @@ public final class ShaderRuntime {
             irisShaderResources.close();
             irisShaderResources = IrisShaderResources.empty();
             CaustiqClient.LOGGER.error("Unable to prepare shader pack '{}': {}", selected.displayName(), exception.getMessage());
-            STATUS.failed("Unable to prepare the selected shader pack: " + exception.getMessage());
+            STATUS.failed("Unable to prepare the selected shader pack (" + safeFailureSummary(exception)
+                    + "). See latest.log for details, then use Reload to retry.");
             discoveryFinished = true;
             closeSources();
         }
