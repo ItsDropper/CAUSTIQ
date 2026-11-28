@@ -137,8 +137,13 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         }
 
         if (displayedScan == null) {
-            drawWrapped(graphics, Component.translatable(refreshStatus.isScanning()
-                            ? "caustiq.diagnostics.scan_in_progress" : "caustiq.diagnostics.no_results"),
+            String emptyStateKey = switch (refreshStatus.state()) {
+                case STARTUP_SCANNING, SCANNING, CANCELLING -> "caustiq.diagnostics.scan_in_progress";
+                case FAILED -> "caustiq.diagnostics.scan_failed_no_results";
+                case CANCELLED -> "caustiq.diagnostics.scan_cancelled_no_results";
+                default -> "caustiq.diagnostics.no_results";
+            };
+            drawWrapped(graphics, Component.translatable(emptyStateKey),
                     16, y + 8, width - 32, 0xFFAAAAAA);
             return;
         }
@@ -198,9 +203,17 @@ public final class ShaderPackDiagnosticsScreen extends Screen {
         }
 
         if (!snapshot.scanCompleted()) {
-            String key = "STARTUP_SCANNING".equals(snapshot.latestRefreshState())
-                    ? "caustiq.diagnostics.scan_startup" : "caustiq.diagnostics.scan_not_completed";
-            lines.add(new OverviewLine(Component.translatable(key), 0xFFFFBB66));
+            Component guidance = switch (snapshot.latestRefreshState()) {
+                case "STARTUP_SCANNING" -> Component.translatable("caustiq.diagnostics.scan_startup");
+                case "SCANNING", "CANCELLING" ->
+                        Component.translatable("caustiq.diagnostics.scan_in_progress_summary");
+                case "FAILED" -> Component.translatable(
+                        "caustiq.diagnostics.failure", snapshot.latestRefreshFailureMessage());
+                case "CANCELLED" -> Component.translatable("caustiq.diagnostics.scan_cancelled_no_results");
+                default -> Component.translatable("caustiq.diagnostics.scan_not_completed");
+            };
+            int color = "FAILED".equals(snapshot.latestRefreshState()) ? 0xFFFF7777 : 0xFFFFBB66;
+            lines.add(new OverviewLine(guidance, color));
         } else {
             lines.add(new OverviewLine(Component.translatable("caustiq.diagnostics.scan_summary",
                     snapshot.packCount(), snapshot.rejectedCount(), snapshot.candidateCount()), 0xFFCCCCCC));

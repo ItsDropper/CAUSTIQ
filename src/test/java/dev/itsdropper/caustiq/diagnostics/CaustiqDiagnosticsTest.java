@@ -96,7 +96,10 @@ class CaustiqDiagnosticsTest {
                     "caustiq.settings.scan_startup_hint",
                     "caustiq.browser.scan_in_progress",
                     "caustiq.diagnostics.scan_in_progress",
+                    "caustiq.diagnostics.scan_in_progress_summary",
                     "caustiq.diagnostics.scan_startup",
+                    "caustiq.diagnostics.scan_failed_no_results",
+                    "caustiq.diagnostics.scan_cancelled_no_results",
                     "caustiq.scan.cancelled",
                     "caustiq.diagnostics.scan_summary",
                     "caustiq.diagnostics.rejected_heading",
@@ -151,6 +154,19 @@ class CaustiqDiagnosticsTest {
 
         assertTrue(report.contains("Shader-pack scan: not completed"));
         assertTrue(report.contains("Latest shader-pack refresh: STARTUP_SCANNING"));
+        assertFalse(report.contains("0 valid pack(s)"));
+    }
+
+    @Test
+    void reportsFailedInitialScanWithoutInventingPackResults() {
+        String report = CaustiqDiagnostics.format(new CaustiqDiagnostics.Snapshot(
+                "unknown", "1.21.11", "25", "Windows 11", "SODIUM_WITH_NVIDIUM",
+                true, true, "SODIUM_AND_NVIDIUM_PRESENT", true, 3, "Not available",
+                false, 0, 0, 0, List.of(), List.of(), 0, 0, "FAILED", "Permission denied"
+        ));
+
+        assertTrue(report.contains("Shader-pack scan: not completed"));
+        assertTrue(report.contains("Latest shader-pack refresh: FAILED - Permission denied"));
         assertFalse(report.contains("0 valid pack(s)"));
     }
 
