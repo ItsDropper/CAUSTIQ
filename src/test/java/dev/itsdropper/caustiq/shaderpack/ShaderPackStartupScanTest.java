@@ -56,6 +56,24 @@ class ShaderPackStartupScanTest {
         }
     }
 
+
+    @Test
+    void dispatchesCompletionThroughTheProvidedClientExecutor() {
+        java.util.List<Runnable> queuedTasks = new java.util.ArrayList<>();
+        AtomicInteger publicationCount = new AtomicInteger();
+        ShaderPackStartupScan startup = ShaderPackStartupScan.start(() -> RESULT, Runnable::run);
+
+        startup.publishWhenReady(queuedTasks::add, outcome -> {
+            assertSame(RESULT, outcome.result());
+            publicationCount.incrementAndGet();
+        });
+
+        assertEquals(1, queuedTasks.size());
+        assertEquals(0, publicationCount.get());
+        queuedTasks.remove(0).run();
+        assertEquals(1, publicationCount.get());
+    }
+
     @Test
     void reportsWorkerFailureWithoutInventingPartialResults() {
         ShaderPackStartupScan startup = ShaderPackStartupScan.start(
