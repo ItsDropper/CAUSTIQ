@@ -4,6 +4,7 @@ import dev.itsdropper.caustiq.diagnostics.CaustiqDiagnostics.IssueDetails;
 import dev.itsdropper.caustiq.diagnostics.CaustiqDiagnostics.IssueKind;
 import dev.itsdropper.caustiq.diagnostics.CaustiqDiagnostics.RejectedCandidate;
 import dev.itsdropper.caustiq.shaderpack.ShaderPackIssue;
+import dev.itsdropper.caustiq.shaderpack.ShaderRuntimeStatus;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
