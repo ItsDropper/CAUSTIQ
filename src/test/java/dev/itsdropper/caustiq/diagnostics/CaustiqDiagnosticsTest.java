@@ -145,6 +145,34 @@ class CaustiqDiagnosticsTest {
     }
 
     @Test
+    void includesRuntimePreparationStateWithoutExportingExceptionOrCompilerText() {
+        CaustiqDiagnostics.Snapshot snapshot = new CaustiqDiagnostics.Snapshot(
+                "1", "1.21.11", "25", "Windows 11", "SODIUM_WITH_NVIDIUM",
+                true, true, "SODIUM_AND_NVIDIUM_PRESENT", true, 3, "Lumina",
+                true, 4, 1, 0, List.of("Lumina"), List.of(), 0, 0, "COMPLETE", ""
+        );
+        ShaderRuntimeStatus runtime = new ShaderRuntimeStatus(
+                ShaderRuntimeStatus.State.FAILED,
+                "Lumina", 0, 0, "deferred", List.of(
+                new ShaderRuntimeStatus.ProgramFailure("deferred", "IllegalStateException")), 0,
+                "Unable to parse /home/player/.minecraft/shaderpacks/Lumina: secret shader source void main() {}"
+        );
+
+        String report = CaustiqDiagnostics.format(snapshot, runtime);
+
+        assertTrue(report.contains("Shader runtime state: FAILED"));
+        assertTrue(report.contains("Runtime selected pack: Lumina"));
+        assertTrue(report.contains("Runtime programs processed: 0 / 0"));
+        assertTrue(report.contains("Runtime program failures: 1"));
+        assertTrue(report.contains("Current shader program: deferred"));
+        assertFalse(report.contains("/home/player"));
+        assertFalse(report.contains("secret shader source"));
+        assertFalse(report.contains("void main"));
+        assertFalse(report.contains("IllegalStateException"));
+        assertTrue(report.contains("Runtime exception messages and compiler output are omitted."));
+    }
+
+    @Test
     void reportsAnUnfinishedScanWithoutInventingPackResults() {
         String report = CaustiqDiagnostics.format(new CaustiqDiagnostics.Snapshot(
                 "unknown", "1.21.11", "21", "Linux", "VANILLA",
