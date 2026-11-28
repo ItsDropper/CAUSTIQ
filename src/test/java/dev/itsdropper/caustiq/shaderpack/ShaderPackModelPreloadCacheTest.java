@@ -40,12 +40,19 @@ class ShaderPackModelPreloadCacheTest {
         CompletableFuture<String> first = new CompletableFuture<>();
 
         cache.getOrStart("Lumina", firstSnapshot, () -> first);
-        CompletableFuture<String> second = cache.getOrStart(
-                "Stillwater", secondSnapshot, () -> CompletableFuture.completedFuture("new"));
+        CompletableFuture<String> differentPack = cache.getOrStart(
+                "Stillwater", firstSnapshot, () -> CompletableFuture.completedFuture("different pack"));
 
         assertFalse(cache.isCurrent("Lumina", firstSnapshot, first));
-        assertTrue(cache.isCurrent("Stillwater", secondSnapshot, second));
-        assertNotSame(first, second);
+        assertTrue(cache.isCurrent("Stillwater", firstSnapshot, differentPack));
+
+        CompletableFuture<String> differentSnapshot = cache.getOrStart(
+                "Stillwater", secondSnapshot, () -> CompletableFuture.completedFuture("new scan"));
+
+        assertFalse(cache.isCurrent("Stillwater", firstSnapshot, differentPack));
+        assertTrue(cache.isCurrent("Stillwater", secondSnapshot, differentSnapshot));
+        assertNotSame(first, differentPack);
+        assertNotSame(differentPack, differentSnapshot);
     }
 
     @Test
