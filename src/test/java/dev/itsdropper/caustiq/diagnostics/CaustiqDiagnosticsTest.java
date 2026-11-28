@@ -257,11 +257,14 @@ class CaustiqDiagnosticsTest {
                         "Broken-" + index + ".zip", "Invalid archive: " + repeated))
                 .toList();
 
-        String report = CaustiqDiagnostics.format(new CaustiqDiagnostics.Snapshot(
+        CaustiqDiagnostics.Snapshot snapshot = new CaustiqDiagnostics.Snapshot(
                 "1", "1.21.11", "25", "Linux", "SODIUM_WITH_NVIDIUM",
                 true, true, "SODIUM_AND_NVIDIUM_PRESENT", true, 3, "Lumina",
                 true, 200, 100, 100, packNames, rejected, 0, 0, "FAILED", repeated
-        ));
+        );
+        ShaderRuntimeStatus runtime = new ShaderRuntimeStatus(
+                ShaderRuntimeStatus.State.FAILED, repeated, 0, 0, repeated, List.of(), 0, repeated);
+        String report = CaustiqDiagnostics.format(snapshot, runtime);
 
         assertTrue(report.length() <= CaustiqDiagnostics.MAX_REPORT_CHARACTERS);
         assertTrue(report.contains("[Report truncated; additional entries were omitted"));
