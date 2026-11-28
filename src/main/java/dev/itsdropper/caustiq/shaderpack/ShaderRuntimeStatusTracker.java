@@ -42,7 +42,7 @@ public final class ShaderRuntimeStatusTracker {
     public synchronized void prepared() {
         state = ShaderRuntimeStatus.State.PREPARED;
         currentProgram = "";
-        message = "Pack preparation finished; enter a world to process its shader programs.";
+        message = "The selected pack is ready for this world; program discovery begins when world rendering starts.";
     }
 
     public synchronized void discovering(String selectedPackName) {
