@@ -112,7 +112,8 @@ public final class ShaderRuntime {
                 return;
             }
             if (failure != null) {
-                STATUS.failed("Unable to read the selected shader pack: " + safeFailureSummary(failure));
+                STATUS.failed("Unable to read the selected shader pack (" + safeFailureSummary(failure)
+                        + "). Check file access and pack integrity, then use Reload to retry.");
             } else {
                 resetStatusForSelection(result);
             }
@@ -403,7 +404,8 @@ public final class ShaderRuntime {
             CaustiqClient.LOGGER.warn(
                     "Selected shader pack '{}' cannot be installed into Nvidium's terrain compiler; preserving Nvidium's Iris safety gate: {}",
                     selected.displayName(), exception.getMessage());
-            STATUS.failed("Unable to prepare the selected shader pack: " + safeFailureSummary(exception));
+            STATUS.failed("Unable to prepare the selected shader pack (" + safeFailureSummary(exception)
+                    + "). See latest.log for details, then use Reload to retry.");
         }
     }
 
@@ -449,9 +451,9 @@ public final class ShaderRuntime {
         while (cause.getCause() != null && cause.getCause() != cause) {
             cause = cause.getCause();
         }
-        String message = cause.getMessage();
-        return ShaderPackIssue.sanitizeDisplayText(
-                message == null || message.isBlank() ? cause.getClass().getSimpleName() : message);
+        // Exception messages can contain shader source excerpts or archive entry paths.
+        // Keep the UI/report safe and leave detailed diagnostics in latest.log.
+        return cause.getClass().getSimpleName();
     }
 
     private record ParsedShaderPack(IrisShaderPackModel model, long parseMillis) { }
